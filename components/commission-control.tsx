@@ -8,13 +8,20 @@ interface CommissionControlProps {
 }
 
 export function CommissionControl({ leads }: CommissionControlProps) {
+  // Helper function to safely get string value
+  const safeString = (value: any): string => {
+    if (value === null || value === undefined) return ""
+    return String(value)
+  }
+
   // Filter leads that have commission data
   const commissionData = leads.filter(
-    (lead) => lead.comissaoSDR || lead.comissaoCloser || lead.statusComissao || lead.valorVenda,
+    (lead) => lead.comissao_sdr || lead.comissao_closer || lead.status_comissao || lead.valor_venda,
   )
 
   const getBadgeColor = (type: string) => {
-    switch (type.toLowerCase()) {
+    const safeType = safeString(type).toLowerCase()
+    switch (safeType) {
       case "estruturação estratégica":
         return "bg-blue-100 text-blue-800"
       case "assessoria":
@@ -37,7 +44,8 @@ export function CommissionControl({ leads }: CommissionControlProps) {
   }
 
   const getStatusBadge = (status: string) => {
-    switch (status?.toLowerCase()) {
+    const safeStatus = safeString(status).toLowerCase()
+    switch (safeStatus) {
       case "pago":
         return <Badge className="bg-green-100 text-green-800">Pago</Badge>
       case "pendente":
@@ -49,12 +57,23 @@ export function CommissionControl({ leads }: CommissionControlProps) {
     }
   }
 
-  const calculateCommission = (valorVenda: string, percentual: string) => {
-    if (!valorVenda || !percentual) return "-"
-    const venda = Number.parseFloat(valorVenda)
-    const perc = Number.parseFloat(percentual)
-    const commission = (venda * perc) / 100
-    return `R$ ${commission.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+  const calculateCommission = (valorVenda: string | number, percentual: string | number) => {
+    const safeVenda = safeString(valorVenda)
+    const safePercentual = safeString(percentual)
+
+    if (!safeVenda || !safePercentual) return "-"
+
+    try {
+      const venda = Number.parseFloat(safeVenda)
+      const perc = Number.parseFloat(safePercentual)
+
+      if (isNaN(venda) || isNaN(perc)) return "-"
+
+      const commission = (venda * perc) / 100
+      return `R$ ${commission.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+    } catch {
+      return "-"
+    }
   }
 
   return (
@@ -122,38 +141,42 @@ export function CommissionControl({ leads }: CommissionControlProps) {
               {commissionData.map((lead) => (
                 <tr key={lead.id} className="hover:bg-gray-50">
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{lead.nomeEmpresa}</div>
+                    <div className="text-sm font-medium text-gray-900">{safeString(lead.nome_empresa)}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{lead.produtoMarketing || "-"}</div>
+                    <div className="text-sm text-gray-900">{safeString(lead.produto_marketing) || "-"}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <Badge className={getBadgeColor(lead.nicho)}>{lead.nicho}</Badge>
+                    <Badge className={getBadgeColor(lead.nicho)}>{safeString(lead.nicho)}</Badge>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 capitalize">{lead.sdr}</div>
+                    <div className="text-sm text-gray-900 capitalize">{safeString(lead.sdr)}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 capitalize">{lead.closer || "-"}</div>
+                    <div className="text-sm text-gray-900 capitalize">{safeString(lead.closer) || "-"}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{lead.comissaoSDR ? `${lead.comissaoSDR}%` : "-"}</div>
+                    <div className="text-sm text-gray-900">
+                      {safeString(lead.comissao_sdr) ? `${safeString(lead.comissao_sdr)}%` : "-"}
+                    </div>
                     <div className="text-xs text-gray-500">
-                      {calculateCommission(lead.valorVenda, lead.comissaoSDR)}
+                      {calculateCommission(lead.valor_venda, lead.comissao_sdr)}
                     </div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{lead.comissaoCloser ? `${lead.comissaoCloser}%` : "-"}</div>
+                    <div className="text-sm text-gray-900">
+                      {safeString(lead.comissao_closer) ? `${safeString(lead.comissao_closer)}%` : "-"}
+                    </div>
                     <div className="text-xs text-gray-500">
-                      {calculateCommission(lead.valorVenda, lead.comissaoCloser)}
+                      {calculateCommission(lead.valor_venda, lead.comissao_closer)}
                     </div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap">{getStatusBadge(lead.statusComissao)}</td>
+                  <td className="px-4 py-4 whitespace-nowrap">{getStatusBadge(lead.status_comissao)}</td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 capitalize">{lead.arrematador || "-"}</div>
+                    <div className="text-sm text-gray-900 capitalize">{safeString(lead.arrematador) || "-"}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{lead.tipoOferta || "-"}</div>
+                    <div className="text-sm text-gray-900">{safeString(lead.tipo_oferta) || "-"}</div>
                   </td>
                 </tr>
               ))}

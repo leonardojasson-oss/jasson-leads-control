@@ -27,33 +27,65 @@ export function LeadsList({ leads, onEditLead, onDeleteLead }: LeadsListProps) {
     { value: "DESQUALIFICADO", label: "Desqualificado", color: "bg-gray-100 text-gray-800 border-gray-200" },
     { value: "TENTANDO CONTATO", label: "Tentando Contato", color: "bg-yellow-100 text-yellow-800 border-yellow-200" },
     { value: "NO-SHOW/REMARCANDO", label: "No-Show/Remarcando", color: "bg-cyan-100 text-cyan-800 border-cyan-200" },
+    { value: "BACKLOG", label: "Backlog", color: "bg-red-100 text-red-800 border-red-200" },
+    { value: "CONTATO AGENDADO", label: "Contato Agendado", color: "bg-blue-100 text-blue-800 border-blue-200" },
+    { value: "QUALIFICANDO", label: "Qualificando", color: "bg-orange-100 text-orange-800 border-orange-200" },
+    { value: "REUNIÃO AGENDADA", label: "Reunião Agendada", color: "bg-indigo-100 text-indigo-800 border-indigo-200" },
+    { value: "REUNIÃO", label: "Reunião", color: "bg-pink-100 text-pink-800 border-pink-200" },
+    { value: "REUNIÃO REALIZADA", label: "Reunião Realizada", color: "bg-teal-100 text-teal-800 border-teal-200" },
+    {
+      value: "DÚVIDAS E FECHAMENTO",
+      label: "Dúvidas e Fechamento",
+      color: "bg-amber-100 text-amber-800 border-amber-200",
+    },
+    { value: "CONTRATO NA RUA", label: "Contrato na Rua", color: "bg-lime-100 text-lime-800 border-lime-200" },
+    { value: "GANHO", label: "Ganho", color: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+    { value: "FOLLOW UP", label: "Follow Up", color: "bg-violet-100 text-violet-800 border-violet-200" },
+    { value: "NO-SHOW", label: "No-Show", color: "bg-rose-100 text-rose-800 border-rose-200" },
   ]
+
+  // Helper function to safely get string value
+  const safeString = (value: any): string => {
+    if (value === null || value === undefined) return ""
+    return String(value)
+  }
 
   // Filter leads based on search term and status
   const filteredLeads = leads.filter((lead) => {
-    const matchesSearch =
-      lead.nomeEmpresa.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.nomeContato.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.produtoMarketing.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.nicho.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.sdr.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (lead.closer && lead.closer.toLowerCase().includes(searchTerm.toLowerCase()))
+    // Safe string conversions for search
+    const nomeEmpresa = safeString(lead.nome_empresa).toLowerCase()
+    const nomeContato = safeString(lead.nome_contato).toLowerCase()
+    const produtoMarketing = safeString(lead.produto_marketing).toLowerCase()
+    const nicho = safeString(lead.nicho).toLowerCase()
+    const sdr = safeString(lead.sdr).toLowerCase()
+    const closer = safeString(lead.closer).toLowerCase()
+    const searchLower = safeString(searchTerm).toLowerCase()
 
-    const matchesStatus = statusFilter === "todos" || lead.status === statusFilter
+    const matchesSearch =
+      nomeEmpresa.includes(searchLower) ||
+      nomeContato.includes(searchLower) ||
+      produtoMarketing.includes(searchLower) ||
+      nicho.includes(searchLower) ||
+      sdr.includes(searchLower) ||
+      closer.includes(searchLower)
+
+    const matchesStatus = statusFilter === "todos" || safeString(lead.status) === statusFilter
 
     return matchesSearch && matchesStatus
   })
 
   const getStatusBadge = (status: string) => {
-    const statusOption = statusOptions.find((option) => option.value === status)
+    const safeStatus = safeString(status)
+    const statusOption = statusOptions.find((option) => option.value === safeStatus)
     if (!statusOption) {
-      return <Badge className="bg-gray-100 text-gray-800">{status || "Sem Status"}</Badge>
+      return <Badge className="bg-gray-100 text-gray-800">{safeStatus || "Sem Status"}</Badge>
     }
     return <Badge className={statusOption.color}>{statusOption.label}</Badge>
   }
 
   const getBadgeColor = (type: string) => {
-    switch (type.toLowerCase()) {
+    const safeType = safeString(type).toLowerCase()
+    switch (safeType) {
       case "estruturação estratégica":
         return "bg-blue-100 text-blue-800"
       case "assessoria":
@@ -66,27 +98,46 @@ export function LeadsList({ leads, onEditLead, onDeleteLead }: LeadsListProps) {
         return "bg-green-100 text-green-800"
       case "outro":
         return "bg-green-100 text-green-800"
+      case "turismo":
+        return "bg-green-100 text-green-800"
+      case "e-commerce":
+        return "bg-green-100 text-green-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
   }
 
   const formatDateTime = (dateString: string) => {
-    if (!dateString) return "-"
-    const date = new Date(dateString)
-    return date.toLocaleString("pt-BR")
+    const safeDateString = safeString(dateString)
+    if (!safeDateString) return "-"
+    try {
+      const date = new Date(safeDateString)
+      return isNaN(date.getTime()) ? "-" : date.toLocaleString("pt-BR")
+    } catch {
+      return "-"
+    }
   }
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return "-"
-    const date = new Date(dateString)
-    return date.toLocaleDateString("pt-BR")
+    const safeDateString = safeString(dateString)
+    if (!safeDateString) return "-"
+    try {
+      const date = new Date(safeDateString)
+      return isNaN(date.getTime()) ? "-" : date.toLocaleDateString("pt-BR")
+    } catch {
+      return "-"
+    }
   }
 
-  const formatCurrency = (value: string) => {
-    if (!value) return "-"
-    const num = Number.parseFloat(value)
-    return `R$ ${num.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+  const formatCurrency = (value: string | number) => {
+    const safeValue = safeString(value)
+    if (!safeValue) return "-"
+    try {
+      const num = Number.parseFloat(safeValue)
+      return isNaN(num) ? "-" : `R$ ${num.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+    } catch {
+      return "-"
+    }
   }
 
   return (
@@ -189,37 +240,37 @@ export function LeadsList({ leads, onEditLead, onDeleteLead }: LeadsListProps) {
                 <tr key={lead.id} className="hover:bg-gray-50">
                   <td className="px-4 py-4 whitespace-nowrap">{getStatusBadge(lead.status)}</td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{lead.nomeEmpresa}</div>
-                    <div className="text-sm text-gray-500">{lead.cidade || "-"}</div>
+                    <div className="text-sm font-medium text-gray-900">{safeString(lead.nome_empresa)}</div>
+                    <div className="text-sm text-gray-500">{safeString(lead.cidade) || "-"}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{lead.nomeContato}</div>
-                    <div className="text-sm text-gray-500">{lead.email}</div>
+                    <div className="text-sm text-gray-900">{safeString(lead.nome_contato)}</div>
+                    <div className="text-sm text-gray-500">{safeString(lead.email)}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{lead.produtoMarketing || "-"}</div>
+                    <div className="text-sm text-gray-900">{safeString(lead.produto_marketing) || "-"}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <Badge className={getBadgeColor(lead.nicho)}>{lead.nicho}</Badge>
+                    <Badge className={getBadgeColor(lead.nicho)}>{safeString(lead.nicho)}</Badge>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{formatCurrency(lead.valorPagoLead)}</div>
+                    <div className="text-sm text-gray-900">{formatCurrency(lead.valor_pago_lead)}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 capitalize">{lead.sdr}</div>
+                    <div className="text-sm text-gray-900 capitalize">{safeString(lead.sdr)}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 capitalize">{lead.closer || "-"}</div>
+                    <div className="text-sm text-gray-900 capitalize">{safeString(lead.closer) || "-"}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{formatDate(lead.dataUltimoContato)}</div>
+                    <div className="text-sm text-gray-900">{formatDate(lead.data_ultimo_contato)}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{formatCurrency(lead.valorVenda)}</div>
+                    <div className="text-sm text-gray-900">{formatCurrency(lead.valor_venda)}</div>
                   </td>
                   <td className="px-4 py-4 max-w-xs">
-                    <div className="text-sm text-gray-900 truncate" title={lead.observacoes}>
-                      {lead.observacoes || "-"}
+                    <div className="text-sm text-gray-900 truncate" title={safeString(lead.observacoes)}>
+                      {safeString(lead.observacoes) || "-"}
                     </div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">

@@ -8,14 +8,25 @@ interface SalesTrackingProps {
 }
 
 export function SalesTracking({ leads }: SalesTrackingProps) {
+  // Helper function to safely get string value
+  const safeString = (value: any): string => {
+    if (value === null || value === undefined) return ""
+    return String(value)
+  }
+
   // Filter leads that have some sales activity
   const salesData = leads.filter(
     (lead) =>
-      lead.conseguiuContato || lead.reuniaoAgendada || lead.reuniaoRealizada || lead.valorProposta || lead.valorVenda,
+      lead.conseguiu_contato ||
+      lead.reuniao_agendada ||
+      lead.reuniao_realizada ||
+      lead.valor_proposta ||
+      lead.valor_venda,
   )
 
   const getBadgeColor = (type: string) => {
-    switch (type.toLowerCase()) {
+    const safeType = safeString(type).toLowerCase()
+    switch (safeType) {
       case "estruturação estratégica":
         return "bg-blue-100 text-blue-800"
       case "assessoria":
@@ -30,6 +41,8 @@ export function SalesTracking({ leads }: SalesTrackingProps) {
         return "bg-green-100 text-green-800"
       case "turismo":
         return "bg-green-100 text-green-800"
+      case "e-commerce":
+        return "bg-green-100 text-green-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
@@ -43,16 +56,26 @@ export function SalesTracking({ leads }: SalesTrackingProps) {
     }
   }
 
-  const formatCurrency = (value: string) => {
-    if (!value) return "-"
-    const num = Number.parseFloat(value)
-    return `R$ ${num.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+  const formatCurrency = (value: string | number) => {
+    const safeValue = safeString(value)
+    if (!safeValue) return "-"
+    try {
+      const num = Number.parseFloat(safeValue)
+      return isNaN(num) ? "-" : `R$ ${num.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+    } catch {
+      return "-"
+    }
   }
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return "-"
-    const date = new Date(dateString)
-    return date.toLocaleDateString("pt-BR")
+    const safeDateString = safeString(dateString)
+    if (!safeDateString) return "-"
+    try {
+      const date = new Date(safeDateString)
+      return isNaN(date.getTime()) ? "-" : date.toLocaleDateString("pt-BR")
+    } catch {
+      return "-"
+    }
   }
 
   return (
@@ -117,27 +140,27 @@ export function SalesTracking({ leads }: SalesTrackingProps) {
               {salesData.map((lead) => (
                 <tr key={lead.id} className="hover:bg-gray-50">
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{lead.nomeEmpresa}</div>
+                    <div className="text-sm font-medium text-gray-900">{safeString(lead.nome_empresa)}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{lead.produtoMarketing || "-"}</div>
+                    <div className="text-sm text-gray-900">{safeString(lead.produto_marketing) || "-"}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <Badge className={getBadgeColor(lead.nicho)}>{lead.nicho}</Badge>
+                    <Badge className={getBadgeColor(lead.nicho)}>{safeString(lead.nicho)}</Badge>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{lead.nomeContato}</div>
+                    <div className="text-sm text-gray-900">{safeString(lead.nome_contato)}</div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap">{getStatusBadge(lead.reuniaoAgendada)}</td>
-                  <td className="px-4 py-4 whitespace-nowrap">{getStatusBadge(lead.reuniaoRealizada)}</td>
+                  <td className="px-4 py-4 whitespace-nowrap">{getStatusBadge(lead.reuniao_agendada)}</td>
+                  <td className="px-4 py-4 whitespace-nowrap">{getStatusBadge(lead.reuniao_realizada)}</td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{formatCurrency(lead.valorProposta)}</div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{formatCurrency(lead.valorVenda)}</div>
+                    <div className="text-sm text-gray-900">{formatCurrency(lead.valor_proposta)}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{formatDate(lead.dataVenda)}</div>
+                    <div className="text-sm text-gray-900">{formatCurrency(lead.valor_venda)}</div>
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{formatDate(lead.data_venda)}</div>
                   </td>
                 </tr>
               ))}
