@@ -8,6 +8,7 @@ import { LeadsList } from "@/components/leads-list"
 import { SalesTracking } from "@/components/sales-tracking"
 import { CommissionControl } from "@/components/commission-control"
 import { DashboardAnalytics } from "@/components/dashboard-analytics"
+import { MetasControl } from "@/components/metas-control"
 import { NovoLeadModal } from "@/components/novo-lead-modal"
 import { leadOperations, type Lead, isSupabaseConfigured } from "@/lib/supabase-operations"
 import { LeadsSpreadsheet } from "@/components/leads-spreadsheet"
@@ -26,6 +27,7 @@ export default function LeadsControl() {
   const tabs = [
     { id: "lista", label: "Lista de Leads", active: activeTab === "lista" },
     { id: "planilha", label: "📊 Planilha", active: activeTab === "planilha" },
+    { id: "metas", label: "🎯 Controle de Metas", active: activeTab === "metas" },
     { id: "vendas", label: "Acompanhamento de Vendas", active: activeTab === "vendas" },
     { id: "comissoes", label: "Controle de Comissões", active: activeTab === "comissoes" },
     { id: "dashboard", label: "Dashboard & Analytics", active: activeTab === "dashboard" },
@@ -277,6 +279,8 @@ export default function LeadsControl() {
         return <LeadsList leads={leads} onEditLead={handleEditLead} onDeleteLead={handleDeleteLead} />
       case "planilha":
         return <LeadsSpreadsheet leads={leads} onUpdateLead={handleUpdateLead} onRefresh={handleRefresh} />
+      case "metas":
+        return <MetasControl leads={leads} />
       case "vendas":
         return <SalesTracking leads={leads} />
       case "comissoes":
