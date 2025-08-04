@@ -1,0 +1,77 @@
+LISTA COMPLETA DAS 45 COLUNAS DA TABELA LEADS
+=============================================
+
+COLUNAS NUMERADAS:
+01. id
+02. nome_empresa
+03. produto_marketing
+04. nicho
+05. data_hora_compra
+06. valor_pago_lead
+07. tipo_lead
+08. faturamento
+09. canal
+10. nivel_urgencia
+11. regiao
+12. cidade
+13. cnpj
+14. nome_contato
+15. cargo_contato
+16. email
+17. email_corporativo
+18. telefone
+19. sdr
+20. closer
+21. arrematador
+22. produto
+23. anuncios
+24. status
+25. observacoes
+26. data_ultimo_contato
+27. motivo_perda_pv
+28. tem_comentario_lbf
+29. investimento_trafego
+30. ticket_medio
+31. qtd_lojas
+32. qtd_vendedores
+33. conseguiu_contato
+34. reuniao_agendada
+35. reuniao_realizada
+36. valor_proposta
+37. valor_venda
+38. data_venda
+39. data_fechamento
+40. fee
+41. escopo_fechado
+42. fee_total
+43. venda_via_jasson_co
+44. comissao_sdr
+45. comissao_closer
+46. status_comissao
+47. created_at
+48. updated_at
+
+TOTAL: 48 COLUNAS
+
+PARA COPY/PASTE:
+id, nome_empresa, produto_marketing, nicho, data_hora_compra, valor_pago_lead, tipo_lead, faturamento, canal, nivel_urgencia, regiao, cidade, cnpj, nome_contato, cargo_contato, email, email_corporativo, telefone, sdr, closer, arrematador, produto, anuncios, status, observacoes, data_ultimo_contato, motivo_perda_pv, tem_comentario_lbf, investimento_trafego, ticket_medio, qtd_lojas, qtd_vendedores, conseguiu_contato, reuniao_agendada, reuniao_realizada, valor_proposta, valor_venda, data_venda, data_fechamento, fee, escopo_fechado, fee_total, venda_via_jasson_co, comissao_sdr, comissao_closer, status_comissao, created_at, updated_at
+
+CAMPOS OBRIGATÓRIOS (7):
+1. id
+2. nome_empresa
+3. nicho
+4. nome_contato
+5. email
+6. sdr
+7. status
+
+CATEGORIAS:
+🆔 Identificação: id
+🏢 Básicas: nome_empresa, produto_marketing, nicho, data_hora_compra, valor_pago_lead, tipo_lead, faturamento, canal, nivel_urgencia, regiao, cidade, cnpj
+👤 Contato: nome_contato, cargo_contato, email, email_corporativo, telefone
+👥 Equipe: sdr, closer, arrematador, produto, anuncios
+📈 Status: status, observacoes, data_ultimo_contato, motivo_perda_pv, tem_comentario_lbf
+🎯 Qualificação: investimento_trafego, ticket_medio, qtd_lojas, qtd_vendedores
+💰 Vendas: conseguiu_contato, reuniao_agendada, reuniao_realizada, valor_proposta, valor_venda, data_venda, data_fechamento, fee, escopo_fechado, fee_total, venda_via_jasson_co
+💵 Comissões: comissao_sdr, comissao_closer, status_comissao
+🕒 Sistema: created_at, updated_at

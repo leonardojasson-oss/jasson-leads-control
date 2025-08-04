@@ -10,6 +10,7 @@ import { CommissionControl } from "@/components/commission-control"
 import { DashboardAnalytics } from "@/components/dashboard-analytics"
 import { NovoLeadModal } from "@/components/novo-lead-modal"
 import { leadOperations, type Lead, isSupabaseConfigured } from "@/lib/supabase-operations"
+import { LeadsSpreadsheet } from "@/components/leads-spreadsheet"
 
 export type { Lead }
 
@@ -24,6 +25,7 @@ export default function LeadsControl() {
 
   const tabs = [
     { id: "lista", label: "Lista de Leads", active: activeTab === "lista" },
+    { id: "planilha", label: "📊 Planilha", active: activeTab === "planilha" },
     { id: "vendas", label: "Acompanhamento de Vendas", active: activeTab === "vendas" },
     { id: "comissoes", label: "Controle de Comissões", active: activeTab === "comissoes" },
     { id: "dashboard", label: "Dashboard & Analytics", active: activeTab === "dashboard" },
@@ -204,6 +206,16 @@ export default function LeadsControl() {
     loadLeads()
   }
 
+  const handleUpdateLead = async (id: string, updates: Partial<Lead>) => {
+    try {
+      await leadOperations.update(id, updates)
+      await loadLeads() // Recarregar dados
+    } catch (error) {
+      console.error("Erro ao atualizar lead:", error)
+      alert("Erro ao atualizar lead")
+    }
+  }
+
   // Calcular KPIs
   const totalLeads = leads.length
   const totalInvestido = leads.reduce((sum, lead) => {
@@ -263,6 +275,8 @@ export default function LeadsControl() {
     switch (activeTab) {
       case "lista":
         return <LeadsList leads={leads} onEditLead={handleEditLead} onDeleteLead={handleDeleteLead} />
+      case "planilha":
+        return <LeadsSpreadsheet leads={leads} onUpdateLead={handleUpdateLead} onRefresh={handleRefresh} />
       case "vendas":
         return <SalesTracking leads={leads} />
       case "comissoes":
