@@ -2,18 +2,100 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Target, TrendingUp, TrendingDown, Award, Zap, BarChart3, DollarSign } from "lucide-react"
-import { useState } from "react"
+import {
+  Target,
+  TrendingUp,
+  TrendingDown,
+  Award,
+  Zap,
+  BarChart3,
+  DollarSign,
+  Settings,
+  Save,
+  RefreshCw,
+} from "lucide-react"
+import { useState, useEffect } from "react"
 import type { Lead } from "@/app/page"
 
 interface MetasControlProps {
   leads: Lead[]
 }
 
+interface TierConfig {
+  meta: number
+  idealDia: number
+  cpmqlMeta: number
+  color: string
+  icon: string
+}
+
+interface MetasConfig {
+  [key: string]: TierConfig
+}
+
 export function MetasControl({ leads }: MetasControlProps) {
   const [selectedPeriod, setSelectedPeriod] = useState("mes")
   const [selectedSdr, setSelectedSdr] = useState("todos")
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
+  const [metasConfig, setMetasConfig] = useState<MetasConfig>({})
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Configuração padrão das metas
+  const defaultMetasConfig: MetasConfig = {
+    "100 a 200k": { meta: 35, idealDia: 5, cpmqlMeta: 700, color: "from-emerald-500 to-teal-600", icon: "🎯" },
+    "200 a 400k": { meta: 39, idealDia: 5, cpmqlMeta: 800, color: "from-blue-500 to-cyan-600", icon: "📈" },
+    "400 a 1kk": { meta: 25, idealDia: 3, cpmqlMeta: 1000, color: "from-purple-500 to-indigo-600", icon: "🚀" },
+    "1 a 4kk": { meta: 15, idealDia: 2, cpmqlMeta: 1600, color: "from-orange-500 to-red-600", icon: "⭐" },
+    "4 a 16kk": { meta: 3, idealDia: 0, cpmqlMeta: 1800, color: "from-pink-500 to-rose-600", icon: "💎" },
+    "16 a 40kk": { meta: 3, idealDia: 0, cpmqlMeta: 2070, color: "from-violet-500 to-purple-600", icon: "👑" },
+    "+40kk": { meta: 3, idealDia: 0, cpmqlMeta: 2070, color: "from-amber-500 to-yellow-600", icon: "🏆" },
+    "-100k": { meta: 0, idealDia: 0, cpmqlMeta: 0, color: "from-gray-400 to-gray-600", icon: "📊" },
+  }
+
+  // Carregar configurações salvas ou usar padrão
+  useEffect(() => {
+    const loadConfig = () => {
+      try {
+        const savedConfig = localStorage.getItem("jasson-metas-config")
+        if (savedConfig) {
+          const parsedConfig = JSON.parse(savedConfig)
+          // Verificar se o config tem todas as propriedades necessárias
+          const validConfig = { ...defaultMetasConfig }
+          Object.keys(parsedConfig).forEach((tier) => {
+            if (parsedConfig[tier] && typeof parsedConfig[tier] === "object") {
+              validConfig[tier] = { ...defaultMetasConfig[tier], ...parsedConfig[tier] }
+            }
+          })
+          setMetasConfig(validConfig)
+        } else {
+          setMetasConfig(defaultMetasConfig)
+        }
+      } catch (error) {
+        console.error("Erro ao carregar configurações:", error)
+        setMetasConfig(defaultMetasConfig)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadConfig()
+  }, [])
+
+  // Salvar configurações
+  const saveMetasConfig = (newConfig: MetasConfig) => {
+    try {
+      setMetasConfig(newConfig)
+      localStorage.setItem("jasson-metas-config", JSON.stringify(newConfig))
+      console.log("✅ Configurações de metas salvas:", newConfig)
+    } catch (error) {
+      console.error("Erro ao salvar configurações:", error)
+    }
+  }
 
   // Helper function to safely get numeric value
   const safeNumber = (value: any): number => {
@@ -83,20 +165,10 @@ export function MetasControl({ leads }: MetasControlProps) {
     return "-100k"
   }
 
-  // Definir metas por tier (baseado na imagem)
-  const tierMetas = {
-    "100 a 200k": { meta: 35, idealDia: 5, cpmqlMeta: 700, color: "from-emerald-500 to-teal-600", icon: "🎯" },
-    "200 a 400k": { meta: 39, idealDia: 5, cpmqlMeta: 800, color: "from-blue-500 to-cyan-600", icon: "📈" },
-    "400 a 1kk": { meta: 25, idealDia: 3, cpmqlMeta: 1000, color: "from-purple-500 to-indigo-600", icon: "🚀" },
-    "1 a 4kk": { meta: 15, idealDia: 2, cpmqlMeta: 1600, color: "from-orange-500 to-red-600", icon: "⭐" },
-    "4 a 16kk": { meta: 3, idealDia: 0, cpmqlMeta: 1800, color: "from-pink-500 to-rose-600", icon: "💎" },
-    "16 a 40kk": { meta: 3, idealDia: 0, cpmqlMeta: 2070, color: "from-violet-500 to-purple-600", icon: "👑" },
-    "+40kk": { meta: 3, idealDia: 0, cpmqlMeta: 2070, color: "from-amber-500 to-yellow-600", icon: "🏆" },
-    "-100k": { meta: 0, idealDia: 0, cpmqlMeta: 0, color: "from-gray-400 to-gray-600", icon: "📊" },
-  }
-
   // Filter leads by period
   const getFilteredLeads = () => {
+    if (!leads || leads.length === 0) return []
+
     const now = new Date()
     let filteredLeads = leads
 
@@ -137,30 +209,37 @@ export function MetasControl({ leads }: MetasControlProps) {
     return filteredLeads
   }
 
-  const filteredLeads = getFilteredLeads()
-
   // Calcular dados por tier
   const calculateTierData = () => {
     const tierData: Record<string, { realizado: number; totalInvestido: number }> = {}
 
+    // Verificar se metasConfig está carregado
+    if (!metasConfig || Object.keys(metasConfig).length === 0) {
+      return {}
+    }
+
     // Inicializar todos os tiers
-    Object.keys(tierMetas).forEach((tier) => {
+    Object.keys(metasConfig).forEach((tier) => {
       tierData[tier] = { realizado: 0, totalInvestido: 0 }
     })
+
+    // Obter leads filtrados
+    const filteredLeads = getFilteredLeads()
 
     // Contar leads por tier
     filteredLeads.forEach((lead) => {
       const tier = mapFaturamentoToTier(lead.faturamento || "")
       const valorPago = safeNumber(lead.valor_pago_lead)
 
-      tierData[tier].realizado++
-      tierData[tier].totalInvestido += valorPago
+      // Verificar se o tier existe no tierData
+      if (tierData[tier]) {
+        tierData[tier].realizado++
+        tierData[tier].totalInvestido += valorPago
+      }
     })
 
     return tierData
   }
-
-  const tierData = calculateTierData()
 
   // Ordem dos tiers conforme a imagem
   const tierOrder = ["100 a 200k", "200 a 400k", "400 a 1kk", "1 a 4kk", "4 a 16kk", "16 a 40kk", "+40kk", "-100k"]
@@ -181,9 +260,156 @@ export function MetasControl({ leads }: MetasControlProps) {
     return { color: "bg-red-500", text: "Crítico", icon: Target }
   }
 
-  const totalMeta = Object.values(tierMetas).reduce((sum, meta) => sum + meta.meta, 0)
-  const totalRealizado = Object.values(tierData).reduce((sum, data) => sum + data.realizado, 0)
+  const calculateIdealPorDia = (metaMensal: number): number => {
+    const hoje = new Date()
+    const diaAtual = hoje.getDate()
+    const diasDoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate()
+
+    if (metaMensal === 0 || diasDoMes === 0) return 0
+
+    const idealCalculado = (metaMensal / diasDoMes) * diaAtual
+    return Math.round(idealCalculado)
+  }
+
+  // Calcular dados apenas se metasConfig estiver carregado
+  const tierData = calculateTierData()
+  const totalMeta = Object.values(metasConfig).reduce((sum, meta) => sum + (meta?.meta || 0), 0)
+  const totalRealizado = Object.values(tierData).reduce((sum, data) => sum + (data?.realizado || 0), 0)
   const percentualGeral = totalMeta > 0 ? (totalRealizado / totalMeta) * 100 : 0
+
+  // Modal de Configuração
+  const ConfigModal = () => {
+    const [tempConfig, setTempConfig] = useState<MetasConfig>(metasConfig)
+
+    const handleSave = () => {
+      saveMetasConfig(tempConfig)
+      setIsConfigModalOpen(false)
+    }
+
+    const updateTierConfig = (tier: string, field: keyof TierConfig, value: number) => {
+      setTempConfig((prev) => ({
+        ...prev,
+        [tier]: {
+          ...prev[tier],
+          [field]: value,
+        },
+      }))
+    }
+
+    return (
+      <Dialog open={isConfigModalOpen} onOpenChange={setIsConfigModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Settings className="w-5 h-5 text-red-600" />
+              <span>Configurar Metas por Tier</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                <strong>💡 Dica:</strong> Configure as metas mensais de leads e CPMQL para cada tier de faturamento.
+                Essas configurações serão salvas e aplicadas automaticamente na análise.
+              </p>
+            </div>
+
+            <div className="grid gap-4">
+              {tierOrder.map((tier) => {
+                const config = tempConfig[tier]
+                if (!config) return null
+
+                return (
+                  <Card key={tier} className="border-l-4 border-l-red-500">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div
+                            className={`w-10 h-10 bg-gradient-to-br ${config.color} rounded-lg flex items-center justify-center text-white font-bold shadow-lg`}
+                          >
+                            {config.icon}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-gray-900">{tier}</h3>
+                            <p className="text-sm text-gray-500">Configurações do tier</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <Label htmlFor={`meta-${tier}`} className="text-sm font-medium">
+                            Meta Mensal (leads)
+                          </Label>
+                          <Input
+                            id={`meta-${tier}`}
+                            type="number"
+                            value={config.meta}
+                            onChange={(e) => updateTierConfig(tier, "meta", Number(e.target.value))}
+                            className="mt-1"
+                            min="0"
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor={`ideal-${tier}`} className="text-sm font-medium">
+                            Ideal por Dia (Calculado)
+                          </Label>
+                          <div className="mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-700">
+                            {calculateIdealPorDia(config.meta)}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Calculado automaticamente: (Meta Mensal ÷ Dias do Mês) × Dia Atual
+                          </p>
+                        </div>
+
+                        <div>
+                          <Label htmlFor={`cpmql-${tier}`} className="text-sm font-medium">
+                            CPMQL Meta (R$)
+                          </Label>
+                          <Input
+                            id={`cpmql-${tier}`}
+                            type="number"
+                            value={config.cpmqlMeta}
+                            onChange={(e) => updateTierConfig(tier, "cpmqlMeta", Number(e.target.value))}
+                            className="mt-1"
+                            min="0"
+                            step="0.01"
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4 border-t">
+              <Button variant="outline" onClick={() => setIsConfigModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} className="bg-red-600 hover:bg-red-700">
+                <Save className="w-4 h-4 mr-2" />
+                Salvar Configurações
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-red-600" />
+          <p className="text-gray-500">Carregando configurações de metas...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">
@@ -204,6 +430,14 @@ export function MetasControl({ leads }: MetasControlProps) {
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsConfigModalOpen(true)}
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Configurar Metas
+              </Button>
               <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
                 <SelectTrigger className="w-40 bg-white/10 border-white/20 text-white backdrop-blur-sm">
                   <SelectValue />
@@ -309,7 +543,7 @@ export function MetasControl({ leads }: MetasControlProps) {
                   <th className="px-6 py-4 text-left font-bold text-sm">Faturamento</th>
                   <th className="px-6 py-4 text-center font-bold text-sm">Meta</th>
                   <th className="px-6 py-4 text-center font-bold text-sm">Realizado</th>
-                  <th className="px-6 py-4 text-center font-bold text-sm">Progresso</th>
+                  <th className="px-6 py-4 text-center font-bold text-sm">Ideal por Dia</th>
                   <th className="px-6 py-4 text-center font-bold text-sm">% Meta</th>
                   <th className="px-6 py-4 text-center font-bold text-sm">CPMQL Meta</th>
                   <th className="px-6 py-4 text-center font-bold text-sm">CPMQL Real</th>
@@ -320,9 +554,12 @@ export function MetasControl({ leads }: MetasControlProps) {
               {/* Linhas de Dados */}
               <tbody className="divide-y divide-gray-100">
                 {tierOrder.map((tier, index) => {
-                  const meta = tierMetas[tier]
-                  const realizado = tierData[tier].realizado
-                  const totalInvestido = tierData[tier].totalInvestido
+                  const meta = metasConfig[tier]
+                  if (!meta) return null
+
+                  const tierDataItem = tierData[tier] || { realizado: 0, totalInvestido: 0 }
+                  const realizado = tierDataItem.realizado
+                  const totalInvestido = tierDataItem.totalInvestido
                   const percentualMeta = meta.meta > 0 ? (realizado / meta.meta) * 100 : 0
                   const cpmqlRealizado = realizado > 0 ? totalInvestido / realizado : 0
                   const status = getStatusBadge(percentualMeta)
@@ -351,16 +588,9 @@ export function MetasControl({ leads }: MetasControlProps) {
                         <div className="font-bold text-lg text-blue-600">{realizado}</div>
                         <div className="text-xs text-gray-500">conquistados</div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="w-full bg-gray-200 rounded-full h-3 mb-1">
-                          <div
-                            className={`h-3 rounded-full bg-gradient-to-r ${meta.color} transition-all duration-500`}
-                            style={{ width: `${Math.min(percentualMeta, 100)}%` }}
-                          ></div>
-                        </div>
-                        <div className="text-xs text-center text-gray-600">
-                          {realizado}/{meta.meta}
-                        </div>
+                      <td className="px-6 py-4 text-center">
+                        <div className="font-bold text-lg text-purple-600">{calculateIdealPorDia(meta.meta)}</div>
+                        <div className="text-xs text-gray-500">até hoje</div>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <Badge className={`${status.color} text-white font-bold px-3 py-1`}>
@@ -409,9 +639,9 @@ export function MetasControl({ leads }: MetasControlProps) {
               </div>
               <p className="text-sm text-gray-600">
                 {tierOrder.find((tier) => {
-                  const meta = tierMetas[tier]
-                  const realizado = tierData[tier].realizado
-                  return meta.meta > 0 && (realizado / meta.meta) * 100 > 0
+                  const meta = metasConfig[tier]
+                  const tierDataItem = tierData[tier]
+                  return meta && tierDataItem && meta.meta > 0 && (tierDataItem.realizado / meta.meta) * 100 > 0
                 }) || "Nenhum tier com performance"}{" "}
                 está liderando as metas
               </p>
@@ -422,13 +652,16 @@ export function MetasControl({ leads }: MetasControlProps) {
                 <span className="font-semibold text-gray-800">Investimento Total</span>
               </div>
               <p className="text-sm text-gray-600">
-                {formatCurrency(Object.values(tierData).reduce((sum, data) => sum + data.totalInvestido, 0))} investidos
-                este período
+                {formatCurrency(Object.values(tierData).reduce((sum, data) => sum + (data?.totalInvestido || 0), 0))}{" "}
+                investidos este período
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal de Configuração */}
+      <ConfigModal />
     </div>
   )
 }
