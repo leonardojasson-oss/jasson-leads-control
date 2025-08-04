@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar, TrendingUp, Target, DollarSign, Users, BarChart3 } from "lucide-react"
+import { Target, TrendingUp, TrendingDown, Award, Zap, BarChart3, DollarSign } from "lucide-react"
 import { useState } from "react"
 import type { Lead } from "@/app/page"
 
@@ -12,7 +12,7 @@ interface MetasControlProps {
 }
 
 export function MetasControl({ leads }: MetasControlProps) {
-  const [selectedPeriod, setSelectedPeriod] = useState("todos")
+  const [selectedPeriod, setSelectedPeriod] = useState("mes")
   const [selectedSdr, setSelectedSdr] = useState("todos")
 
   // Helper function to safely get numeric value
@@ -28,12 +28,12 @@ export function MetasControl({ leads }: MetasControlProps) {
     return String(value)
   }
 
-  // Mapear faturamento para tiers - VERSÃO MELHORADA
+  // Mapear faturamento para tiers exatamente como na imagem
   const mapFaturamentoToTier = (faturamento: string): string => {
     const faturamentoClean = safeString(faturamento).toLowerCase().trim()
 
     if (!faturamentoClean || faturamentoClean === "" || faturamentoClean === "-") {
-      return "Não informado"
+      return "-100k"
     }
 
     // Mapeamento específico baseado na imagem
@@ -59,10 +59,10 @@ export function MetasControl({ leads }: MetasControlProps) {
       return "16 a 40kk"
     }
     if (faturamentoClean.includes("40") || faturamentoClean.includes("acima") || faturamentoClean.includes("mais")) {
-      return "Acima 40kk"
+      return "+40kk"
     }
 
-    // Mapeamentos alternativos baseados em palavras-chave
+    // Mapeamentos alternativos
     if (faturamentoClean.includes("até 100") || faturamentoClean.includes("100 mil")) {
       return "100 a 200k"
     }
@@ -79,8 +79,20 @@ export function MetasControl({ leads }: MetasControlProps) {
       return "1 a 4kk"
     }
 
-    // Se não conseguiu mapear, coloca em "Não informado"
-    return "Não informado"
+    // Se não conseguiu mapear, coloca em -100k
+    return "-100k"
+  }
+
+  // Definir metas por tier (baseado na imagem)
+  const tierMetas = {
+    "100 a 200k": { meta: 35, idealDia: 5, cpmqlMeta: 700, color: "from-emerald-500 to-teal-600", icon: "🎯" },
+    "200 a 400k": { meta: 39, idealDia: 5, cpmqlMeta: 800, color: "from-blue-500 to-cyan-600", icon: "📈" },
+    "400 a 1kk": { meta: 25, idealDia: 3, cpmqlMeta: 1000, color: "from-purple-500 to-indigo-600", icon: "🚀" },
+    "1 a 4kk": { meta: 15, idealDia: 2, cpmqlMeta: 1600, color: "from-orange-500 to-red-600", icon: "⭐" },
+    "4 a 16kk": { meta: 3, idealDia: 0, cpmqlMeta: 1800, color: "from-pink-500 to-rose-600", icon: "💎" },
+    "16 a 40kk": { meta: 3, idealDia: 0, cpmqlMeta: 2070, color: "from-violet-500 to-purple-600", icon: "👑" },
+    "+40kk": { meta: 3, idealDia: 0, cpmqlMeta: 2070, color: "from-amber-500 to-yellow-600", icon: "🏆" },
+    "-100k": { meta: 0, idealDia: 0, cpmqlMeta: 0, color: "from-gray-400 to-gray-600", icon: "📊" },
   }
 
   // Filter leads by period
@@ -114,7 +126,6 @@ export function MetasControl({ leads }: MetasControlProps) {
         })
         break
       default:
-        // "todos" - não filtra por data
         filteredLeads = leads
     }
 
@@ -128,120 +139,31 @@ export function MetasControl({ leads }: MetasControlProps) {
 
   const filteredLeads = getFilteredLeads()
 
-  // Calcular métricas por tier
-  const tierAnalysis = () => {
-    const tiers: Record<string, { leads: Lead[]; count: number; totalInvestido: number }> = {}
+  // Calcular dados por tier
+  const calculateTierData = () => {
+    const tierData: Record<string, { realizado: number; totalInvestido: number }> = {}
 
+    // Inicializar todos os tiers
+    Object.keys(tierMetas).forEach((tier) => {
+      tierData[tier] = { realizado: 0, totalInvestido: 0 }
+    })
+
+    // Contar leads por tier
     filteredLeads.forEach((lead) => {
       const tier = mapFaturamentoToTier(lead.faturamento || "")
       const valorPago = safeNumber(lead.valor_pago_lead)
 
-      if (!tiers[tier]) {
-        tiers[tier] = { leads: [], count: 0, totalInvestido: 0 }
-      }
-
-      tiers[tier].leads.push(lead)
-      tiers[tier].count++
-      tiers[tier].totalInvestido += valorPago
+      tierData[tier].realizado++
+      tierData[tier].totalInvestido += valorPago
     })
 
-    const totalLeads = filteredLeads.length
-    const totalInvestimento = filteredLeads.reduce((sum, lead) => {
-      const valor = safeNumber(lead.valor_pago_lead)
-      return sum + valor
-    }, 0)
-
-    // Definir ordem correta dos tiers
-    const tierOrder = [
-      "100 a 200k",
-      "200 a 400k",
-      "400 a 1kk",
-      "1 a 4kk",
-      "4 a 16kk",
-      "16 a 40kk",
-      "Acima 40kk",
-      "Não informado",
-    ]
-
-    const tierData = tierOrder.map((tierName) => {
-      const tierInfo = tiers[tierName] || { leads: [], count: 0, totalInvestido: 0 }
-      return {
-        tier: tierName,
-        count: tierInfo.count,
-        percentage: totalLeads > 0 ? (tierInfo.count / totalLeads) * 100 : 0,
-        totalInvestido: tierInfo.totalInvestido,
-        cpmql: tierInfo.count > 0 ? tierInfo.totalInvestido / tierInfo.count : 0,
-        leads: tierInfo.leads,
-      }
-    })
-
-    return { tierData, totalLeads, totalInvestimento }
+    return tierData
   }
 
-  const { tierData, totalLeads, totalInvestimento } = tierAnalysis()
+  const tierData = calculateTierData()
 
-  // Calcular métricas gerais
-  const cpmqlGeral = totalLeads > 0 ? totalInvestimento / totalLeads : 0
-
-  // Análise por SDR
-  const sdrAnalysis = () => {
-    const sdrStats: Record<string, { count: number; investido: number }> = {}
-
-    filteredLeads.forEach((lead) => {
-      const sdr = lead.sdr || "Não informado"
-      const valor = safeNumber(lead.valor_pago_lead)
-
-      if (!sdrStats[sdr]) {
-        sdrStats[sdr] = { count: 0, investido: 0 }
-      }
-
-      sdrStats[sdr].count++
-      sdrStats[sdr].investido += valor
-    })
-
-    return Object.entries(sdrStats).map(([sdr, stats]) => ({
-      sdr,
-      count: stats.count,
-      investido: stats.investido,
-      cpmql: stats.count > 0 ? stats.investido / stats.count : 0,
-    }))
-  }
-
-  const sdrStats = sdrAnalysis()
-
-  // Análise por dia (últimos 7 dias)
-  const dailyAnalysis = () => {
-    const dailyStats: Record<string, { count: number; investido: number }> = {}
-
-    filteredLeads.forEach((lead) => {
-      if (!lead.data_hora_compra) return
-
-      const date = new Date(lead.data_hora_compra).toLocaleDateString("pt-BR")
-      const valor = safeNumber(lead.valor_pago_lead)
-
-      if (!dailyStats[date]) {
-        dailyStats[date] = { count: 0, investido: 0 }
-      }
-
-      dailyStats[date].count++
-      dailyStats[date].investido += valor
-    })
-
-    return Object.entries(dailyStats)
-      .map(([date, stats]) => ({
-        date,
-        count: stats.count,
-        investido: stats.investido,
-        cpmql: stats.count > 0 ? stats.investido / stats.count : 0,
-      }))
-      .sort(
-        (a, b) =>
-          new Date(a.date.split("/").reverse().join("-")).getTime() -
-          new Date(b.date.split("/").reverse().join("-")).getTime(),
-      )
-  }
-
-  const dailyStats = dailyAnalysis()
+  // Ordem dos tiers conforme a imagem
+  const tierOrder = ["100 a 200k", "200 a 400k", "400 a 1kk", "1 a 4kk", "4 a 16kk", "16 a 40kk", "+40kk", "-100k"]
 
   const formatCurrency = (value: number) => {
     return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
@@ -251,238 +173,262 @@ export function MetasControl({ leads }: MetasControlProps) {
     return `${value.toFixed(1)}%`
   }
 
+  const getStatusBadge = (percentual: number) => {
+    if (percentual >= 100) return { color: "bg-green-500", text: "Meta Atingida", icon: Award }
+    if (percentual >= 75) return { color: "bg-blue-500", text: "Quase Lá", icon: TrendingUp }
+    if (percentual >= 50) return { color: "bg-yellow-500", text: "Em Progresso", icon: Zap }
+    if (percentual >= 25) return { color: "bg-orange-500", text: "Atenção", icon: TrendingDown }
+    return { color: "bg-red-500", text: "Crítico", icon: Target }
+  }
+
+  const totalMeta = Object.values(tierMetas).reduce((sum, meta) => sum + meta.meta, 0)
+  const totalRealizado = Object.values(tierData).reduce((sum, data) => sum + data.realizado, 0)
+  const percentualGeral = totalMeta > 0 ? (totalRealizado / totalMeta) * 100 : 0
+
   return (
-    <div className="space-y-6">
-      {/* Header com Filtros */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">🎯 Controle de Metas</h2>
-          <p className="text-sm text-gray-500">Análise de investimento e performance de compra de leads</p>
+    <div className="space-y-8">
+      {/* Header Moderno */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-600 via-red-700 to-red-800 p-8 text-white shadow-2xl">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="relative z-10">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center space-x-3 mb-2">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                  <Target className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold">Controle de Metas</h1>
+                  <p className="text-red-100">Meta/Mês Compra de Leads</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                <SelectTrigger className="w-40 bg-white/10 border-white/20 text-white backdrop-blur-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hoje">Hoje</SelectItem>
+                  <SelectItem value="semana">Última Semana</SelectItem>
+                  <SelectItem value="mes">Este Mês</SelectItem>
+                  <SelectItem value="todos">Todos</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={selectedSdr} onValueChange={setSelectedSdr}>
+                <SelectTrigger className="w-40 bg-white/10 border-white/20 text-white backdrop-blur-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos SDRs</SelectItem>
+                  <SelectItem value="antonio">Antônio</SelectItem>
+                  <SelectItem value="gabrielli">Gabrielli</SelectItem>
+                  <SelectItem value="vanessa">Vanessa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center space-x-3">
-          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="hoje">Hoje</SelectItem>
-              <SelectItem value="semana">Última Semana</SelectItem>
-              <SelectItem value="mes">Este Mês</SelectItem>
-              <SelectItem value="todos">Todos</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={selectedSdr} onValueChange={setSelectedSdr}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos SDRs</SelectItem>
-              <SelectItem value="antonio">Antônio</SelectItem>
-              <SelectItem value="gabrielli">Gabrielli</SelectItem>
-              <SelectItem value="vanessa">Vanessa</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <div className="absolute -top-4 -right-4 w-32 h-32 bg-white/5 rounded-full"></div>
+        <div className="absolute -bottom-8 -left-8 w-40 h-40 bg-white/5 rounded-full"></div>
       </div>
 
-      {/* KPIs Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-green-500">
-          <CardContent className="p-4">
+      {/* Cards de Resumo Modernos */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600"></div>
+          <CardContent className="relative z-10 p-6 text-white">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 flex items-center">
-                  <DollarSign className="w-4 h-4 mr-1" />
-                  Total Investimento
-                </p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalInvestimento)}</p>
+                <p className="text-blue-100 text-sm font-medium mb-1">Total Meta Mensal</p>
+                <p className="text-3xl font-bold">{totalMeta}</p>
+                <p className="text-blue-100 text-sm">leads esperados</p>
+              </div>
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                <Target className="w-6 h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-blue-500">
-          <CardContent className="p-4">
+        <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-green-600"></div>
+          <CardContent className="relative z-10 p-6 text-white">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 flex items-center">
-                  <Users className="w-4 h-4 mr-1" />
-                  Total Leads
-                </p>
-                <p className="text-2xl font-bold text-gray-900">{totalLeads}</p>
+                <p className="text-green-100 text-sm font-medium mb-1">Total Realizado</p>
+                <p className="text-3xl font-bold">{totalRealizado}</p>
+                <p className="text-green-100 text-sm">leads conquistados</p>
+              </div>
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                <Award className="w-6 h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-purple-500">
-          <CardContent className="p-4">
+        <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+          <div
+            className={`absolute inset-0 bg-gradient-to-br ${
+              percentualGeral >= 75
+                ? "from-emerald-500 to-emerald-600"
+                : percentualGeral >= 50
+                  ? "from-yellow-500 to-yellow-600"
+                  : "from-red-500 to-red-600"
+            }`}
+          ></div>
+          <CardContent className="relative z-10 p-6 text-white">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 flex items-center">
-                  <Target className="w-4 h-4 mr-1" />
-                  CPMQL Médio
-                </p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(cpmqlGeral)}</p>
+                <p className="text-white/80 text-sm font-medium mb-1">Performance Geral</p>
+                <p className="text-3xl font-bold">{formatPercentage(percentualGeral)}</p>
+                <p className="text-white/80 text-sm">da meta atingida</p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-orange-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 flex items-center">
-                  <TrendingUp className="w-4 h-4 mr-1" />
-                  Leads/Dia Médio
-                </p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {dailyStats.length > 0 ? Math.round(totalLeads / dailyStats.length) : totalLeads}
-                </p>
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                <BarChart3 className="w-6 h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Distribuição por Tier */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <BarChart3 className="w-5 h-5 text-blue-600" />
-            <span>Distribuição por Tier de Faturamento</span>
+      {/* Tabela Principal Moderna */}
+      <Card className="border-0 shadow-xl overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+          <CardTitle className="text-xl font-bold text-gray-800 flex items-center space-x-2">
+            <BarChart3 className="w-5 h-5 text-red-600" />
+            <span>Detalhamento por Tier de Faturamento</span>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50">
+              {/* Header da Tabela */}
+              <thead className="bg-gradient-to-r from-red-600 to-red-700 text-white">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Distribuição por tier
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">%</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">R$</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CPMQL médio</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qnt leads</th>
+                  <th className="px-6 py-4 text-left font-bold text-sm">Faturamento</th>
+                  <th className="px-6 py-4 text-center font-bold text-sm">Meta</th>
+                  <th className="px-6 py-4 text-center font-bold text-sm">Realizado</th>
+                  <th className="px-6 py-4 text-center font-bold text-sm">Progresso</th>
+                  <th className="px-6 py-4 text-center font-bold text-sm">% Meta</th>
+                  <th className="px-6 py-4 text-center font-bold text-sm">CPMQL Meta</th>
+                  <th className="px-6 py-4 text-center font-bold text-sm">CPMQL Real</th>
+                  <th className="px-6 py-4 text-center font-bold text-sm">Status</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {tierData
-                  .filter((tier) => tier.count > 0)
-                  .map((tier) => (
-                    <tr key={tier.tier} className="hover:bg-gray-50">
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{tier.tier}</div>
+
+              {/* Linhas de Dados */}
+              <tbody className="divide-y divide-gray-100">
+                {tierOrder.map((tier, index) => {
+                  const meta = tierMetas[tier]
+                  const realizado = tierData[tier].realizado
+                  const totalInvestido = tierData[tier].totalInvestido
+                  const percentualMeta = meta.meta > 0 ? (realizado / meta.meta) * 100 : 0
+                  const cpmqlRealizado = realizado > 0 ? totalInvestido / realizado : 0
+                  const status = getStatusBadge(percentualMeta)
+                  const StatusIcon = status.icon
+
+                  return (
+                    <tr key={tier} className="hover:bg-gray-50 transition-colors duration-200">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center space-x-3">
+                          <div
+                            className={`w-10 h-10 bg-gradient-to-br ${meta.color} rounded-lg flex items-center justify-center text-white font-bold shadow-lg`}
+                          >
+                            {meta.icon}
+                          </div>
+                          <div>
+                            <div className="font-bold text-gray-900">{tier}</div>
+                            <div className="text-sm text-gray-500">Tier {index + 1}</div>
+                          </div>
+                        </div>
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <Badge variant="outline">{formatPercentage(tier.percentage)}</Badge>
+                      <td className="px-6 py-4 text-center">
+                        <div className="font-bold text-lg text-gray-900">{meta.meta}</div>
+                        <div className="text-xs text-gray-500">leads</div>
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{formatCurrency(tier.totalInvestido)}</div>
+                      <td className="px-6 py-4 text-center">
+                        <div className="font-bold text-lg text-blue-600">{realizado}</div>
+                        <div className="text-xs text-gray-500">conquistados</div>
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{formatCurrency(tier.cpmql)}</div>
+                      <td className="px-6 py-4">
+                        <div className="w-full bg-gray-200 rounded-full h-3 mb-1">
+                          <div
+                            className={`h-3 rounded-full bg-gradient-to-r ${meta.color} transition-all duration-500`}
+                            style={{ width: `${Math.min(percentualMeta, 100)}%` }}
+                          ></div>
+                        </div>
+                        <div className="text-xs text-center text-gray-600">
+                          {realizado}/{meta.meta}
+                        </div>
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm font-bold text-gray-900">{tier.count}</div>
+                      <td className="px-6 py-4 text-center">
+                        <Badge className={`${status.color} text-white font-bold px-3 py-1`}>
+                          {formatPercentage(percentualMeta)}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="font-semibold text-gray-900">{formatCurrency(meta.cpmqlMeta)}</div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className={`font-semibold ${realizado > 0 ? "text-green-600" : "text-gray-400"}`}>
+                          {realizado > 0 ? formatCurrency(cpmqlRealizado) : "R$ 0,00"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className={`w-8 h-8 ${status.color} rounded-full flex items-center justify-center`}>
+                            <StatusIcon className="w-4 h-4 text-white" />
+                          </div>
+                          <span className="text-sm font-medium text-gray-700">{status.text}</span>
+                        </div>
                       </td>
                     </tr>
-                  ))}
-
-                {/* Linha de Total */}
-                <tr className="bg-gray-100 font-bold border-t-2 border-gray-300">
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm font-bold text-gray-900">TOTAL</div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <Badge className="bg-gray-600">100%</Badge>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm font-bold text-gray-900">{formatCurrency(totalInvestimento)}</div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm font-bold text-gray-900">{formatCurrency(cpmqlGeral)}</div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm font-bold text-gray-900">{totalLeads}</div>
-                  </td>
-                </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         </CardContent>
       </Card>
 
-      {/* Performance por SDR e Análise Diária */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Performance por SDR */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Users className="w-5 h-5 text-green-600" />
-              <span>Performance por SDR</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {sdrStats.length === 0 ? (
-                <div className="text-center py-8">
-                  <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">Nenhum dado para o período selecionado</p>
-                </div>
-              ) : (
-                sdrStats.map((sdr) => (
-                  <div key={sdr.sdr} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="font-medium capitalize">{sdr.sdr}</p>
-                      <p className="text-sm text-gray-500">{sdr.count} leads</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold">{formatCurrency(sdr.investido)}</p>
-                      <p className="text-sm text-gray-500">CPMQL: {formatCurrency(sdr.cpmql)}</p>
-                    </div>
-                  </div>
-                ))
-              )}
+      {/* Insights Card */}
+      <Card className="border-0 shadow-lg bg-gradient-to-br from-indigo-50 to-purple-50">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2 text-indigo-800">
+            <Zap className="w-5 h-5" />
+            <span>Insights Inteligentes</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="flex items-center space-x-2 mb-2">
+                <TrendingUp className="w-4 h-4 text-green-600" />
+                <span className="font-semibold text-gray-800">Melhor Performance</span>
+              </div>
+              <p className="text-sm text-gray-600">
+                {tierOrder.find((tier) => {
+                  const meta = tierMetas[tier]
+                  const realizado = tierData[tier].realizado
+                  return meta.meta > 0 && (realizado / meta.meta) * 100 > 0
+                }) || "Nenhum tier com performance"}{" "}
+                está liderando as metas
+              </p>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Análise Diária */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Calendar className="w-5 h-5 text-purple-600" />
-              <span>Análise por Data</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {dailyStats.length === 0 ? (
-                <div className="text-center py-8">
-                  <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">Nenhum dado para o período selecionado</p>
-                </div>
-              ) : (
-                dailyStats.map((day) => (
-                  <div key={day.date} className="flex items-center justify-between p-2 border-b border-gray-100">
-                    <div>
-                      <p className="font-medium">{day.date}</p>
-                      <p className="text-sm text-gray-500">{day.count} leads</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-sm">{formatCurrency(day.investido)}</p>
-                      <p className="text-xs text-gray-500">{formatCurrency(day.cpmql)}/lead</p>
-                    </div>
-                  </div>
-                ))
-              )}
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="flex items-center space-x-2 mb-2">
+                <DollarSign className="w-4 h-4 text-blue-600" />
+                <span className="font-semibold text-gray-800">Investimento Total</span>
+              </div>
+              <p className="text-sm text-gray-600">
+                {formatCurrency(Object.values(tierData).reduce((sum, data) => sum + data.totalInvestido, 0))} investidos
+                este período
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
