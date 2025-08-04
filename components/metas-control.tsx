@@ -7,18 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Target,
-  TrendingUp,
-  TrendingDown,
-  Award,
-  Zap,
-  BarChart3,
-  DollarSign,
-  Settings,
-  Save,
-  RefreshCw,
-} from "lucide-react"
+import { Target, TrendingUp, TrendingDown, Award, Zap, BarChart3, Settings, Save, RefreshCw, Users } from "lucide-react"
 import { useState, useEffect } from "react"
 import type { Lead } from "@/app/page"
 
@@ -38,12 +27,20 @@ interface MetasConfig {
   [key: string]: TierConfig
 }
 
+interface ArrematadorTierMetas {
+  [arrematador: string]: {
+    [tier: string]: number
+  }
+}
+
 export function MetasControl({ leads }: MetasControlProps) {
   const [selectedPeriod, setSelectedPeriod] = useState("mes")
   const [selectedSdr, setSelectedSdr] = useState("todos")
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
   const [metasConfig, setMetasConfig] = useState<MetasConfig>({})
   const [isLoading, setIsLoading] = useState(true)
+  const [isArrematadorModalOpen, setIsArrematadorModalOpen] = useState(false)
+  const [arrematadorMetas, setArrematadorMetas] = useState<ArrematadorTierMetas>({})
 
   // Configuração padrão das metas
   const defaultMetasConfig: MetasConfig = {
@@ -64,7 +61,6 @@ export function MetasControl({ leads }: MetasControlProps) {
         const savedConfig = localStorage.getItem("jasson-metas-config")
         if (savedConfig) {
           const parsedConfig = JSON.parse(savedConfig)
-          // Verificar se o config tem todas as propriedades necessárias
           const validConfig = { ...defaultMetasConfig }
           Object.keys(parsedConfig).forEach((tier) => {
             if (parsedConfig[tier] && typeof parsedConfig[tier] === "object") {
@@ -110,7 +106,7 @@ export function MetasControl({ leads }: MetasControlProps) {
     return String(value)
   }
 
-  // Mapear faturamento para tiers exatamente como na imagem
+  // Mapear faturamento para tiers
   const mapFaturamentoToTier = (faturamento: string): string => {
     const faturamentoClean = safeString(faturamento).toLowerCase().trim()
 
@@ -118,7 +114,6 @@ export function MetasControl({ leads }: MetasControlProps) {
       return "-100k"
     }
 
-    // Mapeamento específico baseado na imagem
     if (faturamentoClean.includes("100") && (faturamentoClean.includes("200") || faturamentoClean.includes("2"))) {
       return "100 a 200k"
     }
@@ -144,24 +139,6 @@ export function MetasControl({ leads }: MetasControlProps) {
       return "+40kk"
     }
 
-    // Mapeamentos alternativos
-    if (faturamentoClean.includes("até 100") || faturamentoClean.includes("100 mil")) {
-      return "100 a 200k"
-    }
-    if (faturamentoClean.includes("pequeno") || faturamentoClean.includes("micro")) {
-      return "100 a 200k"
-    }
-    if (faturamentoClean.includes("médio") || faturamentoClean.includes("medio")) {
-      return "400 a 1kk"
-    }
-    if (faturamentoClean.includes("grande") || faturamentoClean.includes("alto")) {
-      return "4 a 16kk"
-    }
-    if (faturamentoClean.includes("milhão") || faturamentoClean.includes("milhao")) {
-      return "1 a 4kk"
-    }
-
-    // Se não conseguiu mapear, coloca em -100k
     return "-100k"
   }
 
@@ -172,7 +149,6 @@ export function MetasControl({ leads }: MetasControlProps) {
     const now = new Date()
     let filteredLeads = leads
 
-    // Filter by period
     switch (selectedPeriod) {
       case "hoje":
         filteredLeads = leads.filter((lead) => {
@@ -201,7 +177,6 @@ export function MetasControl({ leads }: MetasControlProps) {
         filteredLeads = leads
     }
 
-    // Filter by SDR
     if (selectedSdr !== "todos") {
       filteredLeads = filteredLeads.filter((lead) => lead.sdr === selectedSdr)
     }
@@ -213,25 +188,20 @@ export function MetasControl({ leads }: MetasControlProps) {
   const calculateTierData = () => {
     const tierData: Record<string, { realizado: number; totalInvestido: number }> = {}
 
-    // Verificar se metasConfig está carregado
     if (!metasConfig || Object.keys(metasConfig).length === 0) {
       return {}
     }
 
-    // Inicializar todos os tiers
     Object.keys(metasConfig).forEach((tier) => {
       tierData[tier] = { realizado: 0, totalInvestido: 0 }
     })
 
-    // Obter leads filtrados
     const filteredLeads = getFilteredLeads()
 
-    // Contar leads por tier
     filteredLeads.forEach((lead) => {
       const tier = mapFaturamentoToTier(lead.faturamento || "")
       const valorPago = safeNumber(lead.valor_pago_lead)
 
-      // Verificar se o tier existe no tierData
       if (tierData[tier]) {
         tierData[tier].realizado++
         tierData[tier].totalInvestido += valorPago
@@ -241,7 +211,7 @@ export function MetasControl({ leads }: MetasControlProps) {
     return tierData
   }
 
-  // Ordem dos tiers conforme a imagem
+  // Ordem dos tiers
   const tierOrder = ["100 a 200k", "200 a 400k", "400 a 1kk", "1 a 4kk", "4 a 16kk", "16 a 40kk", "+40kk", "-100k"]
 
   const formatCurrency = (value: number) => {
@@ -276,6 +246,108 @@ export function MetasControl({ leads }: MetasControlProps) {
   const totalMeta = Object.values(metasConfig).reduce((sum, meta) => sum + (meta?.meta || 0), 0)
   const totalRealizado = Object.values(tierData).reduce((sum, data) => sum + (data?.realizado || 0), 0)
   const percentualGeral = totalMeta > 0 ? (totalRealizado / totalMeta) * 100 : 0
+
+  // Carregar metas dos arrematadores por tier
+  useEffect(() => {
+    const loadArrematadorMetas = () => {
+      try {
+        const savedMetas = localStorage.getItem("jasson-arrematador-tier-metas")
+        if (savedMetas) {
+          setArrematadorMetas(JSON.parse(savedMetas))
+        } else {
+          // Metas padrão por tier
+          const defaultArrematadorMetas: ArrematadorTierMetas = {}
+          const arrematadores = ["alan", "antonio", "gabrielli", "jasson", "vanessa", "william"]
+
+          arrematadores.forEach((arr) => {
+            defaultArrematadorMetas[arr] = {
+              "100 a 200k": 8,
+              "200 a 400k": 6,
+              "400 a 1kk": 4,
+              "1 a 4kk": 3,
+              "4 a 16kk": 1,
+              "16 a 40kk": 1,
+              "+40kk": 1,
+              "-100k": 0,
+            }
+          })
+
+          setArrematadorMetas(defaultArrematadorMetas)
+        }
+      } catch (error) {
+        console.error("Erro ao carregar metas dos arrematadores:", error)
+      }
+    }
+
+    if (!isLoading) {
+      loadArrematadorMetas()
+    }
+  }, [isLoading])
+
+  // Salvar metas dos arrematadores
+  const saveArrematadorMetas = (newMetas: ArrematadorTierMetas) => {
+    try {
+      setArrematadorMetas(newMetas)
+      localStorage.setItem("jasson-arrematador-tier-metas", JSON.stringify(newMetas))
+      console.log("✅ Metas dos arrematadores salvas:", newMetas)
+    } catch (error) {
+      console.error("Erro ao salvar metas dos arrematadores:", error)
+    }
+  }
+
+  // Calcular dados dos arrematadores por tier
+  const calculateArrematadorData = () => {
+    const arrematadorData: Record<
+      string,
+      {
+        totalRealizado: number
+        totalMeta: number
+        percentualGeral: number
+        tierData: Record<string, { realizado: number; meta: number }>
+      }
+    > = {}
+
+    const arrematadores = ["alan", "antonio", "gabrielli", "jasson", "vanessa", "william"]
+
+    // Inicializar dados
+    arrematadores.forEach((arr) => {
+      arrematadorData[arr] = {
+        totalRealizado: 0,
+        totalMeta: 0,
+        percentualGeral: 0,
+        tierData: {},
+      }
+
+      // Inicializar dados por tier
+      tierOrder.forEach((tier) => {
+        arrematadorData[arr].tierData[tier] = {
+          realizado: 0,
+          meta: arrematadorMetas[arr]?.[tier] || 0,
+        }
+      })
+    })
+
+    // Contar leads por arrematador e tier
+    const filteredLeads = getFilteredLeads()
+    filteredLeads.forEach((lead) => {
+      const arr = lead.arrematador?.toLowerCase()
+      const tier = mapFaturamentoToTier(lead.faturamento || "")
+
+      if (arr && arrematadorData[arr] && arrematadorData[arr].tierData[tier]) {
+        arrematadorData[arr].tierData[tier].realizado++
+        arrematadorData[arr].totalRealizado++
+      }
+    })
+
+    // Calcular totais e percentuais
+    Object.keys(arrematadorData).forEach((arr) => {
+      const data = arrematadorData[arr]
+      data.totalMeta = Object.values(data.tierData).reduce((sum, tier) => sum + tier.meta, 0)
+      data.percentualGeral = data.totalMeta > 0 ? (data.totalRealizado / data.totalMeta) * 100 : 0
+    })
+
+    return arrematadorData
+  }
 
   // Modal de Configuração
   const ConfigModal = () => {
@@ -399,6 +471,113 @@ export function MetasControl({ leads }: MetasControlProps) {
     )
   }
 
+  // Modal de Metas dos Arrematadores por Tier
+  const ArrematadorMetasModal = () => {
+    const [tempMetas, setTempMetas] = useState<ArrematadorTierMetas>(arrematadorMetas)
+
+    const handleSave = () => {
+      saveArrematadorMetas(tempMetas)
+      setIsArrematadorModalOpen(false)
+    }
+
+    const updateMeta = (arrematador: string, tier: string, meta: number) => {
+      setTempMetas((prev) => ({
+        ...prev,
+        [arrematador]: {
+          ...prev[arrematador],
+          [tier]: meta,
+        },
+      }))
+    }
+
+    const arrematadores = [
+      { key: "alan", name: "Alan", color: "from-blue-500 to-blue-600", icon: "🎯" },
+      { key: "antonio", name: "Antônio", color: "from-green-500 to-green-600", icon: "📈" },
+      { key: "gabrielli", name: "Gabrielli", color: "from-purple-500 to-purple-600", icon: "🚀" },
+      { key: "jasson", name: "Jasson", color: "from-red-500 to-red-600", icon: "⭐" },
+      { key: "vanessa", name: "Vanessa", color: "from-pink-500 to-pink-600", icon: "💎" },
+      { key: "william", name: "William", color: "from-orange-500 to-orange-600", icon: "👑" },
+    ]
+
+    return (
+      <Dialog open={isArrematadorModalOpen} onOpenChange={setIsArrematadorModalOpen}>
+        <DialogContent className="max-w-6xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Users className="w-5 h-5 text-green-600" />
+              <span>Configurar Metas dos Arrematadores por Tier</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="text-sm text-green-800">
+                <strong>🎯 Configuração:</strong> Defina a meta mensal de leads por tier de faturamento para cada
+                arrematador.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {arrematadores.map((arr) => (
+                <Card key={arr.key} className="border-l-4 border-l-green-500">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <div
+                        className={`w-8 h-8 bg-gradient-to-br ${arr.color} rounded-lg flex items-center justify-center text-white font-bold shadow-lg`}
+                      >
+                        <span className="text-sm">{arr.icon}</span>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-gray-900 capitalize">{arr.name}</h3>
+                        <p className="text-sm text-gray-500">Metas por tier de faturamento</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+                      {tierOrder.map((tier) => {
+                        const tierConfig = metasConfig[tier]
+                        return (
+                          <div key={tier} className="space-y-1">
+                            <Label className="text-xs font-medium text-gray-600">{tier}</Label>
+                            <div className="flex items-center space-x-1">
+                              <div
+                                className={`w-4 h-4 bg-gradient-to-br ${tierConfig?.color} rounded flex items-center justify-center`}
+                              >
+                                <span className="text-xs">{tierConfig?.icon}</span>
+                              </div>
+                              <Input
+                                type="number"
+                                value={tempMetas[arr.key]?.[tier] || 0}
+                                onChange={(e) => updateMeta(arr.key, tier, Number(e.target.value))}
+                                className="h-8 text-xs"
+                                min="0"
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4 border-t">
+              <Button variant="outline" onClick={() => setIsArrematadorModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700">
+                <Save className="w-4 h-4 mr-2" />
+                Salvar Metas
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
   // Loading state
   if (isLoading) {
     return (
@@ -412,49 +591,47 @@ export function MetasControl({ leads }: MetasControlProps) {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header Moderno */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-600 via-red-700 to-red-800 p-8 text-white shadow-2xl">
+    <div className="space-y-6">
+      {/* Header Compacto */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-600 via-red-700 to-red-800 p-6 text-white shadow-xl">
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="relative z-10">
           <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center space-x-3 mb-2">
-                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                  <Target className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold">Controle de Metas</h1>
-                  <p className="text-red-100">Meta/Mês Compra de Leads</p>
-                </div>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                <Target className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">Controle de Metas</h1>
+                <p className="text-red-100 text-sm">Meta/Mês Compra de Leads</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <Button
                 variant="outline"
                 onClick={() => setIsConfigModalOpen(true)}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm"
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm text-sm h-8"
               >
-                <Settings className="w-4 h-4 mr-2" />
-                Configurar Metas
+                <Settings className="w-3 h-3 mr-1" />
+                Config
               </Button>
               <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-40 bg-white/10 border-white/20 text-white backdrop-blur-sm">
+                <SelectTrigger className="w-32 bg-white/10 border-white/20 text-white backdrop-blur-sm h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="hoje">Hoje</SelectItem>
-                  <SelectItem value="semana">Última Semana</SelectItem>
-                  <SelectItem value="mes">Este Mês</SelectItem>
+                  <SelectItem value="semana">Semana</SelectItem>
+                  <SelectItem value="mes">Mês</SelectItem>
                   <SelectItem value="todos">Todos</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={selectedSdr} onValueChange={setSelectedSdr}>
-                <SelectTrigger className="w-40 bg-white/10 border-white/20 text-white backdrop-blur-sm">
+                <SelectTrigger className="w-32 bg-white/10 border-white/20 text-white backdrop-blur-sm h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todos">Todos SDRs</SelectItem>
+                  <SelectItem value="todos">Todos</SelectItem>
                   <SelectItem value="antonio">Antônio</SelectItem>
                   <SelectItem value="gabrielli">Gabrielli</SelectItem>
                   <SelectItem value="vanessa">Vanessa</SelectItem>
@@ -463,45 +640,37 @@ export function MetasControl({ leads }: MetasControlProps) {
             </div>
           </div>
         </div>
-        <div className="absolute -top-4 -right-4 w-32 h-32 bg-white/5 rounded-full"></div>
-        <div className="absolute -bottom-8 -left-8 w-40 h-40 bg-white/5 rounded-full"></div>
       </div>
 
-      {/* Cards de Resumo Modernos */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+      {/* Cards de Resumo Compactos */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="relative overflow-hidden border-0 shadow-md">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600"></div>
-          <CardContent className="relative z-10 p-6 text-white">
+          <CardContent className="relative z-10 p-4 text-white">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-100 text-sm font-medium mb-1">Total Meta Mensal</p>
-                <p className="text-3xl font-bold">{totalMeta}</p>
-                <p className="text-blue-100 text-sm">leads esperados</p>
+                <p className="text-blue-100 text-xs font-medium mb-1">Meta Total</p>
+                <p className="text-2xl font-bold">{totalMeta}</p>
               </div>
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                <Target className="w-6 h-6" />
-              </div>
+              <Target className="w-8 h-8 text-white/80" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+        <Card className="relative overflow-hidden border-0 shadow-md">
           <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-green-600"></div>
-          <CardContent className="relative z-10 p-6 text-white">
+          <CardContent className="relative z-10 p-4 text-white">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-green-100 text-sm font-medium mb-1">Total Realizado</p>
-                <p className="text-3xl font-bold">{totalRealizado}</p>
-                <p className="text-green-100 text-sm">leads conquistados</p>
+                <p className="text-green-100 text-xs font-medium mb-1">Realizado</p>
+                <p className="text-2xl font-bold">{totalRealizado}</p>
               </div>
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                <Award className="w-6 h-6" />
-              </div>
+              <Award className="w-8 h-8 text-white/80" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+        <Card className="relative overflow-hidden border-0 shadow-md">
           <div
             className={`absolute inset-0 bg-gradient-to-br ${
               percentualGeral >= 75
@@ -511,49 +680,42 @@ export function MetasControl({ leads }: MetasControlProps) {
                   : "from-red-500 to-red-600"
             }`}
           ></div>
-          <CardContent className="relative z-10 p-6 text-white">
+          <CardContent className="relative z-10 p-4 text-white">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-white/80 text-sm font-medium mb-1">Performance Geral</p>
-                <p className="text-3xl font-bold">{formatPercentage(percentualGeral)}</p>
-                <p className="text-white/80 text-sm">da meta atingida</p>
+                <p className="text-white/80 text-xs font-medium mb-1">Performance</p>
+                <p className="text-2xl font-bold">{formatPercentage(percentualGeral)}</p>
               </div>
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                <BarChart3 className="w-6 h-6" />
-              </div>
+              <BarChart3 className="w-8 h-8 text-white/80" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Tabela Principal Moderna */}
-      <Card className="border-0 shadow-xl overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
-          <CardTitle className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-            <BarChart3 className="w-5 h-5 text-red-600" />
-            <span>Detalhamento por Tier de Faturamento</span>
+      {/* Tabela Principal Compacta */}
+      <Card className="border-0 shadow-lg overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b py-3">
+          <CardTitle className="text-lg font-bold text-gray-800 flex items-center space-x-2">
+            <BarChart3 className="w-4 h-4 text-red-600" />
+            <span>Detalhamento por Tier</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full">
-              {/* Header da Tabela */}
               <thead className="bg-gradient-to-r from-red-600 to-red-700 text-white">
                 <tr>
-                  <th className="px-6 py-4 text-left font-bold text-sm">Faturamento</th>
-                  <th className="px-6 py-4 text-center font-bold text-sm">Meta</th>
-                  <th className="px-6 py-4 text-center font-bold text-sm">Realizado</th>
-                  <th className="px-6 py-4 text-center font-bold text-sm">Ideal por Dia</th>
-                  <th className="px-6 py-4 text-center font-bold text-sm">% Meta</th>
-                  <th className="px-6 py-4 text-center font-bold text-sm">CPMQL Meta</th>
-                  <th className="px-6 py-4 text-center font-bold text-sm">CPMQL Real</th>
-                  <th className="px-6 py-4 text-center font-bold text-sm">Status</th>
+                  <th className="px-4 py-3 text-left font-bold text-xs">Tier</th>
+                  <th className="px-4 py-3 text-center font-bold text-xs">Meta</th>
+                  <th className="px-4 py-3 text-center font-bold text-xs">Real</th>
+                  <th className="px-4 py-3 text-center font-bold text-xs">Ideal</th>
+                  <th className="px-4 py-3 text-center font-bold text-xs">%</th>
+                  <th className="px-4 py-3 text-center font-bold text-xs">CPMQL</th>
+                  <th className="px-4 py-3 text-center font-bold text-xs">Status</th>
                 </tr>
               </thead>
-
-              {/* Linhas de Dados */}
               <tbody className="divide-y divide-gray-100">
-                {tierOrder.map((tier, index) => {
+                {tierOrder.map((tier) => {
                   const meta = metasConfig[tier]
                   if (!meta) return null
 
@@ -563,54 +725,46 @@ export function MetasControl({ leads }: MetasControlProps) {
                   const percentualMeta = meta.meta > 0 ? (realizado / meta.meta) * 100 : 0
                   const cpmqlRealizado = realizado > 0 ? totalInvestido / realizado : 0
                   const status = getStatusBadge(percentualMeta)
-                  const StatusIcon = status.icon
 
                   return (
                     <tr key={tier} className="hover:bg-gray-50 transition-colors duration-200">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center space-x-3">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center space-x-2">
                           <div
-                            className={`w-10 h-10 bg-gradient-to-br ${meta.color} rounded-lg flex items-center justify-center text-white font-bold shadow-lg`}
+                            className={`w-6 h-6 bg-gradient-to-br ${meta.color} rounded flex items-center justify-center text-white text-xs font-bold`}
                           >
                             {meta.icon}
                           </div>
-                          <div>
-                            <div className="font-bold text-gray-900">{tier}</div>
-                            <div className="text-sm text-gray-500">Tier {index + 1}</div>
-                          </div>
+                          <span className="font-medium text-sm text-gray-900">{tier}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="font-bold text-lg text-gray-900">{meta.meta}</div>
-                        <div className="text-xs text-gray-500">leads</div>
+                      <td className="px-4 py-3 text-center">
+                        <span className="font-bold text-gray-900">{meta.meta}</span>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="font-bold text-lg text-blue-600">{realizado}</div>
-                        <div className="text-xs text-gray-500">conquistados</div>
+                      <td className="px-4 py-3 text-center">
+                        <span className="font-bold text-blue-600">{realizado}</span>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="font-bold text-lg text-purple-600">{calculateIdealPorDia(meta.meta)}</div>
-                        <div className="text-xs text-gray-500">até hoje</div>
+                      <td className="px-4 py-3 text-center">
+                        <span className="font-bold text-purple-600">{calculateIdealPorDia(meta.meta)}</span>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <Badge className={`${status.color} text-white font-bold px-3 py-1`}>
+                      <td className="px-4 py-3 text-center">
+                        <Badge className={`${status.color} text-white font-bold text-xs px-2 py-1`}>
                           {formatPercentage(percentualMeta)}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="font-semibold text-gray-900">{formatCurrency(meta.cpmqlMeta)}</div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className={`font-semibold ${realizado > 0 ? "text-green-600" : "text-gray-400"}`}>
-                          {realizado > 0 ? formatCurrency(cpmqlRealizado) : "R$ 0,00"}
+                      <td className="px-4 py-3 text-center">
+                        <div className="text-xs">
+                          <div className="font-semibold text-gray-600">{formatCurrency(meta.cpmqlMeta)}</div>
+                          <div className={`${realizado > 0 ? "text-green-600" : "text-gray-400"}`}>
+                            {realizado > 0 ? formatCurrency(cpmqlRealizado) : "R$ 0"}
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex items-center justify-center space-x-2">
-                          <div className={`w-8 h-8 ${status.color} rounded-full flex items-center justify-center`}>
-                            <StatusIcon className="w-4 h-4 text-white" />
-                          </div>
-                          <span className="text-sm font-medium text-gray-700">{status.text}</span>
+                      <td className="px-4 py-3 text-center">
+                        <div
+                          className={`w-6 h-6 ${status.color} rounded-full flex items-center justify-center mx-auto`}
+                        >
+                          <status.icon className="w-3 h-3 text-white" />
                         </div>
                       </td>
                     </tr>
@@ -622,43 +776,81 @@ export function MetasControl({ leads }: MetasControlProps) {
         </CardContent>
       </Card>
 
-      {/* Insights Card */}
-      <Card className="border-0 shadow-lg bg-gradient-to-br from-indigo-50 to-purple-50">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-indigo-800">
-            <Zap className="w-5 h-5" />
-            <span>Insights Inteligentes</span>
-          </CardTitle>
+      {/* Seção dos Arrematadores Compacta */}
+      <Card className="border-0 shadow-lg overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-100 border-b py-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg font-bold text-gray-800 flex items-center space-x-2">
+              <Users className="w-4 h-4 text-green-600" />
+              <span>Performance dos Arrematadores</span>
+            </CardTitle>
+            <Button
+              variant="outline"
+              onClick={() => setIsArrematadorModalOpen(true)}
+              className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 text-sm h-8"
+            >
+              <Settings className="w-3 h-3 mr-1" />
+              Config
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="flex items-center space-x-2 mb-2">
-                <TrendingUp className="w-4 h-4 text-green-600" />
-                <span className="font-semibold text-gray-800">Melhor Performance</span>
-              </div>
-              <p className="text-sm text-gray-600">
-                {tierOrder.find((tier) => {
-                  const meta = metasConfig[tier]
-                  const tierDataItem = tierData[tier]
-                  return meta && tierDataItem && meta.meta > 0 && (tierDataItem.realizado / meta.meta) * 100 > 0
-                }) || "Nenhum tier com performance"}{" "}
-                está liderando as metas
-              </p>
-            </div>
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="flex items-center space-x-2 mb-2">
-                <DollarSign className="w-4 h-4 text-blue-600" />
-                <span className="font-semibold text-gray-800">Investimento Total</span>
-              </div>
-              <p className="text-sm text-gray-600">
-                {formatCurrency(Object.values(tierData).reduce((sum, data) => sum + (data?.totalInvestido || 0), 0))}{" "}
-                investidos este período
-              </p>
-            </div>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {(() => {
+              const arrematadorData = calculateArrematadorData()
+              const arrematadores = [
+                { key: "alan", name: "Alan", color: "from-blue-500 to-blue-600", icon: "🎯" },
+                { key: "antonio", name: "Antônio", color: "from-green-500 to-green-600", icon: "📈" },
+                { key: "gabrielli", name: "Gabrielli", color: "from-purple-500 to-purple-600", icon: "🚀" },
+                { key: "jasson", name: "Jasson", color: "from-red-500 to-red-600", icon: "⭐" },
+                { key: "vanessa", name: "Vanessa", color: "from-pink-500 to-pink-600", icon: "💎" },
+                { key: "william", name: "William", color: "from-orange-500 to-orange-600", icon: "👑" },
+              ]
+
+              return arrematadores.map((arr) => {
+                const data = arrematadorData[arr.key]
+                const status = getStatusBadge(data.percentualGeral)
+
+                return (
+                  <Card
+                    key={arr.key}
+                    className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300"
+                  >
+                    <div className={`absolute inset-0 bg-gradient-to-br ${arr.color}`}></div>
+                    <CardContent className="relative z-10 p-3 text-white">
+                      <div className="text-center space-y-2">
+                        <div className="flex items-center justify-center space-x-1">
+                          <div className="w-6 h-6 bg-white/20 rounded flex items-center justify-center backdrop-blur-sm">
+                            <span className="text-xs">{arr.icon}</span>
+                          </div>
+                          <h3 className="font-bold text-sm">{arr.name}</h3>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-white/80">Real:</span>
+                            <span className="font-bold">{data.totalRealizado}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-white/80">Meta:</span>
+                            <span className="font-semibold">{data.totalMeta}</span>
+                          </div>
+                          <Badge className={`${status.color} text-white text-xs px-2 py-0.5 w-full justify-center`}>
+                            {formatPercentage(data.percentualGeral)}
+                          </Badge>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })
+            })()}
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal de Metas dos Arrematadores */}
+      <ArrematadorMetasModal />
 
       {/* Modal de Configuração */}
       <ConfigModal />
