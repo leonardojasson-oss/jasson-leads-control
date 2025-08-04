@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Target, TrendingUp, TrendingDown, Award, Zap, BarChart3, Settings, Save, RefreshCw, Users } from "lucide-react"
+import { Target, TrendingUp, TrendingDown, Award, Zap, BarChart3, Settings, Save, RefreshCw, Users } from 'lucide-react'
 import { useState, useEffect } from "react"
 import type { Lead } from "@/app/page"
 
@@ -27,20 +27,12 @@ interface MetasConfig {
   [key: string]: TierConfig
 }
 
-interface ArrematadorTierMetas {
-  [arrematador: string]: {
-    [tier: string]: number
-  }
-}
-
 export function MetasControl({ leads }: MetasControlProps) {
   const [selectedPeriod, setSelectedPeriod] = useState("mes")
   const [selectedSdr, setSelectedSdr] = useState("todos")
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
   const [metasConfig, setMetasConfig] = useState<MetasConfig>({})
   const [isLoading, setIsLoading] = useState(true)
-  const [isArrematadorModalOpen, setIsArrematadorModalOpen] = useState(false)
-  const [arrematadorMetas, setArrematadorMetas] = useState<ArrematadorTierMetas>({})
 
   // Configuração padrão das metas
   const defaultMetasConfig: MetasConfig = {
@@ -247,63 +239,13 @@ export function MetasControl({ leads }: MetasControlProps) {
   const totalRealizado = Object.values(tierData).reduce((sum, data) => sum + (data?.realizado || 0), 0)
   const percentualGeral = totalMeta > 0 ? (totalRealizado / totalMeta) * 100 : 0
 
-  // Carregar metas dos arrematadores por tier
-  useEffect(() => {
-    const loadArrematadorMetas = () => {
-      try {
-        const savedMetas = localStorage.getItem("jasson-arrematador-tier-metas")
-        if (savedMetas) {
-          setArrematadorMetas(JSON.parse(savedMetas))
-        } else {
-          // Metas padrão por tier
-          const defaultArrematadorMetas: ArrematadorTierMetas = {}
-          const arrematadores = ["alan", "antonio", "gabrielli", "jasson", "vanessa", "william"]
-
-          arrematadores.forEach((arr) => {
-            defaultArrematadorMetas[arr] = {
-              "100 a 200k": 8,
-              "200 a 400k": 6,
-              "400 a 1kk": 4,
-              "1 a 4kk": 3,
-              "4 a 16kk": 1,
-              "16 a 40kk": 1,
-              "+40kk": 1,
-              "-100k": 0,
-            }
-          })
-
-          setArrematadorMetas(defaultArrematadorMetas)
-        }
-      } catch (error) {
-        console.error("Erro ao carregar metas dos arrematadores:", error)
-      }
-    }
-
-    if (!isLoading) {
-      loadArrematadorMetas()
-    }
-  }, [isLoading])
-
-  // Salvar metas dos arrematadores
-  const saveArrematadorMetas = (newMetas: ArrematadorTierMetas) => {
-    try {
-      setArrematadorMetas(newMetas)
-      localStorage.setItem("jasson-arrematador-tier-metas", JSON.stringify(newMetas))
-      console.log("✅ Metas dos arrematadores salvas:", newMetas)
-    } catch (error) {
-      console.error("Erro ao salvar metas dos arrematadores:", error)
-    }
-  }
-
-  // Calcular dados dos arrematadores por tier
+  // Calcular dados reais dos arrematadores por tier
   const calculateArrematadorData = () => {
     const arrematadorData: Record<
       string,
       {
         totalRealizado: number
-        totalMeta: number
-        percentualGeral: number
-        tierData: Record<string, { realizado: number; meta: number }>
+        tierData: Record<string, number>
       }
     > = {}
 
@@ -313,17 +255,12 @@ export function MetasControl({ leads }: MetasControlProps) {
     arrematadores.forEach((arr) => {
       arrematadorData[arr] = {
         totalRealizado: 0,
-        totalMeta: 0,
-        percentualGeral: 0,
         tierData: {},
       }
 
       // Inicializar dados por tier
       tierOrder.forEach((tier) => {
-        arrematadorData[arr].tierData[tier] = {
-          realizado: 0,
-          meta: arrematadorMetas[arr]?.[tier] || 0,
-        }
+        arrematadorData[arr].tierData[tier] = 0
       })
     })
 
@@ -333,17 +270,10 @@ export function MetasControl({ leads }: MetasControlProps) {
       const arr = lead.arrematador?.toLowerCase()
       const tier = mapFaturamentoToTier(lead.faturamento || "")
 
-      if (arr && arrematadorData[arr] && arrematadorData[arr].tierData[tier]) {
-        arrematadorData[arr].tierData[tier].realizado++
+      if (arr && arrematadorData[arr]) {
+        arrematadorData[arr].tierData[tier]++
         arrematadorData[arr].totalRealizado++
       }
-    })
-
-    // Calcular totais e percentuais
-    Object.keys(arrematadorData).forEach((arr) => {
-      const data = arrematadorData[arr]
-      data.totalMeta = Object.values(data.tierData).reduce((sum, tier) => sum + tier.meta, 0)
-      data.percentualGeral = data.totalMeta > 0 ? (data.totalRealizado / data.totalMeta) * 100 : 0
     })
 
     return arrematadorData
@@ -463,113 +393,6 @@ export function MetasControl({ leads }: MetasControlProps) {
               <Button onClick={handleSave} className="bg-red-600 hover:bg-red-700">
                 <Save className="w-4 h-4 mr-2" />
                 Salvar Configurações
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    )
-  }
-
-  // Modal de Metas dos Arrematadores por Tier
-  const ArrematadorMetasModal = () => {
-    const [tempMetas, setTempMetas] = useState<ArrematadorTierMetas>(arrematadorMetas)
-
-    const handleSave = () => {
-      saveArrematadorMetas(tempMetas)
-      setIsArrematadorModalOpen(false)
-    }
-
-    const updateMeta = (arrematador: string, tier: string, meta: number) => {
-      setTempMetas((prev) => ({
-        ...prev,
-        [arrematador]: {
-          ...prev[arrematador],
-          [tier]: meta,
-        },
-      }))
-    }
-
-    const arrematadores = [
-      { key: "alan", name: "Alan", color: "from-blue-500 to-blue-600", icon: "🎯" },
-      { key: "antonio", name: "Antônio", color: "from-green-500 to-green-600", icon: "📈" },
-      { key: "gabrielli", name: "Gabrielli", color: "from-purple-500 to-purple-600", icon: "🚀" },
-      { key: "jasson", name: "Jasson", color: "from-red-500 to-red-600", icon: "⭐" },
-      { key: "vanessa", name: "Vanessa", color: "from-pink-500 to-pink-600", icon: "💎" },
-      { key: "william", name: "William", color: "from-orange-500 to-orange-600", icon: "👑" },
-    ]
-
-    return (
-      <Dialog open={isArrematadorModalOpen} onOpenChange={setIsArrematadorModalOpen}>
-        <DialogContent className="max-w-6xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <Users className="w-5 h-5 text-green-600" />
-              <span>Configurar Metas dos Arrematadores por Tier</span>
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-6">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <p className="text-sm text-green-800">
-                <strong>🎯 Configuração:</strong> Defina a meta mensal de leads por tier de faturamento para cada
-                arrematador.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {arrematadores.map((arr) => (
-                <Card key={arr.key} className="border-l-4 border-l-green-500">
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <div
-                        className={`w-8 h-8 bg-gradient-to-br ${arr.color} rounded-lg flex items-center justify-center text-white font-bold shadow-lg`}
-                      >
-                        <span className="text-sm">{arr.icon}</span>
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-gray-900 capitalize">{arr.name}</h3>
-                        <p className="text-sm text-gray-500">Metas por tier de faturamento</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-                      {tierOrder.map((tier) => {
-                        const tierConfig = metasConfig[tier]
-                        return (
-                          <div key={tier} className="space-y-1">
-                            <Label className="text-xs font-medium text-gray-600">{tier}</Label>
-                            <div className="flex items-center space-x-1">
-                              <div
-                                className={`w-4 h-4 bg-gradient-to-br ${tierConfig?.color} rounded flex items-center justify-center`}
-                              >
-                                <span className="text-xs">{tierConfig?.icon}</span>
-                              </div>
-                              <Input
-                                type="number"
-                                value={tempMetas[arr.key]?.[tier] || 0}
-                                onChange={(e) => updateMeta(arr.key, tier, Number(e.target.value))}
-                                className="h-8 text-xs"
-                                min="0"
-                                placeholder="0"
-                              />
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            <div className="flex justify-end space-x-3 pt-4 border-t">
-              <Button variant="outline" onClick={() => setIsArrematadorModalOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700">
-                <Save className="w-4 h-4 mr-2" />
-                Salvar Metas
               </Button>
             </div>
           </div>
@@ -779,78 +602,86 @@ export function MetasControl({ leads }: MetasControlProps) {
       {/* Seção dos Arrematadores Compacta */}
       <Card className="border-0 shadow-lg overflow-hidden">
         <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-100 border-b py-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-bold text-gray-800 flex items-center space-x-2">
-              <Users className="w-4 h-4 text-green-600" />
-              <span>Performance dos Arrematadores</span>
-            </CardTitle>
-            <Button
-              variant="outline"
-              onClick={() => setIsArrematadorModalOpen(true)}
-              className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 text-sm h-8"
-            >
-              <Settings className="w-3 h-3 mr-1" />
-              Config
-            </Button>
-          </div>
+          <CardTitle className="text-lg font-bold text-gray-800 flex items-center space-x-2">
+            <Users className="w-4 h-4 text-green-600" />
+            <span>Leads Comprados por Arrematador</span>
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {(() => {
-              const arrematadorData = calculateArrematadorData()
-              const arrematadores = [
-                { key: "alan", name: "Alan", color: "from-blue-500 to-blue-600", icon: "🎯" },
-                { key: "antonio", name: "Antônio", color: "from-green-500 to-green-600", icon: "📈" },
-                { key: "gabrielli", name: "Gabrielli", color: "from-purple-500 to-purple-600", icon: "🚀" },
-                { key: "jasson", name: "Jasson", color: "from-red-500 to-red-600", icon: "⭐" },
-                { key: "vanessa", name: "Vanessa", color: "from-pink-500 to-pink-600", icon: "💎" },
-                { key: "william", name: "William", color: "from-orange-500 to-orange-600", icon: "👑" },
-              ]
-
-              return arrematadores.map((arr) => {
-                const data = arrematadorData[arr.key]
-                const status = getStatusBadge(data.percentualGeral)
-
-                return (
-                  <Card
-                    key={arr.key}
-                    className="relative overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300"
-                  >
-                    <div className={`absolute inset-0 bg-gradient-to-br ${arr.color}`}></div>
-                    <CardContent className="relative z-10 p-3 text-white">
-                      <div className="text-center space-y-2">
-                        <div className="flex items-center justify-center space-x-1">
-                          <div className="w-6 h-6 bg-white/20 rounded flex items-center justify-center backdrop-blur-sm">
-                            <span className="text-xs">{arr.icon}</span>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 font-semibold text-gray-700">Arrematador</th>
+                  {tierOrder.slice(0, 6).map((tier) => {
+                    const tierConfig = metasConfig[tier]
+                    return (
+                      <th key={tier} className="text-center py-2 px-1">
+                        <div className="flex flex-col items-center space-y-1">
+                          <div
+                            className={`w-5 h-5 bg-gradient-to-br ${tierConfig?.color} rounded flex items-center justify-center`}
+                          >
+                            <span className="text-xs">{tierConfig?.icon}</span>
                           </div>
-                          <h3 className="font-bold text-sm">{arr.name}</h3>
+                          <span className="text-xs font-medium text-gray-600 leading-tight">
+                            {tier.replace(" a ", "-").replace("kk", "M")}
+                          </span>
                         </div>
+                      </th>
+                    )
+                  })}
+                  <th className="text-center py-2 font-semibold text-gray-700">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  const arrematadorData = calculateArrematadorData()
+                  const arrematadores = [
+                    { key: "alan", name: "Alan", color: "from-blue-500 to-blue-600", icon: "🎯" },
+                    { key: "antonio", name: "Antônio", color: "from-green-500 to-green-600", icon: "📈" },
+                    { key: "gabrielli", name: "Gabrielli", color: "from-purple-500 to-purple-600", icon: "🚀" },
+                    { key: "jasson", name: "Jasson", color: "from-red-500 to-red-600", icon: "⭐" },
+                    { key: "vanessa", name: "Vanessa", color: "from-pink-500 to-pink-600", icon: "💎" },
+                    { key: "william", name: "William", color: "from-orange-500 to-orange-600", icon: "👑" },
+                  ]
 
-                        <div className="space-y-1">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-white/80">Real:</span>
-                            <span className="font-bold">{data.totalRealizado}</span>
+                  return arrematadores.map((arr) => {
+                    const data = arrematadorData[arr.key]
+
+                    return (
+                      <tr key={arr.key} className="border-b hover:bg-gray-50">
+                        <td className="py-3">
+                          <div className="flex items-center space-x-2">
+                            <div
+                              className={`w-6 h-6 bg-gradient-to-br ${arr.color} rounded flex items-center justify-center text-white font-bold shadow-sm`}
+                            >
+                              <span className="text-xs">{arr.icon}</span>
+                            </div>
+                            <span className="font-medium text-gray-900">{arr.name}</span>
                           </div>
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-white/80">Meta:</span>
-                            <span className="font-semibold">{data.totalMeta}</span>
-                          </div>
-                          <Badge className={`${status.color} text-white text-xs px-2 py-0.5 w-full justify-center`}>
-                            {formatPercentage(data.percentualGeral)}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })
-            })()}
+                        </td>
+                        {tierOrder.slice(0, 6).map((tier) => {
+                          const leadsCount = data.tierData[tier] || 0
+                          return (
+                            <td key={tier} className="text-center py-3 px-1">
+                              <span className={`font-bold ${leadsCount > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                                {leadsCount}
+                              </span>
+                            </td>
+                          )
+                        })}
+                        <td className="text-center py-3">
+                          <span className="font-bold text-lg text-blue-600">{data.totalRealizado}</span>
+                        </td>
+                      </tr>
+                    )
+                  })
+                })()}
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>
-
-      {/* Modal de Metas dos Arrematadores */}
-      <ArrematadorMetasModal />
 
       {/* Modal de Configuração */}
       <ConfigModal />
