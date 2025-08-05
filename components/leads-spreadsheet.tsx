@@ -1,11 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Save, RefreshCw, Filter, Eye, EyeOff, RotateCcw } from "lucide-react"
+import { Save, RefreshCw, Settings, Eye, EyeOff } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
 import type { Lead } from "@/app/page"
 
 interface LeadsSpreadsheetProps {
@@ -17,49 +19,17 @@ interface LeadsSpreadsheetProps {
 export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpreadsheetProps) {
   const [editingCell, setEditingCell] = useState<string | null>(null)
   const [localChanges, setLocalChanges] = useState<Record<string, Partial<Lead>>>({})
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
-    // Colunas principais sempre visíveis
-    nome_empresa: true,
-    status: true,
-    observacoes: true,
-    data_ultimo_contato: true,
-    data_hora_compra: true,
-    arrematador: true,
-    sdr: true,
-    valor_pago_lead: true,
-    tipo_lead: true,
-    conseguiu_contato: true,
-    reuniao_agendada: true,
-    reuniao_realizada: true,
-    // Outras colunas inicialmente ocultas
-    data_venda: false,
-    data_fechamento: false,
-    motivo_perda_pv: false,
-    faturamento: false,
-    nicho: false,
-    cidade: false,
-    regiao: false,
-    cargo_contato: false,
-    email: false,
-    produto: false,
-    anuncios: false,
-    horario_compra: false,
-    closer: false,
-    tem_comentario_lbf: false,
-    fee: false,
-    fee_total: false,
-    escopo_fechado: false,
-    data_assinatura: false,
-  })
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({})
 
-  // TODAS as colunas da planilha conforme solicitado
+  // TODAS as colunas da planilha
   const columns = [
-    { key: "nome_empresa", label: "LEAD", width: "200px", type: "text" },
+    { key: "nome_empresa", label: "LEAD", width: "200px", type: "text", essential: true },
     {
       key: "status",
       label: "STATUS",
       width: "150px",
       type: "select",
+      essential: true,
       options: [
         "BACKLOG",
         "TENTANDO CONTATO",
@@ -77,29 +47,37 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         "FOLLOW INFINITO",
       ],
     },
-    { key: "observacoes", label: "OBSERVAÇÕES", width: "200px", type: "text" },
-    { key: "data_ultimo_contato", label: "DATA ÚLTIMO CONTATO", width: "150px", type: "date" },
-    { key: "data_hora_compra", label: "DATA DA COMPRA", width: "150px", type: "datetime-local" },
+    { key: "observacoes", label: "OBSERVAÇÕES", width: "200px", type: "text", essential: true },
+    { key: "data_ultimo_contato", label: "DATA ÚLTIMO CONTATO", width: "150px", type: "date", essential: true },
+    { key: "data_hora_compra", label: "DATA DA COMPRA", width: "150px", type: "datetime-local", essential: true },
     {
       key: "arrematador",
       label: "ARREMATANTE",
       width: "120px",
       type: "select",
+      essential: true,
       options: ["alan", "antonio", "gabrielli", "jasson", "vanessa", "william"],
     },
-    { key: "sdr", label: "SDR", width: "100px", type: "select", options: ["antonio", "gabrielli", "vanessa"] },
-    { key: "valor_pago_lead", label: "VALOR", width: "100px", type: "number" },
+    {
+      key: "sdr",
+      label: "SDR",
+      width: "100px",
+      type: "select",
+      essential: true,
+      options: ["antonio", "gabrielli", "vanessa"],
+    },
+    { key: "valor_pago_lead", label: "VALOR", width: "100px", type: "number", essential: true },
     {
       key: "tipo_lead",
       label: "ORIGEM",
       width: "120px",
       type: "select",
+      essential: true,
       options: ["leadbroker", "organico", "indicacao", "facebook", "google", "linkedin"],
     },
     { key: "conseguiu_contato", label: "CS", width: "60px", type: "boolean" },
     { key: "reuniao_agendada", label: "RM", width: "60px", type: "boolean" },
     { key: "reuniao_realizada", label: "RR", width: "60px", type: "boolean" },
-    { key: "reuniao_realizada", label: "RNS", width: "60px", type: "boolean" }, // Assumindo que RNS = Reunião Realizada
     { key: "data_venda", label: "DATA DA MARCAÇÃO", width: "150px", type: "date" },
     { key: "data_fechamento", label: "DATA DA REUNIÃO", width: "150px", type: "date" },
     { key: "motivo_perda_pv", label: "MOTIVO DE PERDA", width: "150px", type: "text" },
@@ -141,12 +119,35 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       options: ["antonio", "gabrielli", "vanessa", "jasson", "leonardo"],
     },
     { key: "tem_comentario_lbf", label: "COMENTÁRIO", width: "100px", type: "boolean" },
-    { key: "motivo_perda_pv", label: "MOTIVO DE PERDA", width: "150px", type: "text" },
     { key: "fee", label: "FEE", width: "100px", type: "number" },
     { key: "fee_total", label: "MRR FEE", width: "100px", type: "number" },
     { key: "escopo_fechado", label: "ESCOPO FECHADO", width: "150px", type: "text" },
-    { key: "data_fechamento", label: "DATA DE ASSINATURA", width: "150px", type: "date" },
+    { key: "data_assinatura", label: "DATA DE ASSINATURA", width: "150px", type: "date" },
   ]
+
+  // Load column preferences from localStorage
+  useEffect(() => {
+    const savedColumns = localStorage.getItem("leadsSpreadsheetColumns")
+    if (savedColumns) {
+      setVisibleColumns(JSON.parse(savedColumns))
+    } else {
+      // Default: show essential columns
+      const defaultVisible = columns.reduce(
+        (acc, col) => {
+          acc[col.key] = col.essential || false
+          return acc
+        },
+        {} as Record<string, boolean>,
+      )
+      setVisibleColumns(defaultVisible)
+    }
+  }, [])
+
+  // Save column preferences to localStorage
+  const updateVisibleColumns = (newVisibleColumns: Record<string, boolean>) => {
+    setVisibleColumns(newVisibleColumns)
+    localStorage.setItem("leadsSpreadsheetColumns", JSON.stringify(newVisibleColumns))
+  }
 
   const handleCellEdit = (leadId: string, field: string, value: any) => {
     setLocalChanges((prev) => ({
@@ -176,7 +177,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     switch (type) {
       case "datetime-local":
         if (typeof value === "string" && value.includes("T")) {
-          return value.slice(0, 16) // YYYY-MM-DDTHH:MM
+          return value.slice(0, 16)
         }
         return value || ""
       case "date":
@@ -312,33 +313,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   }
 
   const toggleColumn = (columnKey: string) => {
-    setVisibleColumns((prev) => ({
-      ...prev,
-      [columnKey]: !prev[columnKey],
-    }))
-  }
-
-  const showAllColumns = () => {
-    const allVisible = columns.reduce(
-      (acc, col) => {
-        acc[col.key] = true
-        return acc
-      },
-      {} as Record<string, boolean>,
-    )
-    setVisibleColumns(allVisible)
-  }
-
-  const hideAllColumns = () => {
-    const essentialColumns = ["nome_empresa", "status", "sdr", "arrematador"]
-    const newVisible = columns.reduce(
-      (acc, col) => {
-        acc[col.key] = essentialColumns.includes(col.key)
-        return acc
-      },
-      {} as Record<string, boolean>,
-    )
-    setVisibleColumns(newVisible)
+    const newVisible = {
+      ...visibleColumns,
+      [columnKey]: !visibleColumns[columnKey],
+    }
+    updateVisibleColumns(newVisible)
   }
 
   const visibleColumnsArray = columns.filter((col) => visibleColumns[col.key])
@@ -346,69 +325,119 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">📊 Planilha Completa de Leads</h2>
-            <p className="text-sm text-gray-500">
-              Todas as colunas disponíveis • {visibleColumnsArray.length} de {columns.length} colunas visíveis
-            </p>
+      {/* Header Compacto */}
+      <div className="p-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <h2 className="text-lg font-bold text-gray-900">📊 Planilha de Leads</h2>
+            <span className="text-sm text-gray-500">
+              {visibleColumnsArray.length}/{columns.length} colunas
+            </span>
           </div>
           <div className="flex items-center space-x-2">
             {hasUnsavedChanges && (
-              <Button onClick={handleSaveAllChanges} className="bg-green-600 hover:bg-green-700 text-sm" size="sm">
-                <Save className="w-4 h-4 mr-1" />
-                Salvar Todas ({Object.keys(localChanges).length})
+              <Button onClick={handleSaveAllChanges} className="bg-green-600 hover:bg-green-700 text-sm h-8" size="sm">
+                <Save className="w-3 h-3 mr-1" />
+                Salvar ({Object.keys(localChanges).length})
               </Button>
             )}
-            <Button variant="outline" onClick={onRefresh} size="sm">
-              <RefreshCw className="w-4 h-4 mr-1" />
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 bg-transparent">
+                  <Settings className="w-3 h-3 mr-1" />
+                  Colunas
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Configurar Colunas Visíveis</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="font-semibold mb-2 text-green-700">✅ Colunas Essenciais</h4>
+                      <div className="space-y-2">
+                        {columns
+                          .filter((col) => col.essential)
+                          .map((col) => (
+                            <div key={col.key} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={col.key}
+                                checked={visibleColumns[col.key] || false}
+                                onCheckedChange={() => toggleColumn(col.key)}
+                              />
+                              <label htmlFor={col.key} className="text-sm font-medium">
+                                {col.label}
+                              </label>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold mb-2 text-blue-700">📋 Colunas Adicionais</h4>
+                      <div className="space-y-2">
+                        {columns
+                          .filter((col) => !col.essential)
+                          .map((col) => (
+                            <div key={col.key} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={col.key}
+                                checked={visibleColumns[col.key] || false}
+                                onCheckedChange={() => toggleColumn(col.key)}
+                              />
+                              <label htmlFor={col.key} className="text-sm">
+                                {col.label}
+                              </label>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t">
+                    <div className="flex space-x-2">
+                      <Button
+                        onClick={() => {
+                          const allVisible = columns.reduce(
+                            (acc, col) => {
+                              acc[col.key] = true
+                              return acc
+                            },
+                            {} as Record<string, boolean>,
+                          )
+                          updateVisibleColumns(allVisible)
+                        }}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <Eye className="w-3 h-3 mr-1" />
+                        Mostrar Todas
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          const essentialOnly = columns.reduce(
+                            (acc, col) => {
+                              acc[col.key] = col.essential || false
+                              return acc
+                            },
+                            {} as Record<string, boolean>,
+                          )
+                          updateVisibleColumns(essentialOnly)
+                        }}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <EyeOff className="w-3 h-3 mr-1" />
+                        Apenas Essenciais
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Button variant="outline" onClick={onRefresh} size="sm" className="h-8 bg-transparent">
+              <RefreshCw className="w-3 h-3 mr-1" />
               Atualizar
             </Button>
-          </div>
-        </div>
-
-        {/* Controles de Colunas */}
-        <div className="space-y-3">
-          <div className="flex items-center space-x-2">
-            <Button onClick={showAllColumns} variant="outline" size="sm" className="text-xs bg-transparent">
-              <Eye className="w-3 h-3 mr-1" />
-              Mostrar Todas
-            </Button>
-            <Button onClick={hideAllColumns} variant="outline" size="sm" className="text-xs bg-transparent">
-              <EyeOff className="w-3 h-3 mr-1" />
-              Essenciais
-            </Button>
-            <Button
-              onClick={() => setLocalChanges({})}
-              variant="outline"
-              size="sm"
-              className="text-xs"
-              disabled={!hasUnsavedChanges}
-            >
-              <RotateCcw className="w-3 h-3 mr-1" />
-              Descartar Alterações
-            </Button>
-          </div>
-
-          <div className="flex items-center space-x-2 text-sm">
-            <Filter className="w-4 h-4 text-gray-400" />
-            <span className="text-gray-600">Colunas:</span>
-            <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
-              {columns.map((col) => (
-                <Button
-                  key={col.key}
-                  variant={visibleColumns[col.key] ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => toggleColumn(col.key)}
-                  className="h-6 px-2 text-xs"
-                >
-                  {visibleColumns[col.key] ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
-                  {col.label}
-                </Button>
-              ))}
-            </div>
           </div>
         </div>
       </div>
@@ -454,13 +483,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       </div>
 
       {/* Footer */}
-      <div className="p-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">
+      <div className="p-2 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <span>📋 {leads.length} leads exibidos</span>
-            <span>
-              👁️ {visibleColumnsArray.length}/{columns.length} colunas visíveis
-            </span>
+            <span>📋 {leads.length} leads</span>
+            <span>👁️ {visibleColumnsArray.length} colunas visíveis</span>
           </div>
           {hasUnsavedChanges && (
             <span className="text-yellow-600 font-medium">
