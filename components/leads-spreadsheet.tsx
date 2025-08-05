@@ -47,7 +47,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         "FOLLOW INFINITO",
       ],
     },
-    { key: "observacoes", label: "OBSERVAÇÕES", width: "200px", type: "text", essential: true },
+    { key: "observacoes", label: "OBSERVAÇÕES SDR", width: "200px", type: "text", essential: true },
     { key: "data_ultimo_contato", label: "DATA ÚLTIMO CONTATO", width: "150px", type: "date", essential: true },
     { key: "data_hora_compra", label: "DATA DA COMPRA", width: "150px", type: "datetime-local", essential: true },
     {
@@ -78,9 +78,9 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     { key: "conseguiu_contato", label: "CS", width: "60px", type: "boolean" },
     { key: "reuniao_agendada", label: "RM", width: "60px", type: "boolean" },
     { key: "reuniao_realizada", label: "RR", width: "60px", type: "boolean" },
+    { key: "no_show", label: "NS", width: "60px", type: "boolean" },
     { key: "data_venda", label: "DATA DA MARCAÇÃO", width: "150px", type: "date" },
     { key: "data_fechamento", label: "DATA DA REUNIÃO", width: "150px", type: "date" },
-    { key: "motivo_perda_pv", label: "MOTIVO DE PERDA", width: "150px", type: "text" },
     { key: "faturamento", label: "FATURAMENTO", width: "150px", type: "text" },
     {
       key: "nicho",
@@ -119,10 +119,10 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       options: ["antonio", "gabrielli", "vanessa", "jasson", "leonardo"],
     },
     { key: "tem_comentario_lbf", label: "COMENTÁRIO", width: "100px", type: "boolean" },
-    { key: "fee", label: "FEE", width: "100px", type: "number" },
-    { key: "fee_total", label: "MRR FEE", width: "100px", type: "number" },
-    { key: "escopo_fechado", label: "ESCOPO FECHADO", width: "150px", type: "text" },
+    { key: "fee_total", label: "FEE MRR", width: "100px", type: "number" },
+    { key: "escopo_fechado", label: "FEE ONE-TIME", width: "150px", type: "number" },
     { key: "data_assinatura", label: "DATA DE ASSINATURA", width: "150px", type: "date" },
+    { key: "motivo_perda_pv", label: "MOTIVO DE PERDA", width: "150px", type: "text" },
   ]
 
   // Load column preferences from localStorage
@@ -285,6 +285,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
           return value || ""
         case "number":
           if (!value) return ""
+          // Para colunas FEE, mostrar como moeda
+          if (column.key === "fee_total" || column.key === "escopo_fechado") {
+            const numValue = Number(value)
+            return isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+          }
           return Number(value).toLocaleString("pt-BR")
         case "email":
           return String(value || "")
