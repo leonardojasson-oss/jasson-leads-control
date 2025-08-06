@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Save, RefreshCw, Settings, Eye, EyeOff } from "lucide-react"
+import { RefreshCw, Settings, Eye, EyeOff } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { Lead } from "@/app/page"
@@ -18,7 +18,6 @@ interface LeadsSpreadsheetProps {
 
 export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpreadsheetProps) {
   const [editingCell, setEditingCell] = useState<string | null>(null)
-  const [localChanges, setLocalChanges] = useState<Record<string, Partial<Lead>>>({})
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({})
 
   // TODAS as colunas da planilha
@@ -116,9 +115,9 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       label: "CLOSER",
       width: "100px",
       type: "select",
-      options: ["antonio", "gabrielli", "vanessa", "jasson", "leonardo"],
+      options: ["alan", "jasson", "william"],
     },
-    { key: "tem_comentario_lbf", label: "COMENTÁRIO", width: "100px", type: "boolean" },
+    { key: "tem_comentario_lbf", label: "OBSERVAÇÃO CLOSER", width: "200px", type: "text" },
     { key: "fee_total", label: "FEE MRR", width: "100px", type: "number" },
     { key: "escopo_fechado", label: "FEE ONE-TIME", width: "150px", type: "number" },
     { key: "data_assinatura", label: "DATA DE ASSINATURA", width: "150px", type: "date" },
@@ -149,26 +148,14 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     localStorage.setItem("leadsSpreadsheetColumns", JSON.stringify(newVisibleColumns))
   }
 
-  const handleCellEdit = (leadId: string, field: string, value: any) => {
-    setLocalChanges((prev) => ({
-      ...prev,
-      [leadId]: {
-        ...prev[leadId],
-        [field]: value,
-      },
-    }))
-  }
-
-  const handleSaveAllChanges = async () => {
-    for (const [leadId, changes] of Object.entries(localChanges)) {
-      await onUpdateLead(leadId, changes)
-    }
-    setLocalChanges({})
+  // Auto-save function
+  const handleCellEdit = async (leadId: string, field: string, value: any) => {
+    // Save automatically when cell is edited
+    await onUpdateLead(leadId, { [field]: value })
   }
 
   const getCellValue = (lead: Lead, field: string) => {
-    const localValue = localChanges[lead.id]?.[field as keyof Lead]
-    return localValue !== undefined ? localValue : (lead as any)[field]
+    return (lead as any)[field]
   }
 
   const formatValue = (value: any, type: string) => {
@@ -203,7 +190,6 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     const cellKey = `${lead.id}-${column.key}`
     const isEditing = editingCell === cellKey
     const value = getCellValue(lead, column.key)
-    const hasChanges = localChanges[lead.id]?.[column.key as keyof Lead] !== undefined
 
     if (isEditing) {
       switch (column.type) {
@@ -300,9 +286,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
 
     return (
       <div
-        className={`h-8 px-2 py-1 text-xs cursor-pointer hover:bg-gray-100 flex items-center min-h-[32px] ${
-          hasChanges ? "bg-yellow-50 border-l-2 border-l-yellow-400" : ""
-        }`}
+        className="h-8 px-2 py-1 text-xs cursor-pointer hover:bg-gray-100 flex items-center min-h-[32px]"
         onClick={() => setEditingCell(cellKey)}
         title={`Clique para editar • Valor: ${displayValue}`}
       >
@@ -326,7 +310,6 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   }
 
   const visibleColumnsArray = columns.filter((col) => visibleColumns[col.key])
-  const hasUnsavedChanges = Object.keys(localChanges).length > 0
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
@@ -336,16 +319,10 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
           <div className="flex items-center space-x-3">
             <h2 className="text-lg font-bold text-gray-900">📊 Planilha de Leads</h2>
             <span className="text-sm text-gray-500">
-              {visibleColumnsArray.length}/{columns.length} colunas
+              {visibleColumnsArray.length}/{columns.length} colunas • Auto-save ativo
             </span>
           </div>
           <div className="flex items-center space-x-2">
-            {hasUnsavedChanges && (
-              <Button onClick={handleSaveAllChanges} className="bg-green-600 hover:bg-green-700 text-sm h-8" size="sm">
-                <Save className="w-3 h-3 mr-1" />
-                Salvar ({Object.keys(localChanges).length})
-              </Button>
-            )}
             <Dialog>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 bg-transparent">
@@ -494,11 +471,9 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
             <span>📋 {leads.length} leads</span>
             <span>👁️ {visibleColumnsArray.length} colunas visíveis</span>
           </div>
-          {hasUnsavedChanges && (
-            <span className="text-yellow-600 font-medium">
-              ⚠️ {Object.keys(localChanges).length} alterações não salvas
-            </span>
-          )}
+          <span className="text-green-600 font-medium">
+            ✅ Salvamento automático ativo
+          </span>
         </div>
       </div>
     </div>

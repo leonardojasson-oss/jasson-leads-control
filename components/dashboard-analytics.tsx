@@ -8,295 +8,337 @@ interface DashboardAnalyticsProps {
 }
 
 export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
-  // Calculate metrics based on real data
-  const totalLeads = leads.length
-  const leadsWithSales = leads.filter((lead) => lead.valorVenda && Number.parseFloat(lead.valorVenda) > 0).length
-  const conversionRate = totalLeads > 0 ? (leadsWithSales / totalLeads) * 100 : 0
+  // Função para calcular funil de conversão
+  const calculateFunnel = (leadsData: Lead[]) => {
+    const totalLeads = leadsData.length
+    const contato = leadsData.filter(lead => lead.conseguiu_contato).length
+    const agendada = leadsData.filter(lead => lead.reuniao_agendada).length
+    const realizada = leadsData.filter(lead => lead.reuniao_realizada).length
+    const vendas = leadsData.filter(lead => lead.data_fechamento).length
+    
+    // Calcular FEE MRR e FEE ONE TIME
+    const feeMrr = leadsData.reduce((sum, lead) => {
+      const fee = Number.parseFloat(String(lead.fee_total || "0"))
+      return sum + (isNaN(fee) ? 0 : fee)
+    }, 0)
+    
+    const feeOneTime = leadsData.reduce((sum, lead) => {
+      const escopo = Number.parseFloat(String(lead.escopo_fechado || "0"))
+      return sum + (isNaN(escopo) ? 0 : escopo)
+    }, 0)
 
-  const totalSales = leads.reduce((sum, lead) => sum + (Number.parseFloat(lead.valorVenda) || 0), 0)
-  const averageTicket = leadsWithSales > 0 ? totalSales / leadsWithSales : 0
-
-  const totalInvestment = leads.reduce((sum, lead) => sum + (Number.parseFloat(lead.valorPagoLead) || 0), 0)
-  const cac = totalLeads > 0 ? totalInvestment / totalLeads : 0
-
-  const ltvCacRatio = cac > 0 ? averageTicket / cac : 0
-
-  const additionalKPIs = [
-    {
-      title: "Taxa de Conversão Geral",
-      value: `${conversionRate.toFixed(1)}%`,
-      subtitle: `${leadsWithSales} de ${totalLeads} leads`,
-      color: "border-l-blue-500",
-    },
-    {
-      title: "Ticket Médio",
-      value: `R$ ${averageTicket.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`,
-      subtitle: "Valor médio por venda",
-      color: "border-l-green-500",
-    },
-    {
-      title: "CAC (Custo por Lead)",
-      value: `R$ ${cac.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-      subtitle: "Custo médio por lead",
-      color: "border-l-purple-500",
-    },
-    {
-      title: "LTV/CAC Ratio",
-      value: `${ltvCacRatio.toFixed(1)}x`,
-      subtitle: "Retorno sobre investimento",
-      color: "border-l-orange-500",
-    },
-  ]
-
-  // Calculate rankings
-  const sdrStats = leads.reduce(
-    (acc, lead) => {
-      if (!acc[lead.sdr]) {
-        acc[lead.sdr] = { leads: 0, sales: 0, revenue: 0 }
+    return {
+      leads: { count: totalLeads, percentage: 100 },
+      contato: { 
+        count: contato, 
+        percentage: totalLeads > 0 ? (contato / totalLeads) * 100 : 0 
+      },
+      agendada: { 
+        count: agendada, 
+        percentage: totalLeads > 0 ? (agendada / totalLeads) * 100 : 0 
+      },
+      realizada: { 
+        count: realizada, 
+        percentage: totalLeads > 0 ? (realizada / totalLeads) * 100 : 0 
+      },
+      vendas: { 
+        count: vendas, 
+        percentage: totalLeads > 0 ? (vendas / totalLeads) * 100 : 0 
+      },
+      feeMrr,
+      feeOneTime,
+      conversions: {
+        leadToContato: totalLeads > 0 ? (contato / totalLeads) * 100 : 0,
+        contatoToAgendada: contato > 0 ? (agendada / contato) * 100 : 0,
+        agendadaToRealizada: agendada > 0 ? (realizada / agendada) * 100 : 0,
+        realizadaToVenda: realizada > 0 ? (vendas / realizada) * 100 : 0
       }
-      acc[lead.sdr].leads++
-      if (lead.valorVenda && Number.parseFloat(lead.valorVenda) > 0) {
-        acc[lead.sdr].sales++
-        acc[lead.sdr].revenue += Number.parseFloat(lead.valorVenda)
+    }
+  }
+
+  // Funil geral
+  const generalFunnel = calculateFunnel(leads)
+
+  // Funis por closer específicos (APENAS Alan, Jasson, William)
+  const closerStats = leads.reduce((acc, lead) => {
+    const closer = lead.closer?.toLowerCase()
+    if (closer && ['alan', 'jasson', 'william'].includes(closer)) {
+      if (!acc[closer]) {
+        acc[closer] = []
       }
-      return acc
-    },
-    {} as Record<string, { leads: number; sales: number; revenue: number }>,
-  )
+      acc[closer].push(lead)
+    }
+    return acc
+  }, {} as Record<string, Lead[]>)
 
-  const closerStats = leads.reduce(
-    (acc, lead) => {
-      if (lead.closer) {
-        if (!acc[lead.closer]) {
-          acc[lead.closer] = { leads: 0, sales: 0, revenue: 0 }
-        }
-        acc[lead.closer].leads++
-        if (lead.valorVenda && Number.parseFloat(lead.valorVenda) > 0) {
-          acc[lead.closer].sales++
-          acc[lead.closer].revenue += Number.parseFloat(lead.valorVenda)
-        }
-      }
-      return acc
-    },
-    {} as Record<string, { leads: number; sales: number; revenue: number }>,
-  )
+  const closerFunnels = Object.entries(closerStats).map(([closer, closerLeads]) => ({
+    name: closer.charAt(0).toUpperCase() + closer.slice(1),
+    funnel: calculateFunnel(closerLeads)
+  }))
 
-  const nichoStats = leads.reduce(
-    (acc, lead) => {
-      if (!acc[lead.nicho]) {
-        acc[lead.nicho] = { leads: 0, sales: 0, revenue: 0 }
-      }
-      acc[lead.nicho].leads++
-      if (lead.valorVenda && Number.parseFloat(lead.valorVenda) > 0) {
-        acc[lead.nicho].sales++
-        acc[lead.nicho].revenue += Number.parseFloat(lead.valorVenda)
-      }
-      return acc
-    },
-    {} as Record<string, { leads: number; sales: number; revenue: number }>,
-  )
+  // Componente de funil visual
+  const VisualFunnel = ({ title, funnel, totalLeads, color }: { 
+    title: string, 
+    funnel: any, 
+    totalLeads: number,
+    color: string 
+  }) => {
+    const stages = [
+      { name: 'Leads', count: funnel.leads.count, percentage: funnel.leads.percentage, color: '#22d3ee' },
+      { name: 'Contato', count: funnel.contato.count, percentage: funnel.contato.percentage, color: '#4ade80' },
+      { name: 'Agendada', count: funnel.agendada.count, percentage: funnel.agendada.percentage, color: '#a3e635' },
+      { name: 'Realizada', count: funnel.realizada.count, percentage: funnel.realizada.percentage, color: '#fb923c' },
+      { name: 'Vendas', count: funnel.vendas.count, percentage: funnel.vendas.percentage, color: '#ef4444' }
+    ]
 
-  const rankingSDR = Object.entries(sdrStats)
-    .map(([name, stats]) => ({ name, ...stats, conversion: stats.leads > 0 ? (stats.sales / stats.leads) * 100 : 0 }))
-    .sort((a, b) => b.revenue - a.revenue)
+    return (
+      <Card className="w-full">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg font-semibold text-center" style={{ color }}>
+            {title}
+          </CardTitle>
+          <p className="text-sm text-gray-500 text-center">
+            {totalLeads} leads • Funil de Conversão
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="relative flex flex-col items-center space-y-1">
+            {stages.map((stage, index) => {
+              const width = Math.max(20, (stage.percentage / 100) * 100)
+              const leftMargin = (100 - width) / 2
+              
+              return (
+                <div key={stage.name} className="relative w-full flex justify-center">
+                  <div
+                    className="relative flex items-center justify-center text-white font-bold text-sm shadow-lg transition-all duration-300 hover:scale-105"
+                    style={{
+                      backgroundColor: stage.color,
+                      width: `${width}%`,
+                      height: '50px',
+                      clipPath: index === 0 
+                        ? 'polygon(0 0, 100% 0, 95% 100%, 5% 100%)'
+                        : index === stages.length - 1
+                        ? 'polygon(5% 0, 95% 0, 90% 100%, 10% 100%)'
+                        : 'polygon(5% 0, 95% 0, 90% 100%, 10% 100%)',
+                      marginTop: index > 0 ? '-2px' : '0'
+                    }}
+                  >
+                    <div className="text-center">
+                      <div className="font-bold text-lg">{stage.count}</div>
+                      <div className="text-xs opacity-90">{stage.name}</div>
+                    </div>
+                  </div>
+                  
+                  {/* Percentual ao lado */}
+                  <div className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-full ml-4">
+                    <div className="bg-gray-100 px-2 py-1 rounded text-xs font-medium text-gray-700">
+                      {stage.percentage.toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
 
-  const rankingCloser = Object.entries(closerStats)
-    .map(([name, stats]) => ({ name, ...stats, conversion: stats.leads > 0 ? (stats.sales / stats.leads) * 100 : 0 }))
-    .sort((a, b) => b.revenue - a.revenue)
+          {/* Métricas de conversão */}
+          <div className="pt-4 border-t border-gray-200 mt-6">
+            <h4 className="text-sm font-semibold text-gray-700 mb-3">📊 Conversões entre Etapas</h4>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="bg-blue-50 p-2 rounded">
+                <span className="text-gray-600">Lead → Contato:</span>
+                <span className="font-bold text-blue-600 ml-1">
+                  {funnel.conversions.leadToContato.toFixed(1)}%
+                </span>
+              </div>
+              <div className="bg-green-50 p-2 rounded">
+                <span className="text-gray-600">Contato → Agendada:</span>
+                <span className="font-bold text-green-600 ml-1">
+                  {funnel.conversions.contatoToAgendada.toFixed(1)}%
+                </span>
+              </div>
+              <div className="bg-yellow-50 p-2 rounded">
+                <span className="text-gray-600">Agendada → Realizada:</span>
+                <span className="font-bold text-yellow-600 ml-1">
+                  {funnel.conversions.agendadaToRealizada.toFixed(1)}%
+                </span>
+              </div>
+              <div className="bg-red-50 p-2 rounded">
+                <span className="text-gray-600">Realizada → Venda:</span>
+                <span className="font-bold text-red-600 ml-1">
+                  {funnel.conversions.realizadaToVenda.toFixed(1)}%
+                </span>
+              </div>
+            </div>
+          </div>
 
-  const analiseNicho = Object.entries(nichoStats)
-    .map(([name, stats]) => ({ name, ...stats, conversion: stats.leads > 0 ? (stats.sales / stats.leads) * 100 : 0 }))
-    .sort((a, b) => b.revenue - a.revenue)
+          {/* FEE MRR e FEE ONE TIME */}
+          <div className="pt-4 border-t border-gray-200">
+            <h4 className="text-sm font-semibold text-gray-700 mb-3">💰 Receita Gerada</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-green-50 p-3 rounded-lg">
+                <div className="text-xs text-gray-600 mb-1">FEE MRR (Recorrente)</div>
+                <div className="font-bold text-green-600 text-lg">
+                  R$ {funnel.feeMrr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <div className="text-xs text-gray-600 mb-1">FEE ONE TIME (Escopo)</div>
+                <div className="font-bold text-blue-600 text-lg">
+                  R$ {funnel.feeOneTime.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+            </div>
+            <div className="mt-2 bg-gray-50 p-2 rounded text-center">
+              <span className="text-xs text-gray-600">Total: </span>
+              <span className="font-bold text-gray-800">
+                R$ {(funnel.feeMrr + funnel.feeOneTime).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <div className="space-y-6">
-      {/* Additional KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {additionalKPIs.map((kpi, index) => (
-          <Card key={index} className={`border-l-4 ${kpi.color}`}>
-            <CardContent className="p-4">
-              <div>
-                <p className="text-sm font-medium text-gray-600">{kpi.title}</p>
-                <p className="text-2xl font-bold text-gray-900">{kpi.value}</p>
-                <p className="text-xs text-gray-500">{kpi.subtitle}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      {/* Funil Geral */}
+      <div className="mb-8">
+        <VisualFunnel 
+          title="🎯 Funil Geral" 
+          funnel={generalFunnel} 
+          totalLeads={leads.length}
+          color="#dc2626"
+        />
       </div>
 
-      {/* Rankings Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Ranking SDR */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Ranking SDR</CardTitle>
-            <p className="text-sm text-gray-500">Performance detalhada dos SDRs</p>
-          </CardHeader>
-          <CardContent>
-            {rankingSDR.length === 0 ? (
-              <div className="p-8 text-center">
-                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                </div>
-                <p className="text-sm text-gray-500">Nenhum dado de SDR disponível</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {rankingSDR.map((sdr, index) => (
-                  <div key={sdr.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-bold text-blue-600">#{index + 1}</span>
-                      </div>
-                      <div>
-                        <p className="font-medium capitalize">{sdr.name}</p>
-                        <p className="text-sm text-gray-500">{sdr.conversion.toFixed(1)}% conversão</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold">
-                        R$ {sdr.revenue.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {sdr.leads} leads • {sdr.sales} vendas
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Ranking Closer */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Ranking Closer</CardTitle>
-            <p className="text-sm text-gray-500">Performance detalhada dos Closers</p>
-          </CardHeader>
-          <CardContent>
-            {rankingCloser.length === 0 ? (
-              <div className="p-8 text-center">
-                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                </div>
-                <p className="text-sm text-gray-500">Nenhum dado de Closer disponível</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {rankingCloser.map((closer, index) => (
-                  <div key={closer.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-bold text-green-600">#{index + 1}</span>
-                      </div>
-                      <div>
-                        <p className="font-medium capitalize">{closer.name}</p>
-                        <p className="text-sm text-gray-500">{closer.conversion.toFixed(1)}% conversão</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold">
-                        R$ {closer.revenue.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {closer.leads} leads • {closer.sales} vendas
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Análise Detalhada por Nicho */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Análise Detalhada por Nicho</CardTitle>
-          <p className="text-sm text-gray-500">Performance e métricas por segmento de mercado</p>
-        </CardHeader>
-        <CardContent>
-          {analiseNicho.length === 0 ? (
-            <div className="p-8 text-center">
-              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      {/* Funis por Closer */}
+      <div className="space-y-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">👥 Funis por Closer</h2>
+        
+        {closerFunnels.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {closerFunnels.map((closerFunnel) => {
+              const colors = {
+                'Alan': '#2563eb', 
+                'Jasson': '#dc2626',
+                'William': '#059669'
+              }
+              
+              return (
+                <VisualFunnel 
+                  key={closerFunnel.name}
+                  title={`${closerFunnel.name}`} 
+                  funnel={closerFunnel.funnel} 
+                  totalLeads={closerStats[closerFunnel.name.toLowerCase()].length}
+                  color={colors[closerFunnel.name as keyof typeof colors] || '#6b7280'}
+                />
+              )
+            })}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                   />
                 </svg>
               </div>
-              <p className="text-sm text-gray-500">Nenhum dado por nicho disponível</p>
-            </div>
-          ) : (
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum Closer Encontrado</h3>
+              <p className="text-sm text-gray-500">
+                Não foram encontrados leads atribuídos aos closers Alan, Jasson ou William.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Resumo Comparativo */}
+      {closerFunnels.length > 0 && (
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-gray-900">
+              📈 Comparativo de Performance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Nicho
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Leads
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Vendas
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Conversão
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Receita
-                    </th>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 font-semibold">Closer</th>
+                    <th className="text-center py-2 font-semibold">Leads</th>
+                    <th className="text-center py-2 font-semibold">Contato</th>
+                    <th className="text-center py-2 font-semibold">Agendadas</th>
+                    <th className="text-center py-2 font-semibold">Realizadas</th>
+                    <th className="text-center py-2 font-semibold">Vendas</th>
+                    <th className="text-center py-2 font-semibold">FEE MRR</th>
+                    <th className="text-center py-2 font-semibold">FEE ONE TIME</th>
+                    <th className="text-center py-2 font-semibold">Taxa Conversão</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {analiseNicho.map((nicho) => (
-                    <tr key={nicho.name}>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{nicho.name}</div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{nicho.leads}</div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{nicho.sales}</div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{nicho.conversion.toFixed(1)}%</div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          R$ {nicho.revenue.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                <tbody>
+                  {closerFunnels.map((closerFunnel) => {
+                    const conversionRate = closerFunnel.funnel.leads.count > 0 
+                      ? (closerFunnel.funnel.vendas.count / closerFunnel.funnel.leads.count) * 100 
+                      : 0
+                    
+                    return (
+                      <tr key={closerFunnel.name} className="border-b hover:bg-gray-50">
+                        <td className="py-3 font-medium">{closerFunnel.name}</td>
+                        <td className="text-center py-3 font-bold text-blue-600">
+                          {closerFunnel.funnel.leads.count}
+                        </td>
+                        <td className="text-center py-3">
+                          {closerFunnel.funnel.contato.count}
+                          <span className="text-xs text-gray-500 ml-1">
+                            ({closerFunnel.funnel.contato.percentage.toFixed(1)}%)
+                          </span>
+                        </td>
+                        <td className="text-center py-3">
+                          {closerFunnel.funnel.agendada.count}
+                          <span className="text-xs text-gray-500 ml-1">
+                            ({closerFunnel.funnel.agendada.percentage.toFixed(1)}%)
+                          </span>
+                        </td>
+                        <td className="text-center py-3">
+                          {closerFunnel.funnel.realizada.count}
+                          <span className="text-xs text-gray-500 ml-1">
+                            ({closerFunnel.funnel.realizada.percentage.toFixed(1)}%)
+                          </span>
+                        </td>
+                        <td className="text-center py-3 font-bold text-green-600">
+                          {closerFunnel.funnel.vendas.count}
+                        </td>
+                        <td className="text-center py-3 font-bold text-green-600">
+                          R$ {closerFunnel.funnel.feeMrr.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                        </td>
+                        <td className="text-center py-3 font-bold text-blue-600">
+                          R$ {closerFunnel.funnel.feeOneTime.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                        </td>
+                        <td className="text-center py-3">
+                          <span className={`font-bold px-2 py-1 rounded text-xs ${
+                            conversionRate >= 10 ? 'bg-green-100 text-green-800' :
+                            conversionRate >= 5 ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {conversionRate.toFixed(1)}%
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
