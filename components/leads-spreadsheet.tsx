@@ -1,481 +1,379 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import {
+Table,
+TableBody,
+TableCell,
+TableHead,
+TableHeader,
+TableRow,
+} from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { RefreshCw, Settings, Eye, EyeOff } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
-import type { Lead } from "@/app/page"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Settings2, Save, X, Loader2 } from 'lucide-react'
+import { Lead, leadOperations, fetchLookups } from "@/lib/supabase-operations" // Importando fetchLookups diretamente
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface LeadsSpreadsheetProps {
-  leads: Lead[]
-  onUpdateLead: (id: string, updates: Partial<Lead>) => void
-  onRefresh: () => void
+leads: Lead[]
+onUpdateLead: (id: string | number, updates: Partial<Lead>) => Promise<void>
+onRefresh: () => void
 }
 
+type ColumnKey = keyof Lead | "actions"
+
+interface ColumnConfig {
+key: ColumnKey
+label: string
+type: "text" | "number" | "boolean" | "date" | "time" | "select" | "actions"
+lookupTable?: keyof typeof leadOperations._fetchLookups extends infer U ? U extends string ? U : never : never // Dynamically infer lookup table names
+options?: string[] // For select type, if not from lookup
+hidden?: boolean
+editable?: boolean
+}
+
+const ALL_COLUMNS: ColumnConfig[] = [
+{ key: "nome_empresa", label: "Nome Empresa", type: "text", editable: true },
+{ key: "nome_fantazia", label: "Nome Fantasia", type: "text", editable: true },
+{ key: "produto_marketing", label: "Produto Marketing", type: "select", lookupTable: "produto", editable: true },
+{ key: "nicho", label: "Nicho", type: "select", lookupTable: "segmento", editable: true },
+{ key: "data_compra", label: "Data Compra", type: "date", editable: true },
+{ key: "horario_compra", label: "Horário Compra", type: "time", editable: true },
+{ key: "valor_venda", label: "Valor Venda", type: "number", editable: true },
+{ key: "venda", label: "Venda", type: "boolean", editable: true },
+{ key: "tipo_lead", label: "Tipo Lead", type: "select", lookupTable: "origem", editable: true },
+{ key: "faturamento", label: "Faturamento", type: "select", lookupTable: "faturamento", editable: true },
+{ key: "canal", label: "Canal", type: "select", lookupTable: "canal", editable: true },
+{ key: "nivel_urgencia", label: "Nível Urgência", type: "select", lookupTable: "urgencia", editable: true },
+{ key: "regiao", label: "Região", type: "select", lookupTable: "regiao", editable: true },
+{ key: "cidade", label: "Cidade", type: "select", lookupTable: "cidade", editable: true },
+{ key: "nome_contato", label: "Nome Contato", type: "text", editable: true },
+{ key: "cargo_contato", label: "Cargo Contato", type: "select", lookupTable: "cargo_contato", editable: true },
+{ key: "email", label: "Email", type: "text", editable: true },
+{ key: "email_corporativo", label: "Email Corporativo", type: "boolean", editable: true },
+{ key: "sdr", label: "SDR", type: "select", lookupTable: "vendedor", editable: true },
+{ key: "closer", label: "Closer", type: "select", lookupTable: "vendedor", editable: true },
+{ key: "arrematador", label: "Arrematador", type: "select", lookupTable: "vendedor", editable: true },
+{ key: "anuncios", label: "Anúncios", type: "boolean", editable: true },
+{ key: "status", label: "Status", type: "select", lookupTable: "status", editable: true },
+{ key: "observacoes", label: "Observações", type: "text", editable: true },
+{ key: "data_ultimo_contato", label: "Último Contato", type: "date", editable: true },
+{ key: "cs", label: "CS", type: "boolean", editable: true },
+{ key: "rm", label: "RM", type: "boolean", editable: true },
+{ key: "rr", label: "RR", type: "boolean", editable: true },
+{ key: "ns", label: "NS", type: "boolean", editable: true },
+{ key: "data_marcacao", label: "Data Marcação", type: "date", editable: true },
+{ key: "data_reuniao", label: "Data Reunião", type: "date", editable: true },
+{ key: "data_assinatura", label: "Data Assinatura", type: "date", editable: true },
+{ key: "fee", label: "FEE", type: "number", editable: true },
+{ key: "escopo_fechado_valor", label: "Escopo Fechado", type: "number", editable: true },
+{ key: "fee_total", label: "FEE Total", type: "number", editable: true },
+{ key: "created_at", label: "Criado Em", type: "text", editable: false },
+{ key: "updated_at", label: "Atualizado Em", type: "text", editable: false },
+{ key: "actions", label: "Ações", type: "actions", editable: false },
+]
+
+const LOCAL_STORAGE_COLUMNS_KEY = "leads-spreadsheet-columns-v1"
+
 export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpreadsheetProps) {
-  const [editingCell, setEditingCell] = useState<string | null>(null)
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({})
-
-  // TODAS as colunas da planilha
-  const columns = [
-    { key: "nome_empresa", label: "LEAD", width: "200px", type: "text", essential: true },
-    {
-      key: "status",
-      label: "STATUS",
-      width: "150px",
-      type: "select",
-      essential: true,
-      options: [
-        "BACKLOG",
-        "TENTANDO CONTATO",
-        "CONTATO AGENDADO",
-        "QUALIFICANDO",
-        "REUNIÃO AGENDADA",
-        "REUNIÃO",
-        "REUNIÃO REALIZADA",
-        "DÚVIDAS E FECHAMENTO",
-        "CONTRATO NA RUA",
-        "GANHO",
-        "FOLLOW UP",
-        "NO-SHOW",
-        "DROPADO",
-        "FOLLOW INFINITO",
-      ],
-    },
-    { key: "observacoes", label: "OBSERVAÇÕES SDR", width: "200px", type: "text", essential: true },
-    { key: "data_ultimo_contato", label: "DATA ÚLTIMO CONTATO", width: "150px", type: "date", essential: true },
-    { key: "data_hora_compra", label: "DATA DA COMPRA", width: "150px", type: "datetime-local", essential: true },
-    {
-      key: "arrematador",
-      label: "ARREMATANTE",
-      width: "120px",
-      type: "select",
-      essential: true,
-      options: ["alan", "antonio", "gabrielli", "jasson", "vanessa", "william"],
-    },
-    {
-      key: "sdr",
-      label: "SDR",
-      width: "100px",
-      type: "select",
-      essential: true,
-      options: ["antonio", "gabrielli", "vanessa"],
-    },
-    { key: "valor_pago_lead", label: "VALOR", width: "100px", type: "number", essential: true },
-    {
-      key: "tipo_lead",
-      label: "ORIGEM",
-      width: "120px",
-      type: "select",
-      essential: true,
-      options: ["leadbroker", "organico", "indicacao", "facebook", "google", "linkedin"],
-    },
-    { key: "conseguiu_contato", label: "CS", width: "60px", type: "boolean" },
-    { key: "reuniao_agendada", label: "RM", width: "60px", type: "boolean" },
-    { key: "reuniao_realizada", label: "RR", width: "60px", type: "boolean" },
-    { key: "no_show", label: "NS", width: "60px", type: "boolean" },
-    { key: "data_venda", label: "DATA DA MARCAÇÃO", width: "150px", type: "date" },
-    { key: "data_fechamento", label: "DATA DA REUNIÃO", width: "150px", type: "date" },
-    { key: "faturamento", label: "FATURAMENTO", width: "150px", type: "text" },
-    {
-      key: "nicho",
-      label: "SEGMENTO",
-      width: "120px",
-      type: "select",
-      options: [
-        "Estruturação Estratégica",
-        "Assessoria",
-        "Varejo",
-        "Serviço",
-        "Indústria",
-        "Outro",
-        "Turismo",
-        "E-commerce",
-      ],
-    },
-    { key: "cidade", label: "CIDADE", width: "120px", type: "text" },
-    { key: "regiao", label: "REGIÃO", width: "120px", type: "text" },
-    { key: "cargo_contato", label: "CARGO", width: "120px", type: "text" },
-    { key: "email", label: "EMAIL", width: "200px", type: "email" },
-    { key: "produto", label: "PRODUTO", width: "150px", type: "text" },
-    {
-      key: "anuncios",
-      label: "ANÚNCIOS",
-      width: "100px",
-      type: "select",
-      options: ["sim", "nao"],
-    },
-    { key: "horario_compra", label: "HORÁRIO DE COMPRA", width: "130px", type: "time" },
-    {
-      key: "closer",
-      label: "CLOSER",
-      width: "100px",
-      type: "select",
-      options: ["alan", "jasson", "william"],
-    },
-    { key: "tem_comentario_lbf", label: "OBSERVAÇÃO CLOSER", width: "200px", type: "text" },
-    { key: "fee_total", label: "FEE MRR", width: "100px", type: "number" },
-    { key: "escopo_fechado", label: "FEE ONE-TIME", width: "150px", type: "number" },
-    { key: "data_assinatura", label: "DATA DE ASSINATURA", width: "150px", type: "date" },
-    { key: "motivo_perda_pv", label: "MOTIVO DE PERDA", width: "150px", type: "text" },
-  ]
-
-  // Load column preferences from localStorage
-  useEffect(() => {
-    const savedColumns = localStorage.getItem("leadsSpreadsheetColumns")
+const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => {
+  if (typeof window !== "undefined") {
+    const savedColumns = localStorage.getItem(LOCAL_STORAGE_COLUMNS_KEY)
     if (savedColumns) {
-      setVisibleColumns(JSON.parse(savedColumns))
+      return JSON.parse(savedColumns)
+    }
+  }
+  // Default visible columns
+  return [
+    "nome_empresa",
+    "nome_contato",
+    "email",
+    "sdr",
+    "status",
+    "valor_venda",
+    "data_assinatura",
+    "actions",
+  ]
+})
+const [editingCell, setEditingCell] = useState<{
+  leadId: string | number
+  columnKey: ColumnKey
+} | null>(null)
+const [cellValue, setCellValue] = useState<any>("")
+const [savingCell, setSavingCell] = useState(false)
+const [lookups, setLookups] = useState<any>({})
+const inputRef = useRef<HTMLInputElement>(null)
+
+useEffect(() => {
+  const loadLookups = async () => {
+    try {
+      const fetchedLookups = await fetchLookups() // Chamando fetchLookups diretamente
+      setLookups(fetchedLookups)
+    } catch (error) {
+      console.error("Erro ao carregar lookups para planilha:", error)
+    }
+  }
+  loadLookups()
+}, [])
+
+useEffect(() => {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(LOCAL_STORAGE_COLUMNS_KEY, JSON.stringify(visibleColumns))
+  }
+}, [visibleColumns])
+
+const handleColumnVisibilityChange = (key: ColumnKey, isVisible: boolean) => {
+  setVisibleColumns((prev) => {
+    if (isVisible) {
+      // Add column, maintaining order from ALL_COLUMNS
+      const newColumns = ALL_COLUMNS.filter((col) => prev.includes(col.key) || col.key === key).map((col) => col.key)
+      return newColumns
     } else {
-      // Default: show essential columns
-      const defaultVisible = columns.reduce(
-        (acc, col) => {
-          acc[col.key] = col.essential || false
-          return acc
-        },
-        {} as Record<string, boolean>,
+      // Remove column
+      return prev.filter((col) => col !== key)
+    }
+  })
+}
+
+const getColumnConfig = useCallback(
+  (key: ColumnKey) => ALL_COLUMNS.find((col) => col.key === key),
+  []
+)
+
+const handleCellClick = (lead: Lead, column: ColumnConfig) => {
+  if (column.editable) {
+    setEditingCell({ leadId: lead.id, columnKey: column.key })
+    setCellValue(lead[column.key as keyof Lead] || "")
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+}
+
+const handleCellValueChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  setCellValue(e.target.value)
+}
+
+const handleSelectCellValueChange = (value: string) => {
+  setCellValue(value)
+}
+
+const handleCheckboxCellValueChange = (checked: boolean) => {
+  setCellValue(checked)
+}
+
+const handleSaveCell = async () => {
+  if (!editingCell) return
+
+  setSavingCell(true)
+  const { leadId, columnKey } = editingCell
+  const columnConfig = getColumnConfig(columnKey)
+
+  let valueToSave: any = cellValue
+  if (columnConfig?.type === "number") {
+    valueToSave = Number.parseFloat(valueToSave)
+    if (isNaN(valueToSave)) valueToSave = null
+  } else if (columnConfig?.type === "boolean") {
+    valueToSave = Boolean(valueToSave)
+  } else if (valueToSave === "") {
+    valueToSave = null // Treat empty strings as null for DB
+  }
+
+  try {
+    await onUpdateLead(leadId, { [columnKey]: valueToSave })
+    setEditingCell(null)
+    setCellValue("")
+  } catch (error) {
+    console.error("Erro ao salvar célula:", error)
+    alert("Erro ao salvar célula. Verifique o console para mais detalhes.")
+  } finally {
+    setSavingCell(false)
+  }
+}
+
+const handleCancelEdit = () => {
+  setEditingCell(null)
+  setCellValue("")
+}
+
+const renderCellContent = (lead: Lead, column: ColumnConfig) => {
+  const value = lead[column.key as keyof Lead]
+
+  if (editingCell?.leadId === lead.id && editingCell.columnKey === column.key) {
+    if (column.type === "boolean") {
+      return (
+        <Checkbox
+          checked={cellValue as boolean}
+          onCheckedChange={handleCheckboxCellValueChange}
+          disabled={savingCell}
+        />
       )
-      setVisibleColumns(defaultVisible)
-    }
-  }, [])
-
-  // Save column preferences to localStorage
-  const updateVisibleColumns = (newVisibleColumns: Record<string, boolean>) => {
-    setVisibleColumns(newVisibleColumns)
-    localStorage.setItem("leadsSpreadsheetColumns", JSON.stringify(newVisibleColumns))
-  }
-
-  // Auto-save function
-  const handleCellEdit = async (leadId: string, field: string, value: any) => {
-    // Save automatically when cell is edited
-    await onUpdateLead(leadId, { [field]: value })
-  }
-
-  const getCellValue = (lead: Lead, field: string) => {
-    return (lead as any)[field]
-  }
-
-  const formatValue = (value: any, type: string) => {
-    if (value === null || value === undefined) return ""
-
-    switch (type) {
-      case "datetime-local":
-        if (typeof value === "string" && value.includes("T")) {
-          return value.slice(0, 16)
-        }
-        return value || ""
-      case "date":
-        if (typeof value === "string" && value.includes("T")) {
-          return value.split("T")[0]
-        }
-        return value || ""
-      case "time":
-        if (typeof value === "string" && value.includes("T")) {
-          return value.split("T")[1]?.slice(0, 5) || ""
-        }
-        return value || ""
-      case "number":
-        return String(value || "")
-      case "boolean":
-        return value
-      default:
-        return String(value || "")
-    }
-  }
-
-  const renderCell = (lead: Lead, column: any) => {
-    const cellKey = `${lead.id}-${column.key}`
-    const isEditing = editingCell === cellKey
-    const value = getCellValue(lead, column.key)
-
-    if (isEditing) {
-      switch (column.type) {
-        case "select":
-          return (
-            <Select
-              value={formatValue(value, column.type)}
-              onValueChange={(newValue) => {
-                handleCellEdit(lead.id, column.key, newValue)
-                setEditingCell(null)
-              }}
-              onOpenChange={(open) => !open && setEditingCell(null)}
-            >
-              <SelectTrigger className="h-7 text-xs border-blue-500">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {column.options?.map((option: string) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )
-
-        case "boolean":
-          return (
-            <Select
-              value={value ? "true" : "false"}
-              onValueChange={(newValue) => {
-                handleCellEdit(lead.id, column.key, newValue === "true")
-                setEditingCell(null)
-              }}
-              onOpenChange={(open) => !open && setEditingCell(null)}
-            >
-              <SelectTrigger className="h-7 text-xs border-blue-500">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="true">✅</SelectItem>
-                <SelectItem value="false">❌</SelectItem>
-              </SelectContent>
-            </Select>
-          )
-
-        default:
-          return (
-            <Input
-              type={column.type}
-              value={formatValue(value, column.type)}
-              onChange={(e) => handleCellEdit(lead.id, column.key, e.target.value)}
-              onBlur={() => setEditingCell(null)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") setEditingCell(null)
-                if (e.key === "Escape") setEditingCell(null)
-              }}
-              className="h-7 text-xs border-blue-500"
-              autoFocus
-            />
-          )
-      }
-    }
-
-    // Renderização normal da célula
-    const displayValue = (() => {
-      switch (column.type) {
-        case "boolean":
-          return value ? "✅" : "❌"
-        case "date":
-        case "datetime-local":
-          if (!value) return ""
-          try {
-            return new Date(value).toLocaleDateString("pt-BR")
-          } catch {
-            return value
-          }
-        case "time":
-          return value || ""
-        case "number":
-          if (!value) return ""
-          // Para colunas FEE, mostrar como moeda
-          if (column.key === "fee_total" || column.key === "escopo_fechado") {
-            const numValue = Number(value)
-            return isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-          }
-          return Number(value).toLocaleString("pt-BR")
-        case "email":
-          return String(value || "")
-        default:
-          return String(value || "")
-      }
-    })()
-
-    return (
-      <div
-        className="h-8 px-2 py-1 text-xs cursor-pointer hover:bg-gray-100 flex items-center min-h-[32px]"
-        onClick={() => setEditingCell(cellKey)}
-        title={`Clique para editar • Valor: ${displayValue}`}
-      >
-        {column.key === "status" ? (
-          <Badge className="text-xs" variant="outline">
-            {displayValue}
-          </Badge>
-        ) : (
-          <span className="truncate w-full">{displayValue}</span>
-        )}
-      </div>
-    )
-  }
-
-  const toggleColumn = (columnKey: string) => {
-    const newVisible = {
-      ...visibleColumns,
-      [columnKey]: !visibleColumns[columnKey],
-    }
-    updateVisibleColumns(newVisible)
-  }
-
-  const visibleColumnsArray = columns.filter((col) => visibleColumns[col.key])
-
-  return (
-    <div className="bg-white rounded-lg border border-gray-200">
-      {/* Header Compacto */}
-      <div className="p-3 border-b border-gray-200 bg-gray-50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <h2 className="text-lg font-bold text-gray-900">📊 Planilha de Leads</h2>
-            <span className="text-sm text-gray-500">
-              {visibleColumnsArray.length}/{columns.length} colunas • Auto-save ativo
-            </span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 bg-transparent">
-                  <Settings className="w-3 h-3 mr-1" />
-                  Colunas
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Configurar Colunas Visíveis</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-semibold mb-2 text-green-700">✅ Colunas Essenciais</h4>
-                      <div className="space-y-2">
-                        {columns
-                          .filter((col) => col.essential)
-                          .map((col) => (
-                            <div key={col.key} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={col.key}
-                                checked={visibleColumns[col.key] || false}
-                                onCheckedChange={() => toggleColumn(col.key)}
-                              />
-                              <label htmlFor={col.key} className="text-sm font-medium">
-                                {col.label}
-                              </label>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-2 text-blue-700">📋 Colunas Adicionais</h4>
-                      <div className="space-y-2">
-                        {columns
-                          .filter((col) => !col.essential)
-                          .map((col) => (
-                            <div key={col.key} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={col.key}
-                                checked={visibleColumns[col.key] || false}
-                                onCheckedChange={() => toggleColumn(col.key)}
-                              />
-                              <label htmlFor={col.key} className="text-sm">
-                                {col.label}
-                              </label>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="pt-4 border-t">
-                    <div className="flex space-x-2">
-                      <Button
-                        onClick={() => {
-                          const allVisible = columns.reduce(
-                            (acc, col) => {
-                              acc[col.key] = true
-                              return acc
-                            },
-                            {} as Record<string, boolean>,
-                          )
-                          updateVisibleColumns(allVisible)
-                        }}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <Eye className="w-3 h-3 mr-1" />
-                        Mostrar Todas
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          const essentialOnly = columns.reduce(
-                            (acc, col) => {
-                              acc[col.key] = col.essential || false
-                              return acc
-                            },
-                            {} as Record<string, boolean>,
-                          )
-                          updateVisibleColumns(essentialOnly)
-                        }}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <EyeOff className="w-3 h-3 mr-1" />
-                        Apenas Essenciais
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-            <Button variant="outline" onClick={onRefresh} size="sm" className="h-8 bg-transparent">
-              <RefreshCw className="w-3 h-3 mr-1" />
-              Atualizar
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Planilha */}
-      <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-        <table className="w-full border-collapse">
-          {/* Header da Tabela */}
-          <thead className="bg-red-600 text-white sticky top-0 z-10">
-            <tr>
-              {visibleColumnsArray.map((column) => (
-                <th
-                  key={column.key}
-                  className="px-2 py-3 text-xs font-bold uppercase border-r border-red-500 text-center"
-                  style={{ minWidth: column.width, width: column.width }}
-                >
-                  {column.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-
-          {/* Linhas de Dados */}
-          <tbody>
-            {leads.map((lead, index) => (
-              <tr
-                key={lead.id}
-                className={`border-b border-gray-200 hover:bg-gray-50 ${index % 2 === 0 ? "bg-white" : "bg-gray-25"}`}
-              >
-                {visibleColumnsArray.map((column) => (
-                  <td
-                    key={`${lead.id}-${column.key}`}
-                    className="border-r border-gray-200 p-0"
-                    style={{ minWidth: column.width, width: column.width }}
-                  >
-                    {renderCell(lead, column)}
-                  </td>
-                ))}
-              </tr>
+    } else if (column.type === "select" && column.lookupTable) {
+      const options = Array.from(lookups[column.lookupTable]?.map.values() || [])
+      return (
+        <Select onValueChange={handleSelectCellValueChange} value={cellValue} disabled={savingCell}>
+          <SelectTrigger className="w-full h-8">
+            <SelectValue placeholder={`Selecione ${column.label}`} />
+          </SelectTrigger>
+          <SelectContent>
+            {options.map((option: string) => (
+              <SelectItem key={option} value={option}>
+                {option}
+              </SelectItem>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </SelectContent>
+        </Select>
+      )
+    } else {
+      return (
+        <Input
+          ref={inputRef}
+          type={column.type === "number" ? "number" : column.type === "date" ? "date" : column.type === "time" ? "time" : "text"}
+          value={cellValue}
+          onChange={handleCellValueChange}
+          onBlur={handleSaveCell} // Save on blur
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              handleSaveCell()
+            } else if (e.key === "Escape") {
+              handleCancelEdit()
+            }
+          }}
+          className="h-8 w-full"
+          disabled={savingCell}
+        />
+      )
+    }
+  }
 
-      {/* Footer */}
-      <div className="p-2 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <span>📋 {leads.length} leads</span>
-            <span>👁️ {visibleColumnsArray.length} colunas visíveis</span>
+  // Display formatted values
+  if (column.key === "valor_venda" || column.key === "fee" || column.key === "escopo_fechado_valor" || column.key === "fee_total") {
+    return value ? `R$ ${Number(value).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "N/A"
+  }
+  if (column.type === "boolean") {
+    return value ? "Sim" : "Não"
+  }
+  if (column.key === "created_at" || column.key === "updated_at") {
+    return value ? new Date(value as string).toLocaleString() : "N/A"
+  }
+
+  return (value as React.ReactNode) || "N/A"
+}
+
+return (
+  <div className="bg-white rounded-lg shadow overflow-hidden">
+    <div className="p-4 flex justify-between items-center border-b">
+      <h2 className="text-xl font-bold">Planilha de Leads</h2>
+      <div className="flex items-center space-x-2">
+        {savingCell && (
+          <div className="flex items-center text-sm text-gray-500">
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Salvando...
           </div>
-          <span className="text-green-600 font-medium">
-            ✅ Salvamento automático ativo
-          </span>
-        </div>
+        )}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Settings2 className="w-4 h-4 mr-2" />
+              Colunas
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-4">
+            <div className="grid gap-2">
+              <p className="text-sm font-medium">Mostrar Colunas</p>
+              {ALL_COLUMNS.filter(col => col.key !== "actions").map((column) => (
+                <div key={column.key} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`col-${column.key}`}
+                    checked={visibleColumns.includes(column.key)}
+                    onCheckedChange={(checked) =>
+                      handleColumnVisibilityChange(column.key, checked as boolean)
+                    }
+                  />
+                  <label
+                    htmlFor={`col-${column.key}`}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    {column.label}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
-  )
+    <div className="overflow-x-auto">
+      <Table className="min-w-full">
+        <TableHeader>
+          <TableRow>
+            {visibleColumns.map((key) => {
+              const column = getColumnConfig(key)
+              return column ? <TableHead key={key}>{column.label}</TableHead> : null
+            })}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {leads.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={visibleColumns.length} className="text-center py-8 text-gray-500">
+                Nenhum lead encontrado.
+              </TableCell>
+            </TableRow>
+          ) : (
+            leads.map((lead) => (
+              <TableRow key={lead.id}>
+                {visibleColumns.map((key) => {
+                  const column = getColumnConfig(key)
+                  if (!column) return null
+
+                  return (
+                    <TableCell
+                      key={`${lead.id}-${key}`}
+                      className={`relative ${column.editable ? "cursor-pointer hover:bg-gray-100" : ""}`}
+                      onClick={() => handleCellClick(lead, column)}
+                    >
+                      {renderCellContent(lead, column)}
+                      {editingCell?.leadId === lead.id && editingCell.columnKey === key && column.editable && (
+                        <div className="absolute top-1 right-1 flex space-x-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-green-600 hover:bg-green-100"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleSaveCell()
+                            }}
+                            disabled={savingCell}
+                          >
+                            <Save className="h-3 w-3" />
+                            <span className="sr-only">Salvar</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-red-600 hover:bg-red-100"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleCancelEdit()
+                            }}
+                            disabled={savingCell}
+                          >
+                            <X className="h-3 w-3" />
+                            <span className="sr-only">Cancelar</span>
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  )
+                })}
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  </div>
+)
 }

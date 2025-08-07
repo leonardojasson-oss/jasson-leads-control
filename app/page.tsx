@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { RefreshCw, Plus, Info, DollarSign, Users, FileText, BarChart3, CheckCircle, Database } from "lucide-react"
+import { RefreshCw, Plus, Info, DollarSign, Users, FileText, BarChart3, CheckCircle, Database } from 'lucide-react'
 import { LeadsList } from "@/components/leads-list"
 import { SalesTracking } from "@/components/sales-tracking"
 import { CommissionControl } from "@/components/commission-control"
@@ -12,6 +12,7 @@ import { MetasControl } from "@/components/metas-control"
 import { NovoLeadModal } from "@/components/novo-lead-modal"
 import { leadOperations, type Lead, isSupabaseConfigured } from "@/lib/supabase-operations"
 import { LeadsSpreadsheet } from "@/components/leads-spreadsheet"
+import { DeleteImportedLeadsButton } from "@/components/delete-imported-leads-button" // Importe o novo componente
 
 export type { Lead }
 
@@ -50,10 +51,8 @@ export default function LeadsControl() {
 
       // Determinar status da conexão
       if (isSupabaseConfigured) {
-        // Verificar se os dados vieram do Supabase (têm UUID) ou localStorage (têm timestamp)
-        const hasSupabaseData = loadedLeads.some(
-          (lead) => lead.id.includes("-") && lead.id.length > 10, // UUID format
-        )
+        // Check if any lead ID is a number (from Supabase) or string (from localStorage)
+        const hasSupabaseData = loadedLeads.some((lead) => typeof lead.id === "number")
         setSupabaseStatus(hasSupabaseData ? "connected" : "local")
       } else {
         setSupabaseStatus("local")
@@ -74,18 +73,14 @@ export default function LeadsControl() {
     try {
       setSaving(true)
 
-      // Validação básica
+      // Validação básica - CAMPOS OBRIGATÓRIOS
       const requiredFields = [
-        "nomeEmpresa",
-        "produtoMarketing",
+        "nomeEmpresa", // Changed from nome_empresa
         "nicho",
-        "valorPagoLead",
-        "origemLead",
-        "nomeContato",
+        "nomeContato", // Changed from nome_contato
         "email",
-        "telefone",
         "sdr",
-        "arrematador",
+        "status",
       ]
 
       const missingFields = requiredFields.filter((field) => {
@@ -98,53 +93,43 @@ export default function LeadsControl() {
         return
       }
 
-      // Preparar dados para salvar
-      const leadToSave = {
+      // Prepare data for saving (map from form data to Lead type)
+      const leadToSave: Omit<Lead, "id" | "created_at" | "updated_at"> = {
         nome_empresa: leadData.nomeEmpresa,
+        nome_fantazia: leadData.nomeFantazia,
         produto_marketing: leadData.produtoMarketing,
         nicho: leadData.nicho,
-        data_hora_compra: leadData.dataHoraCompra || null,
-        valor_pago_lead: Number.parseFloat(leadData.valorPagoLead) || 0,
-        tipo_lead: leadData.origemLead,
+        data_compra: leadData.dataCompra || null,
+        horario_compra: leadData.horarioCompra || null,
+        valor_venda: Number.parseFloat(leadData.valorVenda) || null,
+        venda: leadData.venda || false,
+        tipo_lead: leadData.tipoLead,
         faturamento: leadData.faturamento,
         canal: leadData.canal,
         nivel_urgencia: leadData.nivelUrgencia,
         regiao: leadData.regiao,
         cidade: leadData.cidade,
-        cnpj: leadData.cnpj,
         nome_contato: leadData.nomeContato,
         cargo_contato: leadData.cargoContato,
         email: leadData.email,
-        email_corporativo: leadData.emailCorporativo,
-        telefone: leadData.telefone,
+        email_corporativo: leadData.emailCorporativo || false,
         sdr: leadData.sdr,
         closer: leadData.closer,
         arrematador: leadData.arrematador,
-        produto: leadData.produto,
-        anuncios: leadData.anuncios,
+        anuncios: leadData.anuncios || false,
         status: leadData.status || "BACKLOG",
         observacoes: leadData.observacoes,
         data_ultimo_contato: leadData.dataUltimoContato || null,
-        motivo_perda_pv: leadData.motivoPerdaPV,
-        tem_comentario_lbf: leadData.temComentarioLBF || false,
-        investimento_trafego: leadData.investimentoTrafego,
-        ticket_medio: leadData.ticketMedio,
-        qtd_lojas: leadData.qtdLojas,
-        qtd_vendedores: leadData.qtdVendedores,
-        conseguiu_contato: leadData.conseguiuContato || false,
-        reuniao_agendada: leadData.reuniaoAgendada || false,
-        reuniao_realizada: leadData.reuniaoRealizada || false,
-        valor_proposta: Number.parseFloat(leadData.valorProposta) || null,
-        valor_venda: Number.parseFloat(leadData.valorVenda) || null,
-        data_venda: leadData.dataVenda || null,
-        data_fechamento: leadData.dataFechamento || null,
+        cs: leadData.conseguiuContato || false,
+        rm: leadData.reuniaoAgendada || false,
+        rr: leadData.reuniaoRealizada || false,
+        ns: leadData.noShow || false,
+        data_marcacao: leadData.dataMarcacao || null,
+        data_reuniao: leadData.dataReuniao || null,
+        data_assinatura: leadData.dataAssinatura || null,
         fee: Number.parseFloat(leadData.fee) || null,
-        escopo_fechado: leadData.escopoFechado,
+        escopo_fechado_valor: Number.parseFloat(leadData.escopoFechadoValor) || null,
         fee_total: Number.parseFloat(leadData.feeTotal) || null,
-        venda_via_jasson_co: leadData.vendaViaJassonCo || false,
-        comissao_sdr: Number.parseFloat(leadData.comissaoSDR) || null,
-        comissao_closer: Number.parseFloat(leadData.comissaoCloser) || null,
-        status_comissao: leadData.statusComissao,
       }
 
       let result: Lead
@@ -165,7 +150,7 @@ export default function LeadsControl() {
       // Fechar modal
       setIsNovoLeadModalOpen(false)
       setEditingLead(null)
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Erro ao salvar lead:", error)
       alert(`❌ Erro ao salvar lead: ${error.message}`)
     } finally {
@@ -179,7 +164,7 @@ export default function LeadsControl() {
     setIsNovoLeadModalOpen(true)
   }
 
-  const handleDeleteLead = async (leadId: string) => {
+  const handleDeleteLead = async (leadId: string | number) => {
     console.log("🗑️ Deletando lead:", leadId)
 
     const leadToDelete = leads.find((lead) => lead.id === leadId)
@@ -208,7 +193,7 @@ export default function LeadsControl() {
     loadLeads()
   }
 
-  const handleUpdateLead = async (id: string, updates: Partial<Lead>) => {
+  const handleUpdateLead = async (id: string | number, updates: Partial<Lead>) => {
     try {
       await leadOperations.update(id, updates)
       await loadLeads() // Recarregar dados
@@ -220,19 +205,16 @@ export default function LeadsControl() {
 
   // Calcular KPIs
   const totalLeads = leads.length
-  const totalInvestido = leads.reduce((sum, lead) => {
-    const valor = Number.parseFloat(String(lead.valor_pago_lead || "0"))
-    return sum + (isNaN(valor) ? 0 : valor)
-  }, 0)
+  // Removed totalInvestido as valor_pago_lead is gone
   const leadsAtivos = leads.filter(
-    (lead) => !["CONTRATO ASSINADO", "DROPADO", "PERDIDO", "DESQUALIFICADO"].includes(lead.status),
+    (lead) => !["GANHO", "DROPADO"].includes(lead.status), // Assuming GANHO and DROPADO are final states
   ).length
   const totalVendas = leads.reduce((sum, lead) => {
     const valor = Number.parseFloat(String(lead.valor_venda || "0"))
     return sum + (isNaN(valor) ? 0 : valor)
   }, 0)
 
-  const contratoAssinado = leads.filter((lead) => lead.status === "CONTRATO ASSINADO").length
+  const contratoAssinado = leads.filter((lead) => lead.status === "CONTRATO ASSINADO" || lead.status === "GANHO").length
   const followInfinito = leads.filter((lead) => lead.status === "FOLLOW INFINITO").length
   const tentandoContato = leads.filter((lead) => lead.status === "TENTANDO CONTATO").length
 
@@ -320,6 +302,8 @@ export default function LeadsControl() {
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
               <span>Atualizar</span>
             </Button>
+            {/* Novo botão de exclusão de leads importados */}
+            <DeleteImportedLeadsButton onDeletionComplete={handleRefresh} />
             <Button
               className="bg-red-600 hover:bg-red-700 flex items-center space-x-2"
               onClick={() => setIsNovoLeadModalOpen(true)}

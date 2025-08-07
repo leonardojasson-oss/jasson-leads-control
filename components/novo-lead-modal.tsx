@@ -1,14 +1,21 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { X, RefreshCw, Sparkles } from "lucide-react"
-import type { Lead } from "@/app/page"
+import { Checkbox } from "@/components/ui/checkbox"
+import { X, RefreshCw, Sparkles } from 'lucide-react'
+import { leadOperations, type Lead, fetchLookups } from "@/lib/supabase-operations" // Importando fetchLookups
 
 interface NovoLeadModalProps {
   isOpen: boolean
@@ -19,104 +26,66 @@ interface NovoLeadModalProps {
 }
 
 export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = false }: NovoLeadModalProps) {
-  const [formData, setFormData] = useState({
-    nomeEmpresa: "",
-    produtoMarketing: "",
-    nicho: "",
-    dataHoraCompra: "",
-    valorPagoLead: "",
-    origemLead: "",
-    faturamento: "",
-    canal: "",
-    nivelUrgencia: "",
-    regiao: "",
-    cidade: "",
-    cnpj: "",
-    nomeContato: "",
-    cargoContato: "",
-    email: "",
-    emailCorporativo: "",
-    telefone: "",
-    sdr: "",
-    closer: "",
-    arrematador: "",
-    anuncios: "",
-    status: "",
-    observacoes: "",
-    dataUltimoContato: "",
-    motivoPerdaPV: "",
-    temComentarioLBF: false,
-    investimentoTrafego: "",
-    ticketMedio: "",
-    qtdLojas: "",
-    qtdVendedores: "",
-    conseguiuContato: false,
-    reuniaoAgendada: false,
-    reuniaoRealizada: false,
-    valorProposta: "",
-    valorVenda: "",
-    dataVenda: "",
-    dataFechamento: "",
-    fee: "",
-    escopoFechado: "",
-    feeTotal: "",
-    vendaViaJassonCo: false,
-    comissaoSDR: "",
-    comissaoCloser: "",
-    statusComissao: "",
-  })
-
+  const [formData, setFormData] = useState<any>({})
+  const [lookups, setLookups] = useState<any>({})
+  const [loadingLookups, setLoadingLookups] = useState(true)
   const [autoFillData, setAutoFillData] = useState("")
 
-  // Reset form when modal opens/closes
+
+  useEffect(() => {
+    const loadLookups = async () => {
+      setLoadingLookups(true)
+      try {
+        const fetchedLookups = await fetchLookups() // Chamando a função exportada diretamente
+        setLookups(fetchedLookups)
+      } catch (error) {
+        console.error("Erro ao carregar lookups:", error)
+      } finally {
+        setLoadingLookups(false)
+      }
+    }
+    loadLookups()
+  }, [])
+
   useEffect(() => {
     if (!isOpen) {
       // Reset form when closing
       setFormData({
         nomeEmpresa: "",
+        nomeFantazia: "",
         produtoMarketing: "",
         nicho: "",
-        dataHoraCompra: "",
-        valorPagoLead: "",
-        origemLead: "",
+        dataCompra: "",
+        horarioCompra: "",
+        valorVenda: "",
+        venda: false,
+        tipoLead: "",
         faturamento: "",
         canal: "",
         nivelUrgencia: "",
         regiao: "",
         cidade: "",
-        cnpj: "",
         nomeContato: "",
         cargoContato: "",
         email: "",
-        emailCorporativo: "",
-        telefone: "",
+        emailCorporativo: false,
         sdr: "",
         closer: "",
         arrematador: "",
-        anuncios: "",
+        anuncios: false,
         status: "",
         observacoes: "",
         dataUltimoContato: "",
-        motivoPerdaPV: "",
-        temComentarioLBF: false,
-        investimentoTrafego: "",
-        ticketMedio: "",
-        qtdLojas: "",
-        qtdVendedores: "",
         conseguiuContato: false,
         reuniaoAgendada: false,
         reuniaoRealizada: false,
-        valorProposta: "",
-        valorVenda: "",
-        dataVenda: "",
-        dataFechamento: "",
+        noShow: false,
+        dataMarcacao: "",
+        dataReuniao: "",
+        dataAssinatura: "",
         fee: "",
-        escopoFechado: "",
+        escopoFechadoValor: "",
         feeTotal: "",
-        vendaViaJassonCo: false,
-        comissaoSDR: "",
-        comissaoCloser: "",
-        statusComissao: "",
       })
       setAutoFillData("")
     }
@@ -124,56 +93,47 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     if (editingLead && isOpen) {
       // Load editing data
       setFormData({
-        nomeEmpresa: editingLead.nomeEmpresa || "",
-        produtoMarketing: editingLead.produtoMarketing || "",
+        nomeEmpresa: editingLead.nome_empresa || "",
+        nomeFantazia: editingLead.nome_fantazia || "",
+        produtoMarketing: editingLead.produto_marketing || "",
         nicho: editingLead.nicho || "",
-        dataHoraCompra: editingLead.dataHoraCompra || "",
-        valorPagoLead: editingLead.valorPagoLead || "",
-        origemLead: editingLead.tipoLead || "",
+        dataCompra: editingLead.data_compra || "",
+        horarioCompra: editingLead.horario_compra || "",
+        valorVenda: editingLead.valor_venda?.toString() || "",
+        venda: editingLead.venda || false,
+        tipoLead: editingLead.tipo_lead || "",
         faturamento: editingLead.faturamento || "",
         canal: editingLead.canal || "",
-        nivelUrgencia: editingLead.nivelUrgencia || "",
+        nivelUrgencia: editingLead.nivel_urgencia || "",
         regiao: editingLead.regiao || "",
         cidade: editingLead.cidade || "",
-        cnpj: editingLead.cnpj || "",
-        nomeContato: editingLead.nomeContato || "",
-        cargoContato: editingLead.cargoContato || "",
+        nomeContato: editingLead.nome_contato || "",
+        cargoContato: editingLead.cargo_contato || "",
         email: editingLead.email || "",
-        emailCorporativo: editingLead.emailCorporativo || "",
-        telefone: editingLead.telefone || "",
+        emailCorporativo: editingLead.email_corporativo || false,
         sdr: editingLead.sdr || "",
         closer: editingLead.closer || "",
         arrematador: editingLead.arrematador || "",
-        anuncios: editingLead.anuncios || "",
+        anuncios: editingLead.anuncios || false,
         status: editingLead.status || "",
         observacoes: editingLead.observacoes || "",
-        dataUltimoContato: editingLead.dataUltimoContato || "",
-        motivoPerdaPV: editingLead.motivoPerdaPV || "",
-        temComentarioLBF: editingLead.temComentarioLBF || false,
-        investimentoTrafego: editingLead.investimentoTrafego || "",
-        ticketMedio: editingLead.ticketMedio || "",
-        qtdLojas: editingLead.qtdLojas || "",
-        qtdVendedores: editingLead.qtdVendedores || "",
-        conseguiuContato: editingLead.conseguiuContato || false,
-        reuniaoAgendada: editingLead.reuniaoAgendada || false,
-        reuniaoRealizada: editingLead.reuniaoRealizada || false,
-        valorProposta: editingLead.valorProposta || "",
-        valorVenda: editingLead.valorVenda || "",
-        dataVenda: editingLead.dataVenda || "",
-        dataFechamento: editingLead.dataFechamento || "",
-        fee: editingLead.fee || "",
-        escopoFechado: editingLead.escopoFechado || "",
-        feeTotal: editingLead.feeTotal || "",
-        vendaViaJassonCo: editingLead.vendaViaJassonCo || false,
-        comissaoSDR: editingLead.comissaoSDR || "",
-        comissaoCloser: editingLead.comissaoCloser || "",
-        statusComissao: editingLead.statusComissao || "",
+        dataUltimoContato: editingLead.data_ultimo_contato || "",
+        conseguiuContato: editingLead.cs || false,
+        reuniaoAgendada: editingLead.rm || false,
+        reuniaoRealizada: editingLead.rr || false,
+        noShow: editingLead.ns || false,
+        dataMarcacao: editingLead.data_marcacao || "",
+        dataReuniao: editingLead.data_reuniao || "",
+        dataAssinatura: editingLead.data_assinatura || "",
+        fee: editingLead.fee?.toString() || "",
+        escopoFechadoValor: editingLead.escopo_fechado_valor?.toString() || "",
+        feeTotal: editingLead.fee_total?.toString() || "",
       })
     }
   }, [editingLead, isOpen])
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData((prev) => ({
+    setFormData((prev: any) => ({
       ...prev,
       [field]: value,
     }))
@@ -199,7 +159,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         console.log("✅ Empresa encontrada:", firstLine)
       }
 
-      // Produto de Marketing
+      // Produto de Marketing (assuming it maps to 'Produto' in the new schema)
       const produtoMatch = data.match(/Produto de Marketing\s*\|\s*([^\n]+)/i)
       if (produtoMatch) {
         updates.produtoMarketing = produtoMatch[1].trim()
@@ -210,19 +170,11 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
       const dataMatch = data.match(/(\d{2}\/\d{2}\/\d{4})\s*\|\s*(\d{2}:\d{2})/i)
       if (dataMatch) {
         const [, dataStr, horaStr] = dataMatch
-        // Converter para formato datetime-local (YYYY-MM-DDTHH:MM)
+        // Converter para formato YYYY-MM-DD e HH:MM:SS
         const [dia, mes, ano] = dataStr.split("/")
-        const dataFormatada = `${ano}-${mes}-${dia}T${horaStr}`
-        updates.dataHoraCompra = dataFormatada
-        console.log("✅ Data/Hora encontrada:", dataFormatada)
-      }
-
-      // Valor pago
-      const valorMatch = data.match(/Valor pago:\s*R\$\s*([\d.,]+)/i)
-      if (valorMatch) {
-        const valor = valorMatch[1].replace(/\./g, "").replace(",", ".")
-        updates.valorPagoLead = valor
-        console.log("✅ Valor encontrado:", valor)
+        updates.dataCompra = `${ano}-${mes}-${dia}`
+        updates.horarioCompra = `${horaStr}:00` // Add seconds for HH:MM:SS format
+        console.log("✅ Data/Hora encontrada:", updates.dataCompra, updates.horarioCompra)
       }
 
       // Faturamento
@@ -275,13 +227,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         console.log("✅ Canal encontrado:", canalMatch[1].trim())
       }
 
-      // CNPJ
-      const cnpjMatch = data.match(/CNPJ:\s*([^\n]+)/i)
-      if (cnpjMatch && cnpjMatch[1].trim() !== "-") {
-        updates.cnpj = cnpjMatch[1].trim()
-        console.log("✅ CNPJ encontrado:", cnpjMatch[1].trim())
-      }
-
       // Nome do contato
       const contatoMatch = data.match(/Nome do contato:\s*([^\n]+)/i)
       if (contatoMatch) {
@@ -303,46 +248,8 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         console.log("✅ Cargo encontrado:", cargoMatch[1].trim())
       }
 
-      // Telefone
-      const telefoneMatch = data.match(/Telefone:\s*([^\n]+)/i)
-      if (telefoneMatch) {
-        let telefone = telefoneMatch[1].trim()
-        // Remover +55 se existir e formatar
-        telefone = telefone.replace(/^\+55/, "").trim()
-        updates.telefone = telefone
-        console.log("✅ Telefone encontrado:", telefone)
-      }
-
-      // Investimento em tráfego
-      const investimentoMatch = data.match(/Investimento em tráfego:\s*([^\n]+)/i)
-      if (investimentoMatch && investimentoMatch[1].trim() !== "-") {
-        updates.investimentoTrafego = investimentoMatch[1].trim()
-        console.log("✅ Investimento encontrado:", investimentoMatch[1].trim())
-      }
-
-      // Ticket médio
-      const ticketMatch = data.match(/Ticket médio:\s*([^\n]+)/i)
-      if (ticketMatch && ticketMatch[1].trim() !== "-") {
-        updates.ticketMedio = ticketMatch[1].trim()
-        console.log("✅ Ticket médio encontrado:", ticketMatch[1].trim())
-      }
-
-      // Quantidade de lojas
-      const lojasMatch = data.match(/Qtd\.\s*de lojas:\s*([^\n]+)/i)
-      if (lojasMatch && lojasMatch[1].trim() !== "-") {
-        updates.qtdLojas = lojasMatch[1].trim()
-        console.log("✅ Qtd lojas encontrada:", lojasMatch[1].trim())
-      }
-
-      // Quantidade de vendedores
-      const vendedoresMatch = data.match(/qtd\.\s*de vendedores:\s*([^\n]+)/i)
-      if (vendedoresMatch && vendedoresMatch[1].trim() !== "-") {
-        updates.qtdVendedores = vendedoresMatch[1].trim()
-        console.log("✅ Qtd vendedores encontrada:", vendedoresMatch[1].trim())
-      }
-
       // Definir origem como LeadBroker por padrão (já que parece ser o formato padrão)
-      updates.origemLead = "leadbroker"
+      updates.tipoLead = "LeadBroker"
       console.log("✅ Origem definida como LeadBroker")
 
       // Definir status padrão como Backlog
@@ -353,7 +260,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
 
       // Aplicar as atualizações ao formulário
       if (Object.keys(updates).length > 0) {
-        setFormData((prev) => {
+        setFormData((prev: any) => {
           const newData = { ...prev, ...updates }
           console.log("✅ Formulário atualizado:", newData)
           return newData
@@ -390,15 +297,11 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     // Validação básica - CAMPOS OBRIGATÓRIOS
     const requiredFields = [
       "nomeEmpresa",
-      "produtoMarketing",
       "nicho",
-      "valorPagoLead",
-      "origemLead",
       "nomeContato",
       "email",
-      "telefone",
       "sdr",
-      "arrematador",
+      "status",
     ]
 
     const missingFields = requiredFields.filter((field) => {
@@ -473,16 +376,25 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
             <h3 className="text-lg font-semibold text-red-900 mb-4">📋 Informações Básicas *</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="nomeEmpresa">Nome da Empresa *</Label>
+                <Label htmlFor="nomeEmpresa">Razão Social *</Label>
                 <Input
                   id="nomeEmpresa"
-                  placeholder="Digite o nome da empresa"
+                  placeholder="Digite a razão social da empresa"
                   value={formData.nomeEmpresa}
                   onChange={(e) => handleInputChange("nomeEmpresa", e.target.value)}
                 />
               </div>
               <div>
-                <Label htmlFor="produtoMarketing">Produto de Marketing *</Label>
+                <Label htmlFor="nomeFantazia">Nome Fantasia</Label>
+                <Input
+                  id="nomeFantazia"
+                  placeholder="Digite o nome fantasia"
+                  value={formData.nomeFantazia}
+                  onChange={(e) => handleInputChange("nomeFantazia", e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="produtoMarketing">Produto de Marketing</Label>
                 <Input
                   id="produtoMarketing"
                   placeholder="Digite o produto de marketing"
@@ -497,50 +409,44 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectValue placeholder="Selecione o nicho" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Estruturação Estratégica">Estruturação Estratégica</SelectItem>
-                    <SelectItem value="Assessoria">Assessoria</SelectItem>
-                    <SelectItem value="Varejo">Varejo</SelectItem>
-                    <SelectItem value="Serviço">Serviço</SelectItem>
-                    <SelectItem value="Indústria">Indústria</SelectItem>
-                    <SelectItem value="Outro">Outro</SelectItem>
-                    <SelectItem value="Turismo">Turismo</SelectItem>
-                    <SelectItem value="E-commerce">E-commerce</SelectItem>
+                    {Array.from(lookups.segmento?.map.values() || []).map((nicho: string) => (
+                      <SelectItem key={nicho} value={nicho}>
+                        {nicho}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="dataHoraCompra">Data/Hora da Compra do Lead</Label>
+                <Label htmlFor="dataCompra">Data da Compra do Lead</Label>
                 <Input
-                  id="dataHoraCompra"
-                  type="datetime-local"
-                  value={formData.dataHoraCompra}
-                  onChange={(e) => handleInputChange("dataHoraCompra", e.target.value)}
+                  id="dataCompra"
+                  type="date"
+                  value={formData.dataCompra}
+                  onChange={(e) => handleInputChange("dataCompra", e.target.value)}
                 />
               </div>
               <div>
-                <Label htmlFor="valorPagoLead">Valor Pago no Lead (R$) *</Label>
+                <Label htmlFor="horarioCompra">Horário da Compra do Lead</Label>
                 <Input
-                  id="valorPagoLead"
-                  type="number"
-                  step="0.01"
-                  placeholder="0"
-                  value={formData.valorPagoLead}
-                  onChange={(e) => handleInputChange("valorPagoLead", e.target.value)}
+                  id="horarioCompra"
+                  type="time"
+                  value={formData.horarioCompra}
+                  onChange={(e) => handleInputChange("horarioCompra", e.target.value)}
                 />
               </div>
               <div>
-                <Label htmlFor="origemLead">Origem do Lead *</Label>
-                <Select value={formData.origemLead} onValueChange={(value) => handleInputChange("origemLead", value)}>
+                <Label htmlFor="tipoLead">Origem do Lead</Label>
+                <Select value={formData.tipoLead} onValueChange={(value) => handleInputChange("tipoLead", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a origem" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="leadbroker">LeadBroker</SelectItem>
-                    <SelectItem value="organico">Orgânico</SelectItem>
-                    <SelectItem value="indicacao">Indicação</SelectItem>
-                    <SelectItem value="facebook">Facebook</SelectItem>
-                    <SelectItem value="google">Google</SelectItem>
-                    <SelectItem value="linkedin">LinkedIn</SelectItem>
+                    {Array.from(lookups.origem?.map.values() || []).map((origem: string) => (
+                      <SelectItem key={origem} value={origem}>
+                        {origem}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -553,21 +459,33 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="faturamento">Faturamento</Label>
-                <Input
-                  id="faturamento"
-                  placeholder="Ex: De 401 mil à 1 milhão"
-                  value={formData.faturamento}
-                  onChange={(e) => handleInputChange("faturamento", e.target.value)}
-                />
+                <Select value={formData.faturamento} onValueChange={(value) => handleInputChange("faturamento", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o Faturamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(lookups.faturamento?.map.values() || []).map((faturamento: string) => (
+                      <SelectItem key={faturamento} value={faturamento}>
+                        {faturamento}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="canal">Canal</Label>
-                <Input
-                  id="canal"
-                  placeholder="Digite o canal"
-                  value={formData.canal}
-                  onChange={(e) => handleInputChange("canal", e.target.value)}
-                />
+                <Select value={formData.canal} onValueChange={(value) => handleInputChange("canal", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o Canal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(lookups.canal?.map.values() || []).map((canal: string) => (
+                      <SelectItem key={canal} value={canal}>
+                        {canal}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="nivelUrgencia">Nível de Urgência</Label>
@@ -579,39 +497,51 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectValue placeholder="Selecione o nível" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="baixo">Baixo</SelectItem>
-                    <SelectItem value="medio">Médio</SelectItem>
-                    <SelectItem value="alto">Alto</SelectItem>
-                    <SelectItem value="urgente">Urgente</SelectItem>
+                    {Array.from(lookups.urgencia?.map.values() || []).map((urgencia: string) => (
+                      <SelectItem key={urgencia} value={urgencia}>
+                        {urgencia}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label htmlFor="regiao">Região</Label>
-                <Input
-                  id="regiao"
-                  placeholder="Digite a região"
-                  value={formData.regiao}
-                  onChange={(e) => handleInputChange("regiao", e.target.value)}
-                />
+                <Select value={formData.regiao} onValueChange={(value) => handleInputChange("regiao", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a Região" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(lookups.regiao?.map.values() || []).map((regiao: string) => (
+                      <SelectItem key={regiao} value={regiao}>
+                        {regiao}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="cidade">Cidade</Label>
-                <Input
-                  id="cidade"
-                  placeholder="Digite a cidade"
-                  value={formData.cidade}
-                  onChange={(e) => handleInputChange("cidade", e.target.value)}
-                />
+                <Select value={formData.cidade} onValueChange={(value) => handleInputChange("cidade", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a Cidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(lookups.cidade?.map.values() || []).map((cidade: string) => (
+                      <SelectItem key={cidade} value={cidade}>
+                        {cidade}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div>
-                <Label htmlFor="cnpj">CNPJ</Label>
-                <Input
-                  id="cnpj"
-                  placeholder="00.000.000/0000-00"
-                  value={formData.cnpj}
-                  onChange={(e) => handleInputChange("cnpj", e.target.value)}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="anuncios"
+                  checked={formData.anuncios}
+                  onCheckedChange={(checked) => handleInputChange("anuncios", checked)}
                 />
+                <Label htmlFor="anuncios">Faz Anúncios?</Label>
               </div>
             </div>
           </div>
@@ -631,12 +561,18 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
               </div>
               <div>
                 <Label htmlFor="cargoContato">Cargo do Contato</Label>
-                <Input
-                  id="cargoContato"
-                  placeholder="Ex: Diretor, Gerente, etc."
-                  value={formData.cargoContato}
-                  onChange={(e) => handleInputChange("cargoContato", e.target.value)}
-                />
+                <Select value={formData.cargoContato} onValueChange={(value) => handleInputChange("cargoContato", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o Cargo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(lookups.cargo_contato?.map.values() || []).map((cargo: string) => (
+                      <SelectItem key={cargo} value={cargo}>
+                        {cargo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="email">E-mail *</Label>
@@ -648,24 +584,13 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                   onChange={(e) => handleInputChange("email", e.target.value)}
                 />
               </div>
-              <div>
-                <Label htmlFor="emailCorporativo">E-mail Corporativo</Label>
-                <Input
+              <div className="flex items-center space-x-2">
+                <Checkbox
                   id="emailCorporativo"
-                  type="email"
-                  placeholder="contato@empresa.com"
-                  value={formData.emailCorporativo}
-                  onChange={(e) => handleInputChange("emailCorporativo", e.target.value)}
+                  checked={formData.emailCorporativo}
+                  onCheckedChange={(checked) => handleInputChange("emailCorporativo", checked)}
                 />
-              </div>
-              <div>
-                <Label htmlFor="telefone">Telefone *</Label>
-                <Input
-                  id="telefone"
-                  placeholder="(11) 99999-9999"
-                  value={formData.telefone}
-                  onChange={(e) => handleInputChange("telefone", e.target.value)}
-                />
+                <Label htmlFor="emailCorporativo">E-mail Corporativo?</Label>
               </div>
             </div>
           </div>
@@ -673,7 +598,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
           {/* Equipe e Processo */}
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
             <h3 className="text-lg font-semibold text-green-900 mb-4">👥 Equipe e Processo *</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="sdr">SDR *</Label>
                 <Select value={formData.sdr} onValueChange={(value) => handleInputChange("sdr", value)}>
@@ -681,9 +606,11 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectValue placeholder="Selecione o SDR" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="antonio">Antônio</SelectItem>
-                    <SelectItem value="gabrielli">Gabrielli</SelectItem>
-                    <SelectItem value="vanessa">Vanessa</SelectItem>
+                    {Array.from(lookups.vendedor?.map.values() || []).map((vendedor: string) => (
+                      <SelectItem key={vendedor} value={vendedor}>
+                        {vendedor}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -694,38 +621,26 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectValue placeholder="Selecione o closer" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="antonio">Antônio</SelectItem>
-                    <SelectItem value="gabrielli">Gabrielli</SelectItem>
-                    <SelectItem value="vanessa">Vanessa</SelectItem>
-                    <SelectItem value="jasson">Jasson</SelectItem>
+                    {Array.from(lookups.vendedor?.map.values() || []).map((vendedor: string) => (
+                      <SelectItem key={vendedor} value={vendedor}>
+                        {vendedor}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="arrematador">Arrematador *</Label>
+                <Label htmlFor="arrematador">Arrematador</Label>
                 <Select value={formData.arrematador} onValueChange={(value) => handleInputChange("arrematador", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o arrematador" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="alan">Alan</SelectItem>
-                    <SelectItem value="antonio">Antônio</SelectItem>
-                    <SelectItem value="gabrielli">Gabrielli</SelectItem>
-                    <SelectItem value="jasson">Jasson</SelectItem>
-                    <SelectItem value="vanessa">Vanessa</SelectItem>
-                    <SelectItem value="william">William</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="anuncios">Anúncios</Label>
-                <Select value={formData.anuncios} onValueChange={(value) => handleInputChange("anuncios", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma opção" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="sim">Sim</SelectItem>
-                    <SelectItem value="nao">Não</SelectItem>
+                    {Array.from(lookups.vendedor?.map.values() || []).map((vendedor: string) => (
+                      <SelectItem key={vendedor} value={vendedor}>
+                        {vendedor}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -734,29 +649,20 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
 
           {/* Status e Acompanhamento */}
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <h3 className="text-lg font-semibold text-yellow-900 mb-4">📈 Status e Acompanhamento</h3>
+            <h3 className="text-lg font-semibold text-yellow-900 mb-4">📈 Status e Acompanhamento *</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status">Status *</Label>
                 <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="BACKLOG">Backlog</SelectItem>
-                    <SelectItem value="TENTANDO CONTATO">Tentando Contato</SelectItem>
-                    <SelectItem value="CONTATO AGENDADO">Contato Agendado</SelectItem>
-                    <SelectItem value="QUALIFICANDO">Qualificando</SelectItem>
-                    <SelectItem value="REUNIÃO AGENDADA">Reunião Agendada</SelectItem>
-                    <SelectItem value="REUNIÃO">Reunião</SelectItem>
-                    <SelectItem value="REUNIÃO REALIZADA">Reunião Realizada</SelectItem>
-                    <SelectItem value="DÚVIDAS E FECHAMENTO">Dúvidas e Fechamento</SelectItem>
-                    <SelectItem value="CONTRATO NA RUA">Contrato na Rua</SelectItem>
-                    <SelectItem value="GANHO">Ganho</SelectItem>
-                    <SelectItem value="FOLLOW UP">Follow Up</SelectItem>
-                    <SelectItem value="NO-SHOW">No-Show</SelectItem>
-                    <SelectItem value="DROPADO">Dropado</SelectItem>
-                    <SelectItem value="FOLLOW INFINITO">Follow Infinito</SelectItem>
+                    {Array.from(lookups.status?.map.values() || []).map((status: string) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -768,6 +674,126 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                   value={formData.dataUltimoContato}
                   onChange={(e) => handleInputChange("dataUltimoContato", e.target.value)}
                 />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="conseguiuContato"
+                  checked={formData.conseguiuContato}
+                  onCheckedChange={(checked) => handleInputChange("conseguiuContato", checked)}
+                />
+                <Label htmlFor="conseguiuContato">Conseguiu Contato?</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="reuniaoAgendada"
+                  checked={formData.reuniaoAgendada}
+                  onCheckedChange={(checked) => handleInputChange("reuniaoAgendada", checked)}
+                />
+                <Label htmlFor="reuniaoAgendada">Reunião Agendada?</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="reuniaoRealizada"
+                  checked={formData.reuniaoRealizada}
+                  onCheckedChange={(checked) => handleInputChange("reuniaoRealizada", checked)}
+                />
+                <Label htmlFor="reuniaoRealizada">Reunião Realizada?</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="noShow"
+                  checked={formData.noShow}
+                  onCheckedChange={(checked) => handleInputChange("noShow", checked)}
+                />
+                <Label htmlFor="noShow">No-Show?</Label>
+              </div>
+            </div>
+          </div>
+
+          {/* Vendas e Financeiro */}
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-purple-900 mb-4">💰 Vendas e Financeiro</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="valorVenda">Valor da Venda (R$)</Label>
+                <Input
+                  id="valorVenda"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.valorVenda}
+                  onChange={(e) => handleInputChange("valorVenda", e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="dataAssinatura">Data da Assinatura</Label>
+                <Input
+                  id="dataAssinatura"
+                  type="date"
+                  value={formData.dataAssinatura}
+                  onChange={(e) => handleInputChange("dataAssinatura", e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="fee">Fee (R$)</Label>
+                <Input
+                  id="fee"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.fee}
+                  onChange={(e) => handleInputChange("fee", e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="escopoFechadoValor">Escopo Fechado (R$)</Label>
+                <Input
+                  id="escopoFechadoValor"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.escopoFechadoValor}
+                  onChange={(e) => handleInputChange("escopoFechadoValor", e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="feeTotal">Fee Total (R$)</Label>
+                <Input
+                  id="feeTotal"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.feeTotal}
+                  onChange={(e) => handleInputChange("feeTotal", e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="dataMarcacao">Data da Marcação</Label>
+                <Input
+                  id="dataMarcacao"
+                  type="date"
+                  value={formData.dataMarcacao}
+                  onChange={(e) => handleInputChange("dataMarcacao", e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="dataReuniao">Data da Reunião</Label>
+                <Input
+                  id="dataReuniao"
+                  type="date"
+                  value={formData.dataReuniao}
+                  onChange={(e) => handleInputChange("dataReuniao", e.target.value)}
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="venda"
+                  checked={formData.venda}
+                  onCheckedChange={(checked) => handleInputChange("venda", checked)}
+                />
+                <Label htmlFor="venda">Venda Concluída?</Label>
               </div>
             </div>
           </div>

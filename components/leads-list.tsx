@@ -1,306 +1,236 @@
-"use client"
-
 import { useState } from "react"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Edit, Trash2, Filter } from "lucide-react"
-import type { Lead } from "@/app/page"
+import { Badge } from "@/components/ui/badge"
+import { Edit, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Lead } from "@/lib/supabase-operations"
 
 interface LeadsListProps {
   leads: Lead[]
   onEditLead: (lead: Lead) => void
-  onDeleteLead: (leadId: string) => void
+  onDeleteLead: (id: string | number) => void
 }
 
 export function LeadsList({ leads, onEditLead, onDeleteLead }: LeadsListProps) {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("todos")
+  const [expandedLeadId, setExpandedLeadId] = useState<string | number | null>(null)
 
-  // Status options with colors (matching the spreadsheet)
-  const statusOptions = [
-    { value: "CONTRATO ASSINADO", label: "Contrato Assinado", color: "bg-green-100 text-green-800 border-green-200" },
-    { value: "DROPADO", label: "Dropado", color: "bg-gray-100 text-gray-800 border-gray-200" },
-    { value: "FOLLOW INFINITO", label: "Follow Infinito", color: "bg-purple-100 text-purple-800 border-purple-200" },
-    { value: "PERDIDO", label: "Perdido", color: "bg-blue-100 text-blue-800 border-blue-200" },
-    { value: "DESQUALIFICADO", label: "Desqualificado", color: "bg-gray-100 text-gray-800 border-gray-200" },
-    { value: "TENTANDO CONTATO", label: "Tentando Contato", color: "bg-yellow-100 text-yellow-800 border-yellow-200" },
-    { value: "NO-SHOW/REMARCANDO", label: "No-Show/Remarcando", color: "bg-cyan-100 text-cyan-800 border-cyan-200" },
-    { value: "BACKLOG", label: "Backlog", color: "bg-red-100 text-red-800 border-red-200" },
-    { value: "CONTATO AGENDADO", label: "Contato Agendado", color: "bg-blue-100 text-blue-800 border-blue-200" },
-    { value: "QUALIFICANDO", label: "Qualificando", color: "bg-orange-100 text-orange-800 border-orange-200" },
-    { value: "REUNIÃO AGENDADA", label: "Reunião Agendada", color: "bg-indigo-100 text-indigo-800 border-indigo-200" },
-    { value: "REUNIÃO", label: "Reunião", color: "bg-pink-100 text-pink-800 border-pink-200" },
-    { value: "REUNIÃO REALIZADA", label: "Reunião Realizada", color: "bg-teal-100 text-teal-800 border-teal-200" },
-    {
-      value: "DÚVIDAS E FECHAMENTO",
-      label: "Dúvidas e Fechamento",
-      color: "bg-amber-100 text-amber-800 border-amber-200",
-    },
-    { value: "CONTRATO NA RUA", label: "Contrato na Rua", color: "bg-lime-100 text-lime-800 border-lime-200" },
-    { value: "GANHO", label: "Ganho", color: "bg-emerald-100 text-emerald-800 border-emerald-200" },
-    { value: "FOLLOW UP", label: "Follow Up", color: "bg-violet-100 text-violet-800 border-violet-200" },
-    { value: "NO-SHOW", label: "No-Show", color: "bg-rose-100 text-rose-800 border-rose-200" },
-  ]
-
-  // Helper function to safely get string value
-  const safeString = (value: any): string => {
-    if (value === null || value === undefined) return ""
-    return String(value)
+  const toggleExpand = (id: string | number) => {
+    setExpandedLeadId(expandedLeadId === id ? null : id)
   }
 
-  // Filter leads based on search term and status
-  const filteredLeads = leads.filter((lead) => {
-    // Safe string conversions for search
-    const nomeEmpresa = safeString(lead.nome_empresa).toLowerCase()
-    const nomeContato = safeString(lead.nome_contato).toLowerCase()
-    const produtoMarketing = safeString(lead.produto_marketing).toLowerCase()
-    const nicho = safeString(lead.nicho).toLowerCase()
-    const sdr = safeString(lead.sdr).toLowerCase()
-    const closer = safeString(lead.closer).toLowerCase()
-    const searchLower = safeString(searchTerm).toLowerCase()
-
-    const matchesSearch =
-      nomeEmpresa.includes(searchLower) ||
-      nomeContato.includes(searchLower) ||
-      produtoMarketing.includes(searchLower) ||
-      nicho.includes(searchLower) ||
-      sdr.includes(searchLower) ||
-      closer.includes(searchLower)
-
-    const matchesStatus = statusFilter === "todos" || safeString(lead.status) === statusFilter
-
-    return matchesSearch && matchesStatus
-  })
-
-  const getStatusBadge = (status: string) => {
-    const safeStatus = safeString(status)
-    const statusOption = statusOptions.find((option) => option.value === safeStatus)
-    if (!statusOption) {
-      return <Badge className="bg-gray-100 text-gray-800">{safeStatus || "Sem Status"}</Badge>
-    }
-    return <Badge className={statusOption.color}>{statusOption.label}</Badge>
-  }
-
-  const getBadgeColor = (type: string) => {
-    const safeType = safeString(type).toLowerCase()
-    switch (safeType) {
-      case "estruturação estratégica":
-        return "bg-blue-100 text-blue-800"
-      case "assessoria":
-        return "bg-blue-100 text-blue-800"
-      case "varejo":
-        return "bg-green-100 text-green-800"
-      case "serviço":
-        return "bg-green-100 text-green-800"
-      case "indústria":
-        return "bg-green-100 text-green-800"
-      case "outro":
-        return "bg-green-100 text-green-800"
-      case "turismo":
-        return "bg-green-100 text-green-800"
-      case "e-commerce":
-        return "bg-green-100 text-green-800"
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "BACKLOG":
+        return "bg-gray-200 text-gray-800"
+      case "TENTANDO CONTATO":
+        return "bg-blue-200 text-blue-800"
+      case "REUNIAO AGENDADA":
+        return "bg-purple-200 text-purple-800"
+      case "REUNIAO REALIZADA":
+        return "bg-indigo-200 text-indigo-800"
+      case "PROPOSTA ENVIADA":
+        return "bg-yellow-200 text-yellow-800"
+      case "NEGOCIACAO":
+        return "bg-orange-200 text-orange-800"
+      case "CONTRATO ASSINADO":
+        return "bg-green-200 text-green-800"
+      case "GANHO":
+        return "bg-green-500 text-white"
+      case "DROPADO":
+        return "bg-red-200 text-red-800"
+      case "FOLLOW INFINITO":
+        return "bg-pink-200 text-pink-800"
       default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  const formatDateTime = (dateString: string) => {
-    const safeDateString = safeString(dateString)
-    if (!safeDateString) return "-"
-    try {
-      const date = new Date(safeDateString)
-      return isNaN(date.getTime()) ? "-" : date.toLocaleString("pt-BR")
-    } catch {
-      return "-"
-    }
-  }
-
-  const formatDate = (dateString: string) => {
-    const safeDateString = safeString(dateString)
-    if (!safeDateString) return "-"
-    try {
-      const date = new Date(safeDateString)
-      return isNaN(date.getTime()) ? "-" : date.toLocaleDateString("pt-BR")
-    } catch {
-      return "-"
-    }
-  }
-
-  const formatCurrency = (value: string | number) => {
-    const safeValue = safeString(value)
-    if (!safeValue) return "-"
-    try {
-      const num = Number.parseFloat(safeValue)
-      return isNaN(num) ? "-" : `R$ ${num.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
-    } catch {
-      return "-"
+        return "bg-gray-100 text-gray-700"
     }
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200">
-      {/* Search and Filters */}
-      <div className="p-4 border-b border-gray-200 space-y-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Buscar por empresa, contato, produto, nicho, SDR ou Closer..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <Filter className="w-4 h-4 text-gray-400" />
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filtrar por status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os Status</SelectItem>
-                {statusOptions.map((status) => (
-                  <SelectItem key={status.value} value={status.value}>
-                    {status.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
-
-      {/* Header */}
-      <div className="p-4">
-        <h2 className="text-xl font-bold text-gray-900 mb-1">Leads Cadastrados ({filteredLeads.length})</h2>
-        <p className="text-sm text-gray-500">Lista completa de leads e suas informações</p>
-      </div>
-
-      {/* Content */}
-      {filteredLeads.length === 0 ? (
-        <div className="p-8 text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Search className="w-8 h-8 text-gray-400" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            {leads.length === 0 ? "Nenhum lead encontrado" : "Nenhum resultado encontrado"}
-          </h3>
-          <p className="text-gray-500 mb-4">
-            {leads.length === 0
-              ? 'Comece adicionando seu primeiro lead clicando no botão "Novo Lead" acima.'
-              : "Tente ajustar os termos de busca ou filtros para encontrar o que procura."}
-          </p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-y border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Empresa
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Contato
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Produto Marketing
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Nicho
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Valor Lead
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SDR</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Closer
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Último Contato
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Valor Venda
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Observações
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredLeads.map((lead) => (
-                <tr key={lead.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-4 whitespace-nowrap">{getStatusBadge(lead.status)}</td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{safeString(lead.nome_empresa)}</div>
-                    <div className="text-sm text-gray-500">{safeString(lead.cidade) || "-"}</div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{safeString(lead.nome_contato)}</div>
-                    <div className="text-sm text-gray-500">{safeString(lead.email)}</div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{safeString(lead.produto_marketing) || "-"}</div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <Badge className={getBadgeColor(lead.nicho)}>{safeString(lead.nicho)}</Badge>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{formatCurrency(lead.valor_pago_lead)}</div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 capitalize">{safeString(lead.sdr)}</div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 capitalize">{safeString(lead.closer) || "-"}</div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{formatDate(lead.data_ultimo_contato)}</div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{formatCurrency(lead.valor_venda)}</div>
-                  </td>
-                  <td className="px-4 py-4 max-w-xs">
-                    <div className="text-sm text-gray-900 truncate" title={safeString(lead.observacoes)}>
-                      {safeString(lead.observacoes) || "-"}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onEditLead(lead)}
-                        className="h-8 w-8 p-0"
-                        title="Editar lead"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onDeleteLead(lead.id)}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        title="Excluir lead"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+    <div className="bg-white rounded-lg shadow overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[50px]"></TableHead>
+            <TableHead>Empresa</TableHead>
+            <TableHead>Contato</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>SDR</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Ações</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {leads.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                Nenhum lead encontrado.
+              </TableCell>
+            </TableRow>
+          ) : (
+            leads.map((lead) => (
+              <>
+                <TableRow key={lead.id}>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => toggleExpand(lead.id)}
+                      aria-expanded={expandedLeadId === lead.id}
+                      aria-controls={`details-${lead.id}`}
+                    >
+                      {expandedLeadId === lead.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+                  </TableCell>
+                  <TableCell className="font-medium">{lead.nome_empresa}</TableCell>
+                  <TableCell>{lead.nome_contato}</TableCell>
+                  <TableCell>{lead.email}</TableCell>
+                  <TableCell>{lead.sdr}</TableCell>
+                  <TableCell>
+                    <Badge className={getStatusColor(lead.status)}>{lead.status}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" onClick={() => onEditLead(lead)} className="mr-2">
+                      <Edit className="h-4 w-4" />
+                      <span className="sr-only">Editar</span>
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => onDeleteLead(lead.id)}>
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Excluir</span>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+                {expandedLeadId === lead.id && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="p-4 bg-gray-50" id={`details-${lead.id}`}>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <p>
+                            <strong>Nome Fantasia:</strong> {lead.nome_fantazia || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Nicho:</strong> {lead.nicho || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Produto Marketing:</strong> {lead.produto_marketing || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Tipo Lead:</strong> {lead.tipo_lead || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Canal:</strong> {lead.canal || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Nível Urgência:</strong> {lead.nivel_urgencia || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Faturamento:</strong> {lead.faturamento || "N/A"}
+                          </p>
+                        </div>
+                        <div>
+                          <p>
+                            <strong>Cargo Contato:</strong> {lead.cargo_contato || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Email Corporativo:</strong> {lead.email_corporativo ? "Sim" : "Não"}
+                          </p>
+                          <p>
+                            <strong>Closer:</strong> {lead.closer || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Arrematador:</strong> {lead.arrematador || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Anúncios:</strong> {lead.anuncios ? "Sim" : "Não"}
+                          </p>
+                          <p>
+                            <strong>Região:</strong> {lead.regiao || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Cidade:</strong> {lead.cidade || "N/A"}
+                          </p>
+                        </div>
+                        <div>
+                          <p>
+                            <strong>Data Compra:</strong> {lead.data_compra || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Horário Compra:</strong> {lead.horario_compra || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Valor Venda:</strong>{" "}
+                            {lead.valor_venda
+                              ? `R$ ${lead.valor_venda.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                              : "N/A"}
+                          </p>
+                          <p>
+                            <strong>Venda:</strong> {lead.venda ? "Sim" : "Não"}
+                          </p>
+                          <p>
+                            <strong>Observações:</strong> {lead.observacoes || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Último Contato:</strong> {lead.data_ultimo_contato || "N/A"}
+                          </p>
+                          <p>
+                            <strong>CS:</strong> {lead.cs ? "Sim" : "Não"}
+                          </p>
+                          <p>
+                            <strong>RM:</strong> {lead.rm ? "Sim" : "Não"}
+                          </p>
+                          <p>
+                            <strong>RR:</strong> {lead.rr ? "Sim" : "Não"}
+                          </p>
+                          <p>
+                            <strong>NS:</strong> {lead.ns ? "Sim" : "Não"}
+                          </p>
+                          <p>
+                            <strong>Data Marcação:</strong> {lead.data_marcacao || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Data Reunião:</strong> {lead.data_reuniao || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Data Assinatura:</strong> {lead.data_assinatura || "N/A"}
+                          </p>
+                          <p>
+                            <strong>FEE:</strong>{" "}
+                            {lead.fee ? `R$ ${lead.fee.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "N/A"}
+                          </p>
+                          <p>
+                            <strong>Escopo Fechado:</strong>{" "}
+                            {lead.escopo_fechado_valor
+                              ? `R$ ${lead.escopo_fechado_valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                              : "N/A"}
+                          </p>
+                          <p>
+                            <strong>FEE Total:</strong>{" "}
+                            {lead.fee_total
+                              ? `R$ ${lead.fee_total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                              : "N/A"}
+                          </p>
+                          <p>
+                            <strong>Criado em:</strong> {new Date(lead.created_at || "").toLocaleString() || "N/A"}
+                          </p>
+                          <p>
+                            <strong>Atualizado em:</strong> {new Date(lead.updated_at || "").toLocaleString() || "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </>
+            ))
+          )}
+        </TableBody>
+      </Table>
     </div>
   )
 }
