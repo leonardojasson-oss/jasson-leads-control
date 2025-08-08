@@ -122,6 +122,8 @@ CREATE TABLE IF NOT EXISTS lead (
     fee DECIMAL(10,2),
     escopo_fechado DECIMAL(10,2),
     fee_total DECIMAL(10,2),
+    observacoes_closer TEXT, -- Nova coluna para observações do closer
+    motivo_perda TEXT,      -- Nova coluna para motivo de perda
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

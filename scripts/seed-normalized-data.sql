@@ -85,7 +85,7 @@ INSERT INTO lead (
     razao_social, nome_fantazia, id_contato, id_segmento, data_compra, horario_compra, valor, venda,
     id_origem, id_faturamento, id_canal, id_urgencia, id_cidade, is_anuncio, id_status,
     data_ultimo_contato, cs, rm, rr, ns, data_marcacao, data_reuniao, data_assinatura,
-    fee, escopo_fechado, fee_total
+    fee, escopo_fechado, fee_total, observacoes_closer, motivo_perda
 ) VALUES
 (
     'Empresa Alpha', 'Alpha Solutions', (SELECT id FROM contato WHERE email = 'joao.silva@exemplo.com'),
@@ -94,7 +94,7 @@ INSERT INTO lead (
     (SELECT id FROM canal WHERE nome = 'Google Ads'), (SELECT id FROM urgencia WHERE nome = 'Alta'),
     (SELECT id FROM cidade WHERE nome = 'São Paulo'), TRUE, (SELECT id FROM status WHERE nome = 'GANHO'),
     '2023-01-10', TRUE, TRUE, TRUE, FALSE, '2023-01-05', '2023-01-08', '2023-01-15',
-    1500.00, 0.00, 1500.00
+    1500.00, 0.00, 1500.00, 'Observação do closer para Alpha.', NULL
 ),
 (
     'Empresa Beta', 'Beta Corp', (SELECT id FROM contato WHERE email = 'maria.souza@outra.com'),
@@ -103,7 +103,7 @@ INSERT INTO lead (
     (SELECT id FROM canal WHERE nome = 'Facebook Ads'), (SELECT id FROM urgencia WHERE nome = 'Média'),
     (SELECT id FROM cidade WHERE nome = 'Rio de Janeiro'), FALSE, (SELECT id FROM status WHERE nome = 'TENTANDO CONTATO'),
     '2023-02-18', FALSE, FALSE, FALSE, FALSE, NULL, NULL, NULL,
-    0.00, 0.00, 0.00
+    0.00, 0.00, 0.00, NULL, NULL
 ),
 (
     'Empresa Gamma', 'Gamma Inc.', (SELECT id FROM contato WHERE email = 'pedro.costa@teste.com'),
@@ -113,7 +113,7 @@ INSERT INTO lead (
     (SELECT id FROM cidade WHERE nome = 'Curitiba'), TRUE,
     (SELECT id FROM status WHERE nome = 'REUNIAO AGENDADA'),
     '2023-02-25', TRUE, TRUE, FALSE, FALSE, '2023-02-28', '2023-03-05', NULL,
-    0.00, 0.00, 0.00
+    0.00, 0.00, 0.00, NULL, 'Preço muito alto'
 );
 
 -- Link Vendedores to Leads (using lead IDs from previous inserts)

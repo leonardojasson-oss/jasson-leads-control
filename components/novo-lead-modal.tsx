@@ -74,7 +74,9 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         arrematador: "",
         anuncios: false,
         status: "",
-        observacoes: "",
+        observacoesSdr: "", // Renomeado
+        observacoesCloser: "", // Novo
+        motivoPerda: "", // Novo
         dataUltimoContato: "",
         conseguiuContato: false,
         reuniaoAgendada: false,
@@ -116,7 +118,9 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         arrematador: editingLead.arrematador || "",
         anuncios: editingLead.anuncios || false,
         status: editingLead.status || "",
-        observacoes: editingLead.observacoes || "",
+        observacoesSdr: editingLead.observacoes_sdr || "", // Mapeado
+        observacoesCloser: editingLead.observacoes_closer || "", // Novo
+        motivoPerda: editingLead.motivo_perda || "", // Novo
         dataUltimoContato: editingLead.data_ultimo_contato || "",
         conseguiuContato: editingLead.cs || false,
         reuniaoAgendada: editingLead.rm || false,
@@ -798,16 +802,40 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
             </div>
           </div>
 
-          {/* Observações */}
-          <div>
-            <Label htmlFor="observacoes">📝 Observações</Label>
-            <Textarea
-              id="observacoes"
-              placeholder="Digite observações sobre o lead..."
-              value={formData.observacoes}
-              onChange={(e) => handleInputChange("observacoes", e.target.value)}
-              className="min-h-[100px]"
-            />
+          {/* Observações e Motivo de Perda */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">📝 Observações e Motivo de Perda</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="observacoesSdr">Observações SDR</Label>
+                <Textarea
+                  id="observacoesSdr"
+                  placeholder="Digite observações do SDR sobre o lead..."
+                  value={formData.observacoesSdr}
+                  onChange={(e) => handleInputChange("observacoesSdr", e.target.value)}
+                  className="min-h-[100px]"
+                />
+              </div>
+              <div>
+                <Label htmlFor="observacoesCloser">Observações Closer</Label>
+                <Textarea
+                  id="observacoesCloser"
+                  placeholder="Digite observações do Closer sobre o lead..."
+                  value={formData.observacoesCloser}
+                  onChange={(e) => handleInputChange("observacoesCloser", e.target.value)}
+                  className="min-h-[100px]"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label htmlFor="motivoPerda">Motivo de Perda</Label>
+                <Input
+                  id="motivoPerda"
+                  placeholder="Digite o motivo da perda do lead..."
+                  value={formData.motivoPerda}
+                  onChange={(e) => handleInputChange("motivoPerda", e.target.value)}
+                />
+              </div>
+            </div>
           </div>
         </div>
 

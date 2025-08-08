@@ -38,7 +38,9 @@ export type Lead = {
   arrematador?: string
   anuncios?: boolean
   status: string
-  observacoes?: string
+  observacoes_sdr?: string // Renomeado de 'observacoes'
+  observacoes_closer?: string // Novo campo
+  motivo_perda?: string // Novo campo
   data_ultimo_contato?: string
   cs?: boolean
   rm?: boolean
@@ -306,7 +308,9 @@ export const leadOperations = {
           arrematador: arrematador ? await getNameFromId("vendedor", arrematador.vendedor_id) : undefined,
           anuncios: l.is_anuncio,
           status: (await getNameFromId("status", l.id_status)) || "BACKLOG",
-          observacoes: comentario?.comentario,
+          observacoes_sdr: comentario?.comentario, // Mapeado do campo 'comentario'
+          observacoes_closer: l.observacoes_closer, // Novo campo
+          motivo_perda: l.motivo_perda, // Novo campo
           data_ultimo_contato: l.data_ultimo_contato,
           cs: l.cs,
           rm: l.rm,
@@ -393,6 +397,8 @@ export const leadOperations = {
           fee: lead.fee,
           escopo_fechado: lead.escopo_fechado_valor,
           fee_total: lead.fee_total,
+          observacoes_closer: lead.observacoes_closer, // Novo campo
+          motivo_perda: lead.motivo_perda, // Novo campo
         })
         .select("id")
         .single()
@@ -401,13 +407,13 @@ export const leadOperations = {
       const lead_id = newLead.id
       console.log("✅ Lead principal criado:", lead_id)
 
-      // 3. comentário
-      if (lead.observacoes) {
+      // 3. comentário (para observacoes_sdr)
+      if (lead.observacoes_sdr) {
         const { error: comentarioError } = await supabase
           .from("comentario")
-          .insert({ comentario: lead.observacoes, id_cliente: lead_id })
+          .insert({ comentario: lead.observacoes_sdr, id_cliente: lead_id })
         if (comentarioError) console.error("Error inserting comentario:", comentarioError)
-        else console.log("✅ Comentário salvo.")
+        else console.log("✅ Comentário (observacoes_sdr) salvo.")
       }
 
       // 4. vendedor_lead
@@ -515,6 +521,8 @@ export const leadOperations = {
           fee: lead.fee,
           escopo_fechado: lead.escopo_fechado_valor,
           fee_total: lead.fee_total,
+          observacoes_closer: lead.observacoes_closer, // Novo campo
+          motivo_perda: lead.motivo_perda, // Novo campo
           updated_at: new Date().toISOString(),
         })
         .eq("id", id)
@@ -522,8 +530,8 @@ export const leadOperations = {
       if (leadUpdateError) throw leadUpdateError
       console.log("✅ Lead principal atualizado.")
 
-      // 3) comentário
-      if (lead.observacoes !== undefined) {
+      // 3) comentário (para observacoes_sdr)
+      if (lead.observacoes_sdr !== undefined) {
         const { data: existingComentario, error: fetchComentarioError } = await supabase
           .from("comentario")
           .select("id")
@@ -535,27 +543,27 @@ export const leadOperations = {
         }
 
         if (existingComentario) {
-          if (lead.observacoes) {
+          if (lead.observacoes_sdr) {
             const { error: updateComentarioError } = await supabase
               .from("comentario")
-              .update({ comentario: lead.observacoes })
+              .update({ comentario: lead.observacoes_sdr })
               .eq("id", existingComentario.id)
             if (updateComentarioError) console.error("Error updating comentario:", updateComentarioError)
-            else console.log("✅ Comentário atualizado.")
+            else console.log("✅ Comentário (observacoes_sdr) atualizado.")
           } else {
             const { error: deleteComentarioError } = await supabase
               .from("comentario")
               .delete()
               .eq("id", existingComentario.id)
             if (deleteComentarioError) console.error("Error deleting comentario:", deleteComentarioError)
-            else console.log("✅ Comentário removido.")
+            else console.log("✅ Comentário (observacoes_sdr) removido.")
           }
-        } else if (lead.observacoes) {
+        } else if (lead.observacoes_sdr) {
           const { error: insertComentarioError } = await supabase
             .from("comentario")
-            .insert({ comentario: lead.observacoes, id_cliente: id })
+            .insert({ comentario: lead.observacoes_sdr, id_cliente: id })
           if (insertComentarioError) console.error("Error inserting new comentario:", insertComentarioError)
-          else console.log("✅ Novo comentário inserido.")
+          else console.log("✅ Novo comentário (observacoes_sdr) inserido.")
         }
       }
 

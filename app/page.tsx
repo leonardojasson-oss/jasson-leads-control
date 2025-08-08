@@ -134,7 +134,9 @@ const handleSaveLead = async (leadData: any) => {
       arrematador: leadData.arrematador,
       anuncios: leadData.anuncios || false,
       status: leadData.status || "BACKLOG",
-      observacoes: leadData.observacoes,
+      observacoes_sdr: leadData.observacoesSdr, // Mapeado do campo renomeado
+      observacoes_closer: leadData.observacoesCloser, // Novo campo
+      motivo_perda: leadData.motivoPerda, // Novo campo
       data_ultimo_contato: leadData.dataUltimoContato || null,
       cs: leadData.conseguiuContato || false,
       rm: leadData.reuniaoAgendada || false,
