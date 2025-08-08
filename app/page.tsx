@@ -13,6 +13,7 @@ import { NovoLeadModal } from "@/components/novo-lead-modal"
 import { leadOperations, type Lead, isSupabaseConfigured } from "@/lib/supabase-operations"
 import { LeadsSpreadsheet } from "@/components/leads-spreadsheet"
 import { DeleteImportedLeadsButton } from "@/components/delete-imported-leads-button" // Importe o novo componente
+import { FunnelsDashboard } from "@/components/funnels-dashboard"
 
 export type { Lead }
 
@@ -268,7 +269,7 @@ export default function LeadsControl() {
       case "comissoes":
         return <CommissionControl leads={leads} />
       case "dashboard":
-        return <DashboardAnalytics leads={leads} />
+        return <FunnelsDashboard leads={leads} />
       default:
         return <LeadsList leads={leads} onEditLead={handleEditLead} onDeleteLead={handleDeleteLead} />
     }
