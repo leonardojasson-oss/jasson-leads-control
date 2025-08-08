@@ -134,6 +134,10 @@ return cache as LookupCache
 // Local storage operations as fallback
 const LOCAL_STORAGE_KEY = "jasson-leads-data-v3" // Updated key for new schema
 
+function isLocalId(id: string | number) {
+  return typeof id === "string" && id.startsWith("local_")
+}
+
 const localStorageOperations = {
 getAll(): Lead[] {
   if (typeof window === "undefined") return []
@@ -458,19 +462,19 @@ async update(id: number | string, lead: Partial<Lead>): Promise<Lead | null> {
   console.log("🆔 ID:", id)
   console.log("📝 Dados:", lead)
 
-  // Always update localStorage first
+  // Atualiza sempre no localStorage para manter a UI responsiva
   const localResult = localStorageOperations.update(String(id), lead)
   console.log("✅ Lead atualizado no localStorage")
 
-  if (!isSupabaseConfigured || !supabase || typeof id !== "number") {
+  // Se não há Supabase configurado ou o ID é local_..., paramos por aqui
+  if (!isSupabaseConfigured || !supabase || isLocalId(id)) {
     return localResult
   }
 
   try {
     console.log("🌐 Tentando atualizar no Supabase...")
-    const cache = await fetchLookups() // Usando a função exportada
 
-    // Fetch existing lead to get related IDs
+    // Buscar lead existente para obter o id_contato
     const { data: existingLead, error: fetchExistingError } = await supabase
       .from("lead")
       .select("id_contato")
@@ -478,9 +482,9 @@ async update(id: number | string, lead: Partial<Lead>): Promise<Lead | null> {
       .single()
 
     if (fetchExistingError) throw fetchExistingError
-    const id_contato = existingLead.id_contato
+    const id_contato = existingLead?.id_contato
 
-    // 1. Update 'contato' table
+    // 1) Atualizar contato (se houver dados)
     if (id_contato && (lead.nome_contato || lead.email || lead.cargo_contato || lead.email_corporativo !== undefined)) {
       const { error: contatoUpdateError } = await supabase
         .from("contato")
@@ -495,7 +499,7 @@ async update(id: number | string, lead: Partial<Lead>): Promise<Lead | null> {
       else console.log("✅ Contato atualizado.")
     }
 
-    // 2. Update 'lead' table
+    // 2) Atualizar lead principal
     const { error: leadUpdateError } = await supabase
       .from("lead")
       .update({
@@ -513,7 +517,6 @@ async update(id: number | string, lead: Partial<Lead>): Promise<Lead | null> {
         id_cidade: lead.cidade ? await getIdFromName("cidade", lead.cidade) : undefined,
         is_anuncio: lead.anuncios,
         id_status: lead.status ? await getIdFromName("status", lead.status) : undefined,
-        observacoes: lead.observacoes, // This will be handled by comentario table
         data_ultimo_contato: lead.data_ultimo_contato,
         cs: lead.cs,
         rm: lead.rm,
@@ -532,16 +535,15 @@ async update(id: number | string, lead: Partial<Lead>): Promise<Lead | null> {
     if (leadUpdateError) throw leadUpdateError
     console.log("✅ Lead principal atualizado.")
 
-    // 3. Update 'comentario'
+    // 3) Observações (comentario)
     if (lead.observacoes !== undefined) {
       const { data: existingComentario, error: fetchComentarioError } = await supabase
         .from("comentario")
         .select("id")
         .eq("id_cliente", id)
-        .single()
+        .maybeSingle()
 
       if (fetchComentarioError && fetchComentarioError.code !== "PGRST116") {
-        // PGRST116 means "no rows found"
         console.error("Error fetching existing comentario:", fetchComentarioError)
       }
 
@@ -565,112 +567,118 @@ async update(id: number | string, lead: Partial<Lead>): Promise<Lead | null> {
         const { error: insertComentarioError } = await supabase
           .from("comentario")
           .insert({ comentario: lead.observacoes, id_cliente: id })
-        if (insertComentarioError) console.error("Error inserting new comentario:", insertComentarioError)
-        else console.log("✅ Novo comentário inserido.")
+          if (insertComentarioError) console.error("Error inserting new comentario:", insertComentarioError)
+          else console.log("✅ Novo comentário inserido.")
+        }
       }
-    }
 
-    // 4. Update 'vendedor_lead' (delete all and re-insert for simplicity)
-    await supabase.from("vendedor_lead").delete().eq("id_lead", id)
-    const vendedorLeadInserts = []
-    const sdrId = await getIdFromName("vendedor", lead.sdr || "")
-    const closerId = await getIdFromName("vendedor", lead.closer || "")
-    const arrematadorId = await getIdFromName("vendedor", lead.arrematador || "")
+      // 4) Vínculos vendedor_lead (reset simples)
+      await supabase.from("vendedor_lead").delete().eq("id_lead", id)
+      const vendedorLeadInserts: any[] = []
+      const sdrId = await getIdFromName("vendedor", lead.sdr || "")
+      const closerId = await getIdFromName("vendedor", lead.closer || "")
+      const arrematadorId = await getIdFromName("vendedor", lead.arrematador || "")
 
-    const papelSdrId = await getIdFromName("papel", "SDR")
-    const papelCloserId = await getIdFromName("papel", "Closer")
-    const papelArrematadorId = await getIdFromName("papel", "Arrematador")
+      const papelSdrId = await getIdFromName("papel", "SDR")
+      const papelCloserId = await getIdFromName("papel", "Closer")
+      const papelArrematadorId = await getIdFromName("papel", "Arrematador")
 
-    if (sdrId && papelSdrId) vendedorLeadInserts.push({ id_lead: id, id_vendedor: sdrId, id_papel: papelSdrId })
-    if (closerId && papelCloserId)
-      vendedorLeadInserts.push({ id_lead: id, id_vendedor: closerId, id_papel: papelCloserId })
-    if (arrematadorId && papelArrematadorId)
-      vendedorLeadInserts.push({ id_lead: id, id_vendedor: arrematadorId, id_papel: papelArrematadorId })
+      if (sdrId && papelSdrId) vendedorLeadInserts.push({ id_lead: id, id_vendedor: sdrId, id_papel: papelSdrId })
+      if (closerId && papelCloserId) vendedorLeadInserts.push({ id_lead: id, id_vendedor: closerId, id_papel: papelCloserId })
+      if (arrematadorId && papelArrematadorId) vendedorLeadInserts.push({ id_lead: id, id_vendedor: arrematadorId, id_papel: papelArrematadorId })
 
-    if (vendedorLeadInserts.length > 0) {
-      const { error: vlError } = await supabase.from("vendedor_lead").insert(vendedorLeadInserts)
-      if (vlError) console.error("Error re-inserting vendedor_lead:", vlError)
-      else console.log("✅ Vendedor_lead(s) atualizado(s).")
-    }
+      if (vendedorLeadInserts.length > 0) {
+        const { error: vlError } = await supabase.from("vendedor_lead").insert(vendedorLeadInserts)
+        if (vlError) console.error("Error re-inserting vendedor_lead:", vlError)
+        else console.log("✅ Vendedor_lead(s) atualizado(s).")
+      }
 
-    // 5. Update 'lead_produto' (delete all and re-insert for simplicity)
-    const { data: existingLeadProducts, error: fetchLeadProductsError } = await supabase
-      .from("lead_produto")
-      .select("id")
-      .eq("id_lead", id);
-
-    if (fetchLeadProductsError) {
-      console.error("Error fetching existing lead_produto:", fetchLeadProductsError);
-    } else if (existingLeadProducts && existingLeadProducts.length > 0) {
-      const { error: deleteLeadProductsError } = await supabase
+      // 5) Produto (reset simples)
+      const { data: existingLeadProducts, error: fetchLeadProductsError } = await supabase
         .from("lead_produto")
-        .delete()
-        .eq("id_lead", id);
-      if (deleteLeadProductsError) console.error("Error deleting old lead_produto:", deleteLeadProductsError);
-    }
+        .select("id")
+        .eq("id_lead", id)
 
-    const produtoId = await getIdFromName("produto", lead.produto_marketing || "")
-    if (produtoId) {
-      const { error: lpError } = await supabase.from("lead_produto").insert({ id_lead: id, id_produto: produtoId })
-      if (lpError) console.error("Error re-inserting lead_produto:", lpError)
-      else console.log("✅ Lead_produto atualizado.")
-    }
+      if (fetchLeadProductsError) {
+        console.error("Error fetching existing lead_produto:", fetchLeadProductsError)
+      } else if (existingLeadProducts && existingLeadProducts.length > 0) {
+        const { error: deleteLeadProductsError } = await supabase
+          .from("lead_produto")
+          .delete()
+          .eq("id_lead", id)
+        if (deleteLeadProductsError) console.error("Error deleting old lead_produto:", deleteLeadProductsError)
+      }
 
-    // Return the localResult as it's immediately available and consistent
-    return localResult
-  } catch (supabaseError: any) {
-    console.error("❌ Erro ao atualizar no Supabase (nova estrutura):", supabaseError.message)
-    console.log("📱 Mas localStorage funcionou, continuando...")
-    return localResult
+      const produtoId = lead.produto_marketing ? await getIdFromName("produto", lead.produto_marketing) : null
+      if (produtoId) {
+        const { error: lpError } = await supabase.from("lead_produto").insert({ id_lead: id, id_produto: produtoId })
+        if (lpError) console.error("Error re-inserting lead_produto:", lpError)
+        else console.log("✅ Lead_produto atualizado.")
+      }
+
+      return localResult
+    } catch (supabaseError: any) {
+      console.error("❌ Erro ao atualizar no Supabase (nova estrutura):", supabaseError.message)
+      console.log("📱 Mas localStorage funcionou, continuando...")
+      return localResult
+    }
   }
-},
 
 async delete(id: number | string): Promise<boolean> {
   console.log("🔄 === DELETANDO LEAD (NOVA ESTRUTURA) ===")
   console.log("🆔 ID:", id)
 
-  // Always delete from localStorage first
+  // Sempre remove do localStorage (para refletir imediatamente na UI)
   const localResult = localStorageOperations.delete(String(id))
   console.log("✅ Lead deletado do localStorage")
 
-  if (!isSupabaseConfigured || !supabase || typeof id !== "number") {
+  // Se não há Supabase ou o ID é local_..., encerramos aqui
+  if (!isSupabaseConfigured || !supabase || isLocalId(id)) {
     return localResult
   }
 
   try {
     console.log("🌐 Tentando deletar do Supabase...")
 
-    // Fetch existing lead to get related IDs
+    // Buscar para obter id_contato
     const { data: existingLead, error: fetchExistingError } = await supabase
       .from("lead")
       .select("id_contato")
       .eq("id", id)
-      .single()
+      .maybeSingle()
 
     if (fetchExistingError) throw fetchExistingError
-    const id_contato = existingLead.id_contato
+    const id_contato = existingLead?.id_contato
 
-    // Delete from related tables first
+    // Deletar tabelas relacionadas
     await supabase.from("vendedor_lead").delete().eq("id_lead", id)
     await supabase.from("lead_produto").delete().eq("id_lead", id)
     await supabase.from("comentario").delete().eq("id_cliente", id)
     console.log("✅ Registros relacionados deletados.")
 
-    // Delete from 'contato'
-    if (id_contato) {
-      await supabase.from("contato").delete().eq("id", id_contato)
-      console.log("✅ Contato deletado.")
-    }
-
-    // Delete from 'lead'
+    // Deletar lead principal
     const { error: leadDeleteError } = await supabase.from("lead").delete().eq("id", id)
     if (leadDeleteError) throw leadDeleteError
     console.log("✅ Lead principal deletado.")
 
+    // Deletar contato se não estiver vinculado a outro lead
+    if (id_contato) {
+      const { data: stillLinked, error: stillLinkedError } = await supabase
+        .from("lead")
+        .select("id")
+        .eq("id_contato", id_contato)
+        .limit(1)
+
+      if (!stillLinkedError && (stillLinked?.length || 0) === 0) {
+        await supabase.from("contato").delete().eq("id", id_contato)
+        console.log("✅ Contato deletado.")
+      }
+    }
+
     return true
   } catch (supabaseError: any) {
     console.error("❌ Erro ao deletar do Supabase (nova estrutura):", supabaseError.message)
-    console.log("📱 Mas localStorage funcionou, continuando...")
+    console.log("📱 Mas localStorage já foi atualizado, continuando...")
     return localResult
   }
 },
