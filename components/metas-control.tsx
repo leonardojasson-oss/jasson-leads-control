@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Target, TrendingUp, TrendingDown, Award, Zap, BarChart3, Settings, Save, RefreshCw, Users, PowerIcon as ProgressIcon } from 'lucide-react'
+import { Target, TrendingUp, TrendingDown, Award, Zap, BarChart3, Settings, Save, RefreshCw, Users } from "lucide-react"
 import { useState, useEffect } from "react"
-import type { Lead } from "@/lib/supabase-operations"
-import { Progress } from "@/components/ui/progress"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import type { Lead } from "@/app/page"
+
+interface MetasControlProps {
+  leads: Lead[]
+}
 
 interface TierConfig {
   meta: number
@@ -25,7 +27,7 @@ interface MetasConfig {
   [key: string]: TierConfig
 }
 
-export function MetasControl({ leads }: { leads: Lead[] }) {
+export function MetasControl({ leads }: MetasControlProps) {
   const [selectedPeriod, setSelectedPeriod] = useState("mes")
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
   const [metasConfig, setMetasConfig] = useState<MetasConfig>({})
@@ -445,55 +447,6 @@ export function MetasControl({ leads }: { leads: Lead[] }) {
     )
   }
 
-  // Exemplo de metas (podem ser configuráveis no futuro)
-  const metas = {
-    totalLeads: 100,
-    leadsAtivos: 70,
-    contratosAssinados: 20,
-    totalVendas: 50000, // R$
-    leadsPorSDR: {
-      "João Silva": 30,
-      "Maria Souza": 40,
-      "Pedro Costa": 30,
-    },
-    vendasPorCloser: {
-      "Ana Lima": 25000,
-      "Carlos Mendes": 25000,
-    },
-  }
-
-  // Calcular KPIs atuais
-  const totalLeadsAtual = leads.length
-  const leadsAtivosAtual = leads.filter(
-    (lead) => !["GANHO", "DROPADO"].includes(lead.status),
-  ).length
-  const contratosAssinadosAtual = leads.filter((lead) => lead.status === "CONTRATO ASSINADO" || lead.status === "GANHO").length
-  const totalVendasAtual = leads.reduce((sum, lead) => {
-    const valor = Number.parseFloat(String(lead.valor_venda || "0"))
-    return sum + (isNaN(valor) ? 0 : valor)
-  }, 0)
-
-  // Calcular leads por SDR
-  const leadsPorSDRAtual = leads.reduce((acc, lead) => {
-    if (lead.sdr) {
-      acc[lead.sdr] = (acc[lead.sdr] || 0) + 1
-    }
-    return acc
-  }, {} as Record<string, number>)
-
-  // Calcular vendas por Closer
-  const vendasPorCloserAtual = leads.reduce((acc, lead) => {
-    if (lead.closer && lead.venda && lead.valor_venda) {
-      acc[lead.closer] = (acc[lead.closer] || 0) + lead.valor_venda
-    }
-    return acc
-  }, {} as Record<string, number>)
-
-  const calculateProgress = (current: number, target: number) => {
-    if (target === 0) return 0
-    return Math.min(100, (current / target) * 100)
-  }
-
   // Loading state
   if (isLoading) {
     return (
@@ -507,7 +460,7 @@ export function MetasControl({ leads }: { leads: Lead[] }) {
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="space-y-6">
       {/* Header Compacto */}
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-600 via-red-700 to-red-800 p-6 text-white shadow-xl">
         <div className="absolute inset-0 bg-black/10"></div>
@@ -593,67 +546,6 @@ export function MetasControl({ leads }: { leads: Lead[] }) {
               </div>
               <BarChart3 className="w-8 h-8 text-white/80" />
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Novos Cards de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Meta de Leads Totais</CardTitle>
-            <span className="text-gray-500">🎯</span>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalLeadsAtual} / {metas.totalLeads}</div>
-            <Progress value={calculateProgress(totalLeadsAtual, metas.totalLeads)} className="mt-2" />
-            <p className="text-xs text-gray-500 mt-1">
-              {calculateProgress(totalLeadsAtual, metas.totalLeads).toFixed(0)}% da meta atingida
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Meta de Leads Ativos</CardTitle>
-            <span className="text-green-500">✅</span>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{leadsAtivosAtual} / {metas.leadsAtivos}</div>
-            <Progress value={calculateProgress(leadsAtivosAtual, metas.leadsAtivos)} className="mt-2" />
-            <p className="text-xs text-gray-500 mt-1">
-              {calculateProgress(leadsAtivosAtual, metas.leadsAtivos).toFixed(0)}% da meta atingida
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Meta de Contratos Assinados</CardTitle>
-            <span className="text-purple-500">💰</span>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{contratosAssinadosAtual} / {metas.contratosAssinados}</div>
-            <Progress value={calculateProgress(contratosAssinadosAtual, metas.contratosAssinados)} className="mt-2" />
-            <p className="text-xs text-gray-500 mt-1">
-              {calculateProgress(contratosAssinadosAtual, metas.contratosAssinados).toFixed(0)}% da meta atingida
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Meta de Valor de Vendas</CardTitle>
-            <span className="text-blue-500">📈</span>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              R$ {totalVendasAtual.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} / R$ {metas.totalVendas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-            </div>
-            <Progress value={calculateProgress(totalVendasAtual, metas.totalVendas)} className="mt-2" />
-            <p className="text-xs text-gray-500 mt-1">
-              {calculateProgress(totalVendasAtual, metas.totalVendas).toFixed(0)}% da meta atingida
-            </p>
           </CardContent>
         </Card>
       </div>
@@ -823,76 +715,6 @@ export function MetasControl({ leads }: { leads: Lead[] }) {
               </tbody>
             </table>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Seção de Desempenho por SDR */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Desempenho por SDR</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>SDR</TableHead>
-                <TableHead className="text-right">Leads Atribuídos</TableHead>
-                <TableHead className="text-right">Meta</TableHead>
-                <TableHead className="text-right">Progresso</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Object.entries(metas.leadsPorSDR).map(([sdr, meta]) => {
-                const atual = leadsPorSDRAtual[sdr] || 0
-                const progress = calculateProgress(atual, meta)
-                return (
-                  <TableRow key={sdr}>
-                    <TableCell className="font-medium">{sdr}</TableCell>
-                    <TableCell className="text-right">{atual}</TableCell>
-                    <TableCell className="text-right">{meta}</TableCell>
-                    <TableCell className="text-right">
-                      <Progress value={progress} className="h-2 w-24 inline-flex" /> {progress.toFixed(0)}%
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Seção de Desempenho por Closer */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Desempenho por Closer</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Closer</TableHead>
-                <TableHead className="text-right">Vendas Realizadas</TableHead>
-                <TableHead className="text-right">Meta</TableHead>
-                <TableHead className="text-right">Progresso</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Object.entries(metas.vendasPorCloser).map(([closer, meta]) => {
-                const atual = vendasPorCloserAtual[closer] || 0
-                const progress = calculateProgress(atual, meta)
-                return (
-                  <TableRow key={closer}>
-                    <TableCell className="font-medium">{closer}</TableCell>
-                    <TableCell className="text-right">R$ {atual.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
-                    <TableCell className="text-right">R$ {meta.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
-                    <TableCell className="text-right">
-                      <Progress value={progress} className="h-2 w-24 inline-flex" /> {progress.toFixed(0)}%
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
         </CardContent>
       </Card>
 

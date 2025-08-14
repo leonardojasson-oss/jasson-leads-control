@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: "Controle de Leads - Jasson Oliveira & Co",
   description: "Sistema de gerenciamento comercial e controle de leads",
   keywords: "leads, vendas, CRM, gestão comercial",
-    generator: 'v0.dev'
+    generator: 'v0.app'
 }
 
 export default function RootLayout({
