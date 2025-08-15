@@ -2,22 +2,63 @@
 
 import { createClient } from "@supabase/supabase-js"
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.log("❌ Variáveis de ambiente do Supabase não configuradas")
+  process.exit(1)
+}
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
 async function checkAndImportSupabaseData() {
   console.log("🔍 === VERIFICANDO DADOS NO SUPABASE ===")
 
-  // Configuração Supabase
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    console.log("❌ Supabase não configurado - usando localStorage")
-    return
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseKey)
-  console.log("✅ Conectado ao Supabase")
+  console.log("🔍 Verificando dados no Supabase...")
 
   try {
+    // Verificar se a tabela leads existe e contar registros
+    const { data, error, count } = await supabase.from("leads").select("*", { count: "exact", head: true })
+
+    if (error) {
+      console.log("❌ Erro ao acessar tabela leads:", error.message)
+      return
+    }
+
+    console.log(`✅ Tabela 'leads' encontrada com ${count} registros`)
+
+    // Buscar alguns registros de exemplo
+    const { data: sampleData, error: sampleError } = await supabase
+      .from("leads")
+      .select("id, nome_empresa, status, sdr, observacoes_closer")
+      .limit(5)
+
+    if (sampleError) {
+      console.log("❌ Erro ao buscar dados de exemplo:", sampleError.message)
+      return
+    }
+
+    console.log("\n📋 Primeiros 5 registros:")
+    sampleData?.forEach((lead, index) => {
+      console.log(`${index + 1}. ${lead.nome_empresa} - Status: ${lead.status} - SDR: ${lead.sdr}`)
+      if (lead.observacoes_closer) {
+        console.log(`   Observações Closer: ${lead.observacoes_closer}`)
+      }
+    })
+
+    // Verificar estrutura da tabela
+    const { data: columns } = await supabase
+      .from("information_schema.columns")
+      .select("column_name, data_type")
+      .eq("table_name", "leads")
+      .order("ordinal_position")
+
+    console.log("\n🏗️ Estrutura da tabela leads:")
+    columns?.forEach((col) => {
+      console.log(`- ${col.column_name}: ${col.data_type}`)
+    })
+
     // 1. Verificar quantos leads existem no Supabase
     console.log("\n📊 Verificando leads existentes...")
     const { data: existingLeads, error: fetchError } = await supabase
@@ -61,7 +102,7 @@ async function checkAndImportSupabaseData() {
       console.log("\n✅ Dados já estão no Supabase - não é necessário importar")
     }
   } catch (error) {
-    console.error("❌ Erro geral:", error)
+    console.error("❌ Erro geral:", error.message)
   }
 }
 

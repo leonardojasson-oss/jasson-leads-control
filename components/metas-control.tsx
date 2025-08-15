@@ -295,18 +295,26 @@ export function MetasControl({ leads }: MetasControlProps) {
       }
     > = {}
 
-    const arrematadores = ["alan", "antonio", "gabrielli", "jasson", "vanessa", "william"]
+    const arrematadores = [
+      { key: "alan", name: "Alan", color: "from-blue-500 to-blue-600", icon: "🎯" },
+      { key: "antonio", name: "Antônio", color: "from-green-500 to-green-600", icon: "📈" },
+      { key: "francisco", name: "Francisco", color: "from-purple-500 to-purple-600", icon: "🚀" },
+      { key: "gabrielli", name: "Gabrielli", color: "from-red-500 to-red-600", icon: "⭐" },
+      { key: "giselle", name: "Giselle", color: "from-pink-500 to-pink-600", icon: "💎" },
+      { key: "leonardo", name: "Leonardo", color: "from-orange-500 to-orange-600", icon: "👑" },
+      { key: "vanessa", name: "Vanessa", color: "from-violet-500 to-violet-600", icon: "🏆" },
+    ]
 
     // Inicializar dados
     arrematadores.forEach((arr) => {
-      arrematadorData[arr] = {
+      arrematadorData[arr.key] = {
         totalRealizado: 0,
         tierData: {},
       }
 
       // Inicializar dados por tier
       tierOrder.forEach((tier) => {
-        arrematadorData[arr].tierData[tier] = 0
+        arrematadorData[arr.key].tierData[tier] = 0
       })
     })
 
@@ -674,10 +682,11 @@ export function MetasControl({ leads }: MetasControlProps) {
                   const arrematadores = [
                     { key: "alan", name: "Alan", color: "from-blue-500 to-blue-600", icon: "🎯" },
                     { key: "antonio", name: "Antônio", color: "from-green-500 to-green-600", icon: "📈" },
-                    { key: "gabrielli", name: "Gabrielli", color: "from-purple-500 to-purple-600", icon: "🚀" },
-                    { key: "jasson", name: "Jasson", color: "from-red-500 to-red-600", icon: "⭐" },
-                    { key: "vanessa", name: "Vanessa", color: "from-pink-500 to-pink-600", icon: "💎" },
-                    { key: "william", name: "William", color: "from-orange-500 to-orange-600", icon: "👑" },
+                    { key: "francisco", name: "Francisco", color: "from-purple-500 to-purple-600", icon: "🚀" },
+                    { key: "gabrielli", name: "Gabrielli", color: "from-red-500 to-red-600", icon: "⭐" },
+                    { key: "giselle", name: "Giselle", color: "from-pink-500 to-pink-600", icon: "💎" },
+                    { key: "leonardo", name: "Leonardo", color: "from-orange-500 to-orange-600", icon: "👑" },
+                    { key: "vanessa", name: "Vanessa", color: "from-violet-500 to-violet-600", icon: "🏆" },
                   ]
 
                   return arrematadores.map((arr) => {

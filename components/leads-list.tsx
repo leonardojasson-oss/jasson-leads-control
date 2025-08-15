@@ -12,11 +12,13 @@ interface LeadsListProps {
   leads: Lead[]
   onEditLead: (lead: Lead) => void
   onDeleteLead: (leadId: string) => void
+  onUpdateLead: (id: string, updates: Partial<Lead>) => void
 }
 
-export function LeadsList({ leads, onEditLead, onDeleteLead }: LeadsListProps) {
+export function LeadsList({ leads, onEditLead, onDeleteLead, onUpdateLead }: LeadsListProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("todos")
+  const [editingCell, setEditingCell] = useState<string | null>(null)
 
   // Status options with colors (matching the spreadsheet)
   const statusOptions = [
@@ -140,6 +142,71 @@ export function LeadsList({ leads, onEditLead, onDeleteLead }: LeadsListProps) {
     }
   }
 
+  // Handle inline editing
+  const handleCellEdit = async (leadId: string, field: string, value: any) => {
+    await onUpdateLead(leadId, { [field]: value })
+    setEditingCell(null)
+  }
+
+  const renderEditableCell = (
+    lead: Lead,
+    field: string,
+    value: any,
+    type: "text" | "select" | "date" = "text",
+    options?: string[],
+  ) => {
+    const cellKey = `${lead.id}-${field}`
+    const isEditing = editingCell === cellKey
+
+    if (isEditing) {
+      if (type === "select" && options) {
+        return (
+          <Select
+            value={safeString(value)}
+            onValueChange={(newValue) => handleCellEdit(lead.id, field, newValue)}
+            onOpenChange={(open) => !open && setEditingCell(null)}
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {options.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )
+      } else {
+        return (
+          <Input
+            type={type}
+            value={safeString(value)}
+            onChange={(e) => handleCellEdit(lead.id, field, e.target.value)}
+            onBlur={() => setEditingCell(null)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setEditingCell(null)
+              if (e.key === "Escape") setEditingCell(null)
+            }}
+            className="h-8 text-sm"
+            autoFocus
+          />
+        )
+      }
+    }
+
+    return (
+      <div
+        className="cursor-pointer hover:bg-gray-100 p-1 rounded min-h-[32px] flex items-center"
+        onClick={() => setEditingCell(cellKey)}
+        title="Clique para editar"
+      >
+        {field === "status" ? getStatusBadge(value) : safeString(value) || "-"}
+      </div>
+    )
+  }
+
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       {/* Search and Filters */}
@@ -176,7 +243,9 @@ export function LeadsList({ leads, onEditLead, onDeleteLead }: LeadsListProps) {
       {/* Header */}
       <div className="p-4">
         <h2 className="text-xl font-bold text-gray-900 mb-1">Leads Cadastrados ({filteredLeads.length})</h2>
-        <p className="text-sm text-gray-500">Lista completa de leads e suas informações</p>
+        <p className="text-sm text-gray-500">
+          Lista completa de leads e suas informações - Clique em qualquer campo para editar
+        </p>
       </div>
 
       {/* Content */}
@@ -222,6 +291,9 @@ export function LeadsList({ leads, onEditLead, onDeleteLead }: LeadsListProps) {
                   Closer
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Arrematador
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Último Contato
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -238,7 +310,24 @@ export function LeadsList({ leads, onEditLead, onDeleteLead }: LeadsListProps) {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredLeads.map((lead) => (
                 <tr key={lead.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-4 whitespace-nowrap">{getStatusBadge(lead.status)}</td>
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    {renderEditableCell(lead, "status", lead.status, "select", [
+                      "BACKLOG",
+                      "TENTANDO CONTATO",
+                      "CONTATO AGENDADO",
+                      "QUALIFICANDO",
+                      "REUNIÃO AGENDADA",
+                      "REUNIÃO",
+                      "REUNIÃO REALIZADA",
+                      "DÚVIDAS E FECHAMENTO",
+                      "CONTRATO NA RUA",
+                      "GANHO",
+                      "FOLLOW UP",
+                      "NO-SHOW",
+                      "DROPADO",
+                      "FOLLOW INFINITO",
+                    ])}
+                  </td>
                   <td className="px-4 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{safeString(lead.nome_empresa)}</div>
                     <div className="text-sm text-gray-500">{safeString(lead.cidade) || "-"}</div>
@@ -257,21 +346,35 @@ export function LeadsList({ leads, onEditLead, onDeleteLead }: LeadsListProps) {
                     <div className="text-sm text-gray-900">{formatCurrency(lead.valor_pago_lead)}</div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 capitalize">{safeString(lead.sdr)}</div>
+                    {renderEditableCell(lead, "sdr", lead.sdr, "select", ["antonio", "gabrielli", "vanessa"])}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 capitalize">{safeString(lead.closer) || "-"}</div>
+                    {renderEditableCell(lead, "closer", lead.closer, "select", [
+                      "alan",
+                      "francisco",
+                      "giselle",
+                      "leonardo",
+                    ])}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{formatDate(lead.data_ultimo_contato)}</div>
+                    {renderEditableCell(lead, "arrematador", lead.arrematador, "select", [
+                      "alan",
+                      "antonio",
+                      "francisco",
+                      "gabrielli",
+                      "giselle",
+                      "leonardo",
+                      "vanessa",
+                    ])}
+                  </td>
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    {renderEditableCell(lead, "data_ultimo_contato", lead.data_ultimo_contato, "date")}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{formatCurrency(lead.valor_venda)}</div>
                   </td>
                   <td className="px-4 py-4 max-w-xs">
-                    <div className="text-sm text-gray-900 truncate" title={safeString(lead.observacoes)}>
-                      {safeString(lead.observacoes) || "-"}
-                    </div>
+                    {renderEditableCell(lead, "observacoes", lead.observacoes, "text")}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
@@ -280,7 +383,7 @@ export function LeadsList({ leads, onEditLead, onDeleteLead }: LeadsListProps) {
                         size="sm"
                         onClick={() => onEditLead(lead)}
                         className="h-8 w-8 p-0"
-                        title="Editar lead"
+                        title="Editar lead completo"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>

@@ -39,6 +39,7 @@ export type Lead = {
   anuncios?: string
   status: string
   observacoes?: string
+  observacoes_closer?: string
   data_ultimo_contato?: string
   motivo_perda_pv?: string
   tem_comentario_lbf?: boolean

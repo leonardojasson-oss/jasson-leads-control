@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, Settings, Eye, EyeOff } from 'lucide-react'
+import { RefreshCw, Settings, Eye, EyeOff } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { Lead } from "@/app/page"
@@ -19,6 +19,11 @@ interface LeadsSpreadsheetProps {
 export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpreadsheetProps) {
   const [editingCell, setEditingCell] = useState<string | null>(null)
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({})
+  const [tempValue, setTempValue] = useState<string>("")
+  const [isEditing, setIsEditing] = useState<boolean>(false)
+  const [savedScrollPosition, setSavedScrollPosition] = useState<number>(0)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const isUpdatingRef = useRef<boolean>(false)
 
   // TODAS as colunas da planilha
   const columns = [
@@ -47,7 +52,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       ],
     },
     { key: "observacoes", label: "OBSERVAÇÕES SDR", width: "200px", type: "text", essential: true },
-    { key: "tem_comentario_lbf", label: "COMENTÁRIO", width: "200px", type: "text", essential: true },
+    { key: "tem_comentario_lbf", label: "COMENTÁRIO NO FORMS", width: "200px", type: "boolean", essential: true },
     { key: "data_ultimo_contato", label: "DATA ÚLTIMO CONTATO", width: "150px", type: "date", essential: true },
     { key: "data_hora_compra", label: "DATA DA COMPRA", width: "150px", type: "datetime-local", essential: true },
     {
@@ -56,7 +61,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       width: "120px",
       type: "select",
       essential: true,
-      options: ["alan", "antonio", "gabrielli", "jasson", "vanessa", "william"],
+      options: ["alan", "antonio", "francisco", "gabrielli", "giselle", "leonardo", "vanessa"],
     },
     {
       key: "sdr",
@@ -116,8 +121,9 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       label: "CLOSER",
       width: "100px",
       type: "select",
-      options: ["alan", "jasson", "william"],
+      options: ["alan", "francisco", "giselle", "leonardo"],
     },
+    { key: "observacoes_closer", label: "OBSERVAÇÕES CLOSER", width: "200px", type: "text" },
     { key: "fee_total", label: "FEE MRR", width: "100px", type: "number" },
     { key: "escopo_fechado", label: "FEE ONE-TIME", width: "150px", type: "number" },
     { key: "data_assinatura", label: "DATA DE ASSINATURA", width: "150px", type: "date" },
@@ -142,14 +148,42 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     }
   }, [])
 
+  // Restore scroll position after leads update
+  useEffect(() => {
+    if (isUpdatingRef.current && scrollContainerRef.current && savedScrollPosition > 0) {
+      const restoreScroll = () => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollLeft = savedScrollPosition
+        }
+      }
+
+      // Multiple attempts to restore scroll
+      restoreScroll()
+      setTimeout(restoreScroll, 0)
+      setTimeout(restoreScroll, 10)
+      setTimeout(restoreScroll, 50)
+      setTimeout(restoreScroll, 100)
+      setTimeout(restoreScroll, 200)
+
+      // Reset flag
+      isUpdatingRef.current = false
+    }
+  }, [leads, savedScrollPosition])
+
   // Save column preferences to localStorage
   const updateVisibleColumns = (newVisibleColumns: Record<string, boolean>) => {
     setVisibleColumns(newVisibleColumns)
     localStorage.setItem("leadsSpreadsheetColumns", JSON.stringify(newVisibleColumns))
   }
 
-  // Auto-save function
+  // Auto-save function with scroll position preservation
   const handleCellEdit = async (leadId: string, field: string, value: any) => {
+    // Save current scroll position
+    if (scrollContainerRef.current) {
+      setSavedScrollPosition(scrollContainerRef.current.scrollLeft)
+      isUpdatingRef.current = true
+    }
+
     // Save automatically when cell is edited
     await onUpdateLead(leadId, { [field]: value })
   }
@@ -188,10 +222,10 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
 
   const renderCell = (lead: Lead, column: any) => {
     const cellKey = `${lead.id}-${column.key}`
-    const isEditing = editingCell === cellKey
+    const isEditingThisCell = editingCell === cellKey
     const value = getCellValue(lead, column.key)
 
-    if (isEditing) {
+    if (isEditingThisCell) {
       switch (column.type) {
         case "select":
           return (
@@ -240,12 +274,32 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
           return (
             <Input
               type={column.type}
-              value={formatValue(value, column.type)}
-              onChange={(e) => handleCellEdit(lead.id, column.key, e.target.value)}
-              onBlur={() => setEditingCell(null)}
+              value={isEditing ? tempValue : formatValue(value, column.type)}
+              onChange={(e) => {
+                setTempValue(e.target.value)
+              }}
+              onFocus={() => {
+                setIsEditing(true)
+                setTempValue(formatValue(value, column.type))
+              }}
+              onBlur={(e) => {
+                handleCellEdit(lead.id, column.key, e.target.value)
+                setEditingCell(null)
+                setIsEditing(false)
+                setTempValue("")
+              }}
               onKeyDown={(e) => {
-                if (e.key === "Enter") setEditingCell(null)
-                if (e.key === "Escape") setEditingCell(null)
+                if (e.key === "Enter") {
+                  handleCellEdit(lead.id, column.key, e.currentTarget.value)
+                  setEditingCell(null)
+                  setIsEditing(false)
+                  setTempValue("")
+                }
+                if (e.key === "Escape") {
+                  setEditingCell(null)
+                  setIsEditing(false)
+                  setTempValue("")
+                }
               }}
               className="h-7 text-xs border-blue-500"
               autoFocus
@@ -290,7 +344,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         onClick={() => setEditingCell(cellKey)}
         title={`Clique para editar • Valor: ${displayValue}`}
       >
-        {column.key === "status" ? (
+        {column.key === "status" || column.key === "tem_comentario_lbf" ? (
           <Badge className="text-xs" variant="outline">
             {displayValue}
           </Badge>
@@ -425,7 +479,14 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       </div>
 
       {/* Planilha */}
-      <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+      <div
+        ref={scrollContainerRef}
+        className="overflow-x-auto max-h-[600px] overflow-y-auto"
+        onScroll={(e) => {
+          // Continuously save scroll position
+          setSavedScrollPosition(e.currentTarget.scrollLeft)
+        }}
+      >
         <table className="w-full border-collapse">
           {/* Header da Tabela */}
           <thead className="bg-red-600 text-white sticky top-0 z-10">
@@ -471,9 +532,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
             <span>📋 {leads.length} leads</span>
             <span>👁️ {visibleColumnsArray.length} colunas visíveis</span>
           </div>
-          <span className="text-green-600 font-medium">
-            ✅ Salvamento automático ativo
-          </span>
+          <span className="text-green-600 font-medium">✅ Salvamento automático ativo</span>
         </div>
       </div>
     </div>

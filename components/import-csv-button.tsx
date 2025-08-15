@@ -1,241 +1,115 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Upload, RefreshCw, CheckCircle, AlertCircle } from "lucide-react"
+import { Upload, FileText, CheckCircle, AlertCircle } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
-interface ImportCsvButtonProps {
-  onImportComplete: () => void
+interface ImportCSVButtonProps {
+  onImportComplete?: () => void
 }
 
-export function ImportCsvButton({ onImportComplete }: ImportCsvButtonProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [importing, setImporting] = useState(false)
-  const [importResult, setImportResult] = useState<{
-    success: number
-    errors: number
-    total: number
-  } | null>(null)
+export function ImportCSVButton({ onImportComplete }: ImportCSVButtonProps) {
+  const [isImporting, setIsImporting] = useState(false)
+  const [importStatus, setImportStatus] = useState<"idle" | "success" | "error">("idle")
+  const [importMessage, setImportMessage] = useState("")
 
-  const handleImport = async () => {
-    setImporting(true)
-    setImportResult(null)
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setIsImporting(true)
+    setImportStatus("idle")
 
     try {
-      console.log("🔄 Iniciando importação do CSV...")
+      const formData = new FormData()
+      formData.append("file", file)
 
-      // Buscar arquivo CSV
-      const response = await fetch(
-        "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/leadbroker%20jasson%20-%20Pa%CC%81gina1-ImqX7957BpVPGXQZnM3XOH2skC3e0u.csv",
-      )
-      const csvText = await response.text()
-
-      // Processar CSV
-      const lines = csvText.split("\n").filter((line) => line.trim() !== "")
-      const headers = lines[0].split(",").map((header) => header.trim().replace(/"/g, ""))
-
-      const leads = []
-      let successCount = 0
-      let errorCount = 0
-
-      for (let i = 1; i < lines.length; i++) {
-        try {
-          const values = parseCsvLine(lines[i])
-          const leadData = mapCsvToLead(headers, values)
-
-          if (leadData) {
-            leads.push(leadData)
-            successCount++
-          }
-        } catch (error) {
-          console.error(`Erro na linha ${i + 1}:`, error.message)
-          errorCount++
-        }
-      }
-
-      // Salvar no localStorage
-      const existingLeads = JSON.parse(localStorage.getItem("jasson-leads-data-v2") || "[]")
-      const allLeads = [...leads, ...existingLeads]
-      localStorage.setItem("jasson-leads-data-v2", JSON.stringify(allLeads))
-
-      setImportResult({
-        success: successCount,
-        errors: errorCount,
-        total: successCount + errorCount,
+      const response = await fetch("/api/import-csv", {
+        method: "POST",
+        body: formData,
       })
 
-      console.log(`✅ Importação concluída: ${successCount} sucessos, ${errorCount} erros`)
+      const result = await response.json()
 
-      // Notificar componente pai
-      setTimeout(() => {
-        onImportComplete()
-      }, 2000)
-    } catch (error) {
-      console.error("❌ Erro na importação:", error)
-      setImportResult({
-        success: 0,
-        errors: 1,
-        total: 1,
-      })
-    } finally {
-      setImporting(false)
-    }
-  }
-
-  // Função auxiliar para processar linha CSV
-  const parseCsvLine = (line: string) => {
-    const values = []
-    let current = ""
-    let inQuotes = false
-
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i]
-
-      if (char === '"') {
-        inQuotes = !inQuotes
-      } else if (char === "," && !inQuotes) {
-        values.push(current.trim().replace(/"/g, ""))
-        current = ""
+      if (response.ok) {
+        setImportStatus("success")
+        setImportMessage(`✅ ${result.count} leads importados com sucesso!`)
+        onImportComplete?.()
       } else {
-        current += char
+        setImportStatus("error")
+        setImportMessage(`❌ Erro: ${result.error}`)
       }
-    }
-    values.push(current.trim().replace(/"/g, ""))
-    return values
-  }
-
-  // Função para mapear CSV para formato do sistema
-  const mapCsvToLead = (headers: string[], values: string[]) => {
-    const getField = (fieldName: string) => {
-      const index = headers.findIndex((h) => h.toUpperCase().includes(fieldName.toUpperCase()))
-      return index !== -1 ? values[index] || "" : ""
-    }
-
-    const getValue = (fieldName: string) => {
-      const value = getField(fieldName)
-      return value === "-" || value === "" ? null : value
-    }
-
-    // Extrair nome da empresa
-    const leadField = getValue("LEAD")
-    const nomeEmpresa = leadField ? leadField.split(" ")[0] || leadField : "Empresa Importada"
-
-    // Validação básica
-    if (!nomeEmpresa || nomeEmpresa.length < 2) {
-      throw new Error("Nome da empresa inválido")
-    }
-
-    const email = getValue("EMAIL")
-    if (!email || !email.includes("@")) {
-      throw new Error("Email inválido")
-    }
-
-    // Mapear campos (versão simplificada)
-    return {
-      id: `csv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      nome_empresa: nomeEmpresa,
-      produto_marketing: getValue("PRODUTO") || "Produto Importado",
-      nicho: getValue("SEGMENTO") || "Outro",
-      valor_pago_lead: 100, // Valor padrão
-      tipo_lead: "leadbroker",
-      nome_contato: leadField || "Contato Importado",
-      email: email,
-      telefone: "Não informado",
-      sdr: getValue("SDR")?.toLowerCase() || "antonio",
-      arrematador: getValue("ARREMATANTE")?.toLowerCase() || "alan",
-      status: getValue("STATUS") || "BACKLOG",
-      observacoes: getValue("OBSERVAÇÕES"),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+    } catch (error) {
+      setImportStatus("error")
+      setImportMessage(`❌ Erro ao importar: ${error}`)
+    } finally {
+      setIsImporting(false)
     }
   }
 
   return (
-    <>
-      <Button
-        variant="outline"
-        onClick={() => setIsOpen(true)}
-        className="flex items-center space-x-2 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-      >
-        <Upload className="w-4 h-4" />
-        <span>Importar CSV</span>
-      </Button>
-
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <Upload className="w-5 h-5 text-blue-600" />
-              <span>Importar Leads do CSV</span>
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {!importing && !importResult && (
-              <div className="text-center space-y-4">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
-                  <Upload className="w-8 h-8 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">Importar dados do LeadBroker</h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Isso vai importar todos os leads do arquivo CSV para o sistema.
-                  </p>
-                </div>
-                <Button onClick={handleImport} className="w-full bg-blue-600 hover:bg-blue-700">
-                  Iniciar Importação
-                </Button>
-              </div>
-            )}
-
-            {importing && (
-              <div className="text-center space-y-4">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
-                  <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">Importando leads...</h3>
-                  <p className="text-sm text-gray-500">Processando arquivo CSV, aguarde...</p>
-                </div>
-              </div>
-            )}
-
-            {importResult && (
-              <div className="text-center space-y-4">
-                <div
-                  className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${
-                    importResult.success > 0 ? "bg-green-100" : "bg-red-100"
-                  }`}
-                >
-                  {importResult.success > 0 ? (
-                    <CheckCircle className="w-8 h-8 text-green-600" />
-                  ) : (
-                    <AlertCircle className="w-8 h-8 text-red-600" />
-                  )}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">Importação Concluída!</h3>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <p>✅ {importResult.success} leads importados com sucesso</p>
-                    {importResult.errors > 0 && <p>❌ {importResult.errors} leads com erro</p>}
-                    <p className="font-medium">Total processado: {importResult.total}</p>
-                  </div>
-                </div>
-                <Button
-                  onClick={() => {
-                    setIsOpen(false)
-                    setImportResult(null)
-                  }}
-                  className="w-full"
-                >
-                  Fechar
-                </Button>
-              </div>
-            )}
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Upload className="w-4 h-4 mr-2" />
+          Importar CSV
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Importar Leads do CSV</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="text-sm text-gray-600">
+            <p>Selecione um arquivo CSV com os dados dos leads.</p>
+            <p className="mt-2">
+              <strong>Colunas esperadas:</strong> Nome da Empresa, Nome do Contato, Email, Telefone, Status, SDR, Valor
+              Pago, Tipo Lead, Nicho, Cidade, Região, Faturamento, Data Compra, Observações, Observações Closer
+            </p>
           </div>
-        </DialogContent>
-      </Dialog>
-    </>
+
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+            <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+            <label htmlFor="csv-upload" className="cursor-pointer">
+              <span className="text-sm font-medium text-blue-600 hover:text-blue-500">
+                Clique para selecionar um arquivo CSV
+              </span>
+              <input
+                id="csv-upload"
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                disabled={isImporting}
+                className="hidden"
+              />
+            </label>
+          </div>
+
+          {isImporting && (
+            <div className="flex items-center justify-center space-x-2 text-blue-600">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <span>Importando...</span>
+            </div>
+          )}
+
+          {importStatus === "success" && (
+            <div className="flex items-center space-x-2 text-green-600 bg-green-50 p-3 rounded-lg">
+              <CheckCircle className="w-5 h-5" />
+              <span>{importMessage}</span>
+            </div>
+          )}
+
+          {importStatus === "error" && (
+            <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg">
+              <AlertCircle className="w-5 h-5" />
+              <span>{importMessage}</span>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

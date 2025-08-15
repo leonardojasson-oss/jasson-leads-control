@@ -45,6 +45,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     observacoes: "",
     dataUltimoContato: "",
     motivoPerdaPV: "",
+    comentarioLead: "", // ADICIONAR ESTE CAMPO
     temComentarioLBF: false,
     investimentoTrafego: "",
     ticketMedio: "",
@@ -98,6 +99,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         observacoes: "",
         dataUltimoContato: "",
         motivoPerdaPV: "",
+        comentarioLead: "", // ADICIONAR na lista de reset
         temComentarioLBF: false,
         investimentoTrafego: "",
         ticketMedio: "",
@@ -122,24 +124,24 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     }
 
     if (editingLead && isOpen) {
-      // Load editing data
+      // Load editing data - CORRIGIR MAPEAMENTO DOS CAMPOS
       setFormData({
-        nomeEmpresa: editingLead.nomeEmpresa || "",
-        produtoMarketing: editingLead.produtoMarketing || "",
+        nomeEmpresa: editingLead.nome_empresa || "",
+        produtoMarketing: editingLead.produto_marketing || "",
         nicho: editingLead.nicho || "",
-        dataHoraCompra: editingLead.dataHoraCompra || "",
-        valorPagoLead: editingLead.valorPagoLead || "",
-        origemLead: editingLead.tipoLead || "",
+        dataHoraCompra: editingLead.data_hora_compra || "",
+        valorPagoLead: editingLead.valor_pago_lead || "",
+        origemLead: editingLead.tipo_lead || "",
         faturamento: editingLead.faturamento || "",
         canal: editingLead.canal || "",
-        nivelUrgencia: editingLead.nivelUrgencia || "",
+        nivelUrgencia: editingLead.nivel_urgencia || "",
         regiao: editingLead.regiao || "",
         cidade: editingLead.cidade || "",
         cnpj: editingLead.cnpj || "",
-        nomeContato: editingLead.nomeContato || "",
-        cargoContato: editingLead.cargoContato || "",
+        nomeContato: editingLead.nome_contato || "",
+        cargoContato: editingLead.cargo_contato || "",
         email: editingLead.email || "",
-        emailCorporativo: editingLead.emailCorporativo || "",
+        emailCorporativo: editingLead.email_corporativo || "",
         telefone: editingLead.telefone || "",
         sdr: editingLead.sdr || "",
         closer: editingLead.closer || "",
@@ -147,27 +149,28 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         anuncios: editingLead.anuncios || "",
         status: editingLead.status || "",
         observacoes: editingLead.observacoes || "",
-        dataUltimoContato: editingLead.dataUltimoContato || "",
-        motivoPerdaPV: editingLead.motivoPerdaPV || "",
-        temComentarioLBF: editingLead.temComentarioLBF || false,
-        investimentoTrafego: editingLead.investimentoTrafego || "",
-        ticketMedio: editingLead.ticketMedio || "",
-        qtdLojas: editingLead.qtdLojas || "",
-        qtdVendedores: editingLead.qtdVendedores || "",
-        conseguiuContato: editingLead.conseguiuContato || false,
-        reuniaoAgendada: editingLead.reuniaoAgendada || false,
-        reuniaoRealizada: editingLead.reuniaoRealizada || false,
-        valorProposta: editingLead.valorProposta || "",
-        valorVenda: editingLead.valorVenda || "",
-        dataVenda: editingLead.dataVenda || "",
-        dataFechamento: editingLead.dataFechamento || "",
+        dataUltimoContato: editingLead.data_ultimo_contato || "",
+        motivoPerdaPV: editingLead.motivo_perda_pv || "",
+        comentarioLead: editingLead.comentario_lead || "", // ADICIONAR no mapeamento de edição
+        temComentarioLBF: editingLead.tem_comentario_lbf || false,
+        investimentoTrafego: editingLead.investimento_trafego || "",
+        ticketMedio: editingLead.ticket_medio || "",
+        qtdLojas: editingLead.qtd_lojas || "",
+        qtdVendedores: editingLead.qtd_vendedores || "",
+        conseguiuContato: editingLead.conseguiu_contato || false,
+        reuniaoAgendada: editingLead.reuniao_agendada || false,
+        reuniaoRealizada: editingLead.reuniao_realizada || false,
+        valorProposta: editingLead.valor_proposta || "",
+        valorVenda: editingLead.valor_venda || "",
+        dataVenda: editingLead.data_venda || "",
+        dataFechamento: editingLead.data_fechamento || "",
         fee: editingLead.fee || "",
-        escopoFechado: editingLead.escopoFechado || "",
-        feeTotal: editingLead.feeTotal || "",
-        vendaViaJassonCo: editingLead.vendaViaJassonCo || false,
-        comissaoSDR: editingLead.comissaoSDR || "",
-        comissaoCloser: editingLead.comissaoCloser || "",
-        statusComissao: editingLead.statusComissao || "",
+        escopoFechado: editingLead.escopo_fechado || "",
+        feeTotal: editingLead.fee_total || "",
+        vendaViaJassonCo: editingLead.venda_via_jasson_co || false,
+        comissaoSDR: editingLead.comissao_sdr || "",
+        comissaoCloser: editingLead.comissao_closer || "",
+        statusComissao: editingLead.status_comissao || "",
       })
     }
   }, [editingLead, isOpen])
@@ -341,6 +344,21 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         console.log("✅ Qtd vendedores encontrada:", vendedoresMatch[1].trim())
       }
 
+      // Descrição do lead (comentário)
+      const descricaoMatch = data.match(/Descrição do lead\s*\n\s*([^\n]*)/i)
+      if (descricaoMatch) {
+        const descricao = descricaoMatch[1].trim()
+        if (descricao && descricao !== "-") {
+          updates.comentarioLead = descricao
+          updates.temComentarioLBF = true
+          console.log("✅ Comentário do lead encontrado:", descricao)
+        } else {
+          updates.comentarioLead = ""
+          updates.temComentarioLBF = false
+          console.log("✅ Lead sem comentário (descrição vazia ou '-')")
+        }
+      }
+
       // Definir origem como LeadBroker por padrão (já que parece ser o formato padrão)
       updates.origemLead = "leadbroker"
       console.log("✅ Origem definida como LeadBroker")
@@ -412,7 +430,11 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     }
 
     console.log("✅ Validação passou, salvando...")
-    onSave(formData)
+    onSave({
+      ...formData,
+      comentario_lead: formData.comentarioLead,
+      tem_comentario_lbf: formData.comentarioLead ? true : false, // Auto-definir baseado no comentário
+    })
   }
 
   if (!isOpen) return null
@@ -438,7 +460,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center space-x-2 mb-3">
                 <Sparkles className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-semibold text-blue-900">✨ Preenchimento Automático</h3>
+                <h3 className="text-lg font-semibold text-blue-900 mb-4">✨ Preenchimento Automático</h3>
               </div>
               <p className="text-sm text-blue-700 mb-3">
                 Cole os dados do lead abaixo e clique em "Preencher" para completar automaticamente os campos:
@@ -613,6 +635,19 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                   onChange={(e) => handleInputChange("cnpj", e.target.value)}
                 />
               </div>
+              <div className="col-span-full">
+                <Label htmlFor="comentarioLead">Comentário do Lead</Label>
+                <Textarea
+                  id="comentarioLead"
+                  placeholder="Comentário deixado pelo lead no formulário de cadastro..."
+                  value={formData.comentarioLead}
+                  onChange={(e) => handleInputChange("comentarioLead", e.target.value)}
+                  className="min-h-[80px]"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Informação adicional fornecida pelo lead durante o cadastro
+                </p>
+              </div>
             </div>
           </div>
 
@@ -694,10 +729,10 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectValue placeholder="Selecione o closer" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="antonio">Antônio</SelectItem>
-                    <SelectItem value="gabrielli">Gabrielli</SelectItem>
-                    <SelectItem value="vanessa">Vanessa</SelectItem>
-                    <SelectItem value="jasson">Jasson</SelectItem>
+                    <SelectItem value="alan">Alan</SelectItem>
+                    <SelectItem value="francisco">Francisco</SelectItem>
+                    <SelectItem value="giselle">Giselle</SelectItem>
+                    <SelectItem value="leonardo">Leonardo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -710,10 +745,11 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                   <SelectContent>
                     <SelectItem value="alan">Alan</SelectItem>
                     <SelectItem value="antonio">Antônio</SelectItem>
+                    <SelectItem value="francisco">Francisco</SelectItem>
                     <SelectItem value="gabrielli">Gabrielli</SelectItem>
-                    <SelectItem value="jasson">Jasson</SelectItem>
+                    <SelectItem value="giselle">Giselle</SelectItem>
+                    <SelectItem value="leonardo">Leonardo</SelectItem>
                     <SelectItem value="vanessa">Vanessa</SelectItem>
-                    <SelectItem value="william">William</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

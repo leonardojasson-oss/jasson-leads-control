@@ -1,93 +1,93 @@
-// Script para verificar a estrutura da tabela leads_jasson
-
 import { createClient } from "@supabase/supabase-js"
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.log("❌ Variáveis de ambiente do Supabase não configuradas")
+  process.exit(1)
+}
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
 async function checkTableStructure() {
-  console.log("🔍 === VERIFICANDO ESTRUTURA DA TABELA ===")
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    console.log("❌ Supabase não configurado")
-    return
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseKey)
+  console.log("🔍 Verificando estrutura da tabela leads...")
 
   try {
-    // 1. Verificar se a tabela existe e buscar alguns registros
-    console.log("📋 Buscando registros da tabela leads_jasson...")
+    // Verificar se a tabela existe
+    const { data: tables, error: tablesError } = await supabase
+      .from("information_schema.tables")
+      .select("table_name")
+      .eq("table_name", "leads")
 
-    const { data: sampleData, error: sampleError } = await supabase.from("leads_jasson").select("*").limit(3)
-
-    if (sampleError) {
-      console.error("❌ Erro ao buscar dados:", sampleError)
+    if (tablesError) {
+      console.log("❌ Erro ao verificar tabelas:", tablesError.message)
       return
     }
 
-    console.log(`✅ Encontrados registros na tabela: ${sampleData?.length || 0}`)
-
-    if (sampleData && sampleData.length > 0) {
-      console.log("\n📊 === ESTRUTURA DOS DADOS ===")
-
-      const firstRecord = sampleData[0]
-      const columns = Object.keys(firstRecord)
-
-      console.log(`📋 Colunas encontradas (${columns.length}):`)
-      columns.forEach((col, index) => {
-        const value = firstRecord[col]
-        const type = typeof value
-        const preview = value ? String(value).substring(0, 50) : "null"
-        console.log(`${index + 1}. ${col} (${type}): ${preview}`)
-      })
-
-      console.log("\n🔍 === MAPEAMENTO NECESSÁRIO ===")
-
-      // Verificar campos importantes
-      const importantFields = [
-        "id",
-        "nome_empresa",
-        "lead",
-        "email",
-        "produto",
-        "segmento",
-        "nicho",
-        "sdr",
-        "closer",
-        "arrematante",
-        "status",
-        "valor",
-        "created_at",
-      ]
-
-      importantFields.forEach((field) => {
-        const exists = columns.includes(field)
-        const similar = columns.find((col) => col.toLowerCase().includes(field.toLowerCase()))
-
-        if (exists) {
-          console.log(`✅ ${field}: existe`)
-        } else if (similar) {
-          console.log(`⚠️ ${field}: não existe, mas encontrado '${similar}'`)
-        } else {
-          console.log(`❌ ${field}: não encontrado`)
-        }
-      })
-
-      console.log("\n📝 === EXEMPLO DE REGISTRO ===")
-      console.log(JSON.stringify(firstRecord, null, 2))
+    if (!tables || tables.length === 0) {
+      console.log('❌ Tabela "leads" não encontrada!')
+      console.log("📝 Execute o script: scripts/create-leads-table-manual.sql")
+      return
     }
 
-    // 2. Contar total de registros
-    const { count, error: countError } = await supabase.from("leads_jasson").select("*", { count: "exact", head: true })
+    console.log('✅ Tabela "leads" encontrada!')
 
-    if (!countError) {
-      console.log(`\n📊 Total de registros na tabela: ${count}`)
+    // Verificar estrutura das colunas
+    const { data: columns, error: columnsError } = await supabase
+      .from("information_schema.columns")
+      .select("column_name, data_type, is_nullable, column_default")
+      .eq("table_name", "leads")
+      .order("ordinal_position")
+
+    if (columnsError) {
+      console.log("❌ Erro ao verificar colunas:", columnsError.message)
+      return
+    }
+
+    console.log("\n🏗️ Estrutura da tabela leads:")
+    console.log("=".repeat(80))
+
+    const requiredColumns = [
+      "id",
+      "nome_empresa",
+      "nome_contato",
+      "email",
+      "status",
+      "sdr",
+      "observacoes",
+      "observacoes_closer",
+      "tem_comentario_lbf",
+      "created_at",
+      "updated_at",
+    ]
+
+    const foundColumns = columns?.map((col) => col.column_name) || []
+
+    columns?.forEach((col) => {
+      const isRequired = requiredColumns.includes(col.column_name)
+      const marker = isRequired ? "🔴" : "⚪"
+      console.log(
+        `${marker} ${col.column_name.padEnd(25)} | ${col.data_type.padEnd(15)} | ${col.is_nullable === "YES" ? "NULL" : "NOT NULL"}`,
+      )
+    })
+
+    console.log("\n🔍 Verificando colunas obrigatórias:")
+    requiredColumns.forEach((reqCol) => {
+      const exists = foundColumns.includes(reqCol)
+      console.log(`${exists ? "✅" : "❌"} ${reqCol}`)
+    })
+
+    // Verificar especificamente a coluna observacoes_closer
+    const hasObservacoesCloser = foundColumns.includes("observacoes_closer")
+    console.log(`\n🎯 Coluna 'observacoes_closer': ${hasObservacoesCloser ? "✅ EXISTE" : "❌ NÃO EXISTE"}`)
+
+    if (!hasObservacoesCloser) {
+      console.log("📝 Execute o script: scripts/add-observacoes-closer-column.sql")
     }
   } catch (error) {
-    console.error("❌ Erro geral:", error)
+    console.log("❌ Erro geral:", error.message)
   }
 }
 
-// Executar verificação
 checkTableStructure()

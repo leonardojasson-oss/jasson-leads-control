@@ -70,6 +70,7 @@ export default function LeadsControl() {
   const handleSaveLead = async (leadData: any) => {
     console.log("🔄 === SALVANDO LEAD ===")
     console.log("📊 Dados recebidos:", leadData)
+    console.log("✏️ Editando lead:", editingLead?.id)
 
     try {
       setSaving(true)
@@ -147,24 +148,30 @@ export default function LeadsControl() {
         status_comissao: leadData.statusComissao,
       }
 
-      let result: Lead
-
       if (editingLead) {
-        console.log("✏️ Atualizando lead existente")
-        result = (await leadOperations.update(editingLead.id, leadToSave)) || editingLead
+        console.log("✏️ Atualizando lead existente:", editingLead.id)
+        const updatedLead = await leadOperations.update(editingLead.id, leadToSave)
+
+        if (updatedLead) {
+          console.log("✅ Lead atualizado com sucesso:", updatedLead.id)
+        } else {
+          console.log("⚠️ Update retornou null, mas pode ter funcionado")
+        }
       } else {
         console.log("➕ Criando novo lead")
-        result = await leadOperations.create(leadToSave)
+        const newLead = await leadOperations.create(leadToSave)
+        console.log("✅ Lead criado com sucesso:", newLead.id)
       }
 
-      console.log("✅ Lead salvo com sucesso:", result.id)
-
-      // Recarregar lista
+      // Recarregar lista SEMPRE após salvar
+      console.log("🔄 Recarregando lista de leads...")
       await loadLeads()
 
       // Fechar modal
       setIsNovoLeadModalOpen(false)
       setEditingLead(null)
+
+      console.log("✅ Processo de salvamento concluído")
     } catch (error) {
       console.error("❌ Erro ao salvar lead:", error)
       alert(`❌ Erro ao salvar lead: ${error.message}`)
@@ -210,8 +217,10 @@ export default function LeadsControl() {
 
   const handleUpdateLead = async (id: string, updates: Partial<Lead>) => {
     try {
+      console.log("🔄 Atualizando lead:", id, updates)
       await leadOperations.update(id, updates)
-      await loadLeads() // Recarregar dados
+      await loadLeads() // Recarregar dados para sincronizar em todas as abas
+      console.log("✅ Lead atualizado e dados recarregados")
     } catch (error) {
       console.error("Erro ao atualizar lead:", error)
       alert("Erro ao atualizar lead")
@@ -276,7 +285,14 @@ export default function LeadsControl() {
 
     switch (activeTab) {
       case "lista":
-        return <LeadsList leads={leads} onEditLead={handleEditLead} onDeleteLead={handleDeleteLead} />
+        return (
+          <LeadsList
+            leads={leads}
+            onEditLead={handleEditLead}
+            onDeleteLead={handleDeleteLead}
+            onUpdateLead={handleUpdateLead}
+          />
+        )
       case "planilha":
         return <LeadsSpreadsheet leads={leads} onUpdateLead={handleUpdateLead} onRefresh={handleRefresh} />
       case "metas":
@@ -288,7 +304,14 @@ export default function LeadsControl() {
       case "dashboard":
         return <DashboardAnalytics leads={leads} />
       default:
-        return <LeadsList leads={leads} onEditLead={handleEditLead} onDeleteLead={handleDeleteLead} />
+        return (
+          <LeadsList
+            leads={leads}
+            onEditLead={handleEditLead}
+            onDeleteLead={handleDeleteLead}
+            onUpdateLead={handleUpdateLead}
+          />
+        )
     }
   }
 
@@ -299,7 +322,7 @@ export default function LeadsControl() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">JO</span>
+              <span className="text-white font-bold text-lg">V4</span>
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Controle de Leads</h1>

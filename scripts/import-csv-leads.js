@@ -1,4 +1,16 @@
-// Script para importar leads do CSV para o sistema
+import { createClient } from "@supabase/supabase-js"
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.log("❌ Variáveis de ambiente do Supabase não configuradas")
+  process.exit(1)
+}
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+const csvFilePath = "./leads.csv" // Ajuste o caminho conforme necessário
 
 async function importCsvLeads() {
   console.log("🔄 === INICIANDO IMPORTAÇÃO DE LEADS DO CSV ===")
@@ -65,6 +77,21 @@ async function importCsvLeads() {
       console.log(`   Valor: R$ ${lead.valor_pago_lead}`)
       console.log(`   Email: ${lead.email}`)
     })
+
+    // Inserir leads em lotes
+    const batchSize = 100
+    for (let i = 0; i < leads.length; i += batchSize) {
+      const batch = leads.slice(i, i + batchSize)
+      const { data, error } = await supabase.from("leads").insert(batch)
+
+      if (error) {
+        console.error(`❌ Erro no lote ${Math.floor(i / batchSize) + 1}:`, error)
+      } else {
+        console.log(`✅ Lote ${Math.floor(i / batchSize) + 1} inserido com sucesso (${batch.length} leads)`)
+      }
+    }
+
+    console.log("🎉 Importação concluída!")
 
     return leads
   } catch (error) {
