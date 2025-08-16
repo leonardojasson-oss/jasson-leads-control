@@ -217,12 +217,22 @@ export default function LeadsControl() {
 
   const handleUpdateLead = async (id: string, updates: Partial<Lead>) => {
     try {
-      console.log("🔄 Atualizando lead:", id, updates)
+      console.log("[v0] === ATUALIZANDO LEAD ===")
+      console.log("[v0] ID:", id)
+      console.log("[v0] Dados recebidos:", updates)
+
+      setLeads((prevLeads) => prevLeads.map((lead) => (lead.id === id ? { ...lead, ...updates } : lead)))
+      console.log("[v0] Lead atualizado no localStorage")
+
+      // Atualizar no Supabase em background
+      console.log("[v0] Tentando atualizar no Supabase...")
       await leadOperations.update(id, updates)
-      await loadLeads() // Recarregar dados para sincronizar em todas as abas
-      console.log("✅ Lead atualizado e dados recarregados")
+      console.log("[v0] ✅ Lead também atualizado no Supabase")
     } catch (error) {
-      console.error("Erro ao atualizar lead:", error)
+      console.error("[v0] Erro ao atualizar lead:", error)
+
+      console.log("[v0] Revertendo estado devido ao erro...")
+      await loadLeads()
       alert("Erro ao atualizar lead")
     }
   }

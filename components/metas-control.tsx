@@ -7,7 +7,20 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Target, TrendingUp, TrendingDown, Award, Zap, BarChart3, Settings, Save, RefreshCw, Users } from "lucide-react"
+import {
+  Target,
+  TrendingUp,
+  TrendingDown,
+  Award,
+  Zap,
+  BarChart3,
+  Settings,
+  Save,
+  RefreshCw,
+  Users,
+  Calendar,
+  CheckCircle,
+} from "lucide-react"
 import { useState, useEffect } from "react"
 import type { Lead } from "@/app/page"
 
@@ -27,10 +40,23 @@ interface MetasConfig {
   [key: string]: TierConfig
 }
 
+interface SDRMetasConfig {
+  metaRM: number // Meta de Reuniões Marcadas
+  metaRR: number // Meta de Reuniões Realizadas
+  color: string
+  icon: string
+}
+
+interface SDRsMetasConfig {
+  [key: string]: SDRMetasConfig
+}
+
 export function MetasControl({ leads }: MetasControlProps) {
   const [selectedPeriod, setSelectedPeriod] = useState("mes")
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
+  const [isSDRConfigModalOpen, setIsSDRConfigModalOpen] = useState(false)
   const [metasConfig, setMetasConfig] = useState<MetasConfig>({})
+  const [sdrMetasConfig, setSDRMetasConfig] = useState<SDRsMetasConfig>({})
   const [isLoading, setIsLoading] = useState(true)
 
   // Configuração padrão das metas
@@ -45,11 +71,19 @@ export function MetasControl({ leads }: MetasControlProps) {
     "-100k": { meta: 0, idealDia: 0, cpmqlMeta: 0, color: "from-gray-400 to-gray-600", icon: "📊" },
   }
 
+  const defaultSDRMetasConfig: SDRsMetasConfig = {
+    gabrielli: { metaRM: 63, metaRR: 57, color: "from-blue-500 to-blue-600", icon: "🎯" },
+    vanessa: { metaRM: 50, metaRR: 45, color: "from-green-500 to-green-600", icon: "📈" },
+    antonio: { metaRM: 60, metaRR: 54, color: "from-purple-500 to-purple-600", icon: "🚀" },
+  }
+
   // Carregar configurações salvas ou usar padrão
   useEffect(() => {
     const loadConfig = () => {
       try {
         const savedConfig = localStorage.getItem("jasson-metas-config")
+        const savedSDRConfig = localStorage.getItem("jasson-sdr-metas-config")
+
         if (savedConfig) {
           const parsedConfig = JSON.parse(savedConfig)
           const validConfig = { ...defaultMetasConfig }
@@ -62,9 +96,23 @@ export function MetasControl({ leads }: MetasControlProps) {
         } else {
           setMetasConfig(defaultMetasConfig)
         }
+
+        if (savedSDRConfig) {
+          const parsedSDRConfig = JSON.parse(savedSDRConfig)
+          const validSDRConfig = { ...defaultSDRMetasConfig }
+          Object.keys(parsedSDRConfig).forEach((sdr) => {
+            if (parsedSDRConfig[sdr] && typeof parsedSDRConfig[sdr] === "object") {
+              validSDRConfig[sdr] = { ...defaultSDRMetasConfig[sdr], ...parsedSDRConfig[sdr] }
+            }
+          })
+          setSDRMetasConfig(validSDRConfig)
+        } else {
+          setSDRMetasConfig(defaultSDRMetasConfig)
+        }
       } catch (error) {
         console.error("Erro ao carregar configurações:", error)
         setMetasConfig(defaultMetasConfig)
+        setSDRMetasConfig(defaultSDRMetasConfig)
       } finally {
         setIsLoading(false)
       }
@@ -81,6 +129,16 @@ export function MetasControl({ leads }: MetasControlProps) {
       console.log("✅ Configurações de metas salvas:", newConfig)
     } catch (error) {
       console.error("Erro ao salvar configurações:", error)
+    }
+  }
+
+  const saveSDRMetasConfig = (newConfig: SDRsMetasConfig) => {
+    try {
+      setSDRMetasConfig(newConfig)
+      localStorage.setItem("jasson-sdr-metas-config", JSON.stringify(newConfig))
+      console.log("✅ Configurações de metas dos SDRs salvas:", newConfig)
+    } catch (error) {
+      console.error("Erro ao salvar configurações dos SDRs:", error)
     }
   }
 
@@ -238,6 +296,58 @@ export function MetasControl({ leads }: MetasControlProps) {
     })
 
     return tierData
+  }
+
+  const calculateSDRData = () => {
+    const sdrData: Record<
+      string,
+      {
+        totalLeads: number
+        reunioesMarcadas: number
+        reunioesRealizadas: number
+        conversaoRM: number
+        conversaoRR: number
+      }
+    > = {}
+
+    // Inicializar dados para cada SDR
+    Object.keys(sdrMetasConfig).forEach((sdr) => {
+      sdrData[sdr] = {
+        totalLeads: 0,
+        reunioesMarcadas: 0,
+        reunioesRealizadas: 0,
+        conversaoRM: 0,
+        conversaoRR: 0,
+      }
+    })
+
+    const filteredLeads = getFilteredLeads()
+
+    filteredLeads.forEach((lead) => {
+      const sdr = lead.sdr?.toLowerCase()
+      if (sdr && sdrData[sdr]) {
+        sdrData[sdr].totalLeads++
+
+        // Contar reuniões marcadas (se tem data de agendamento)
+        if (lead.data_agendamento) {
+          sdrData[sdr].reunioesMarcadas++
+        }
+
+        // Contar reuniões realizadas (se status é "REALIZADA")
+        if (lead.status === "REALIZADA") {
+          sdrData[sdr].reunioesRealizadas++
+        }
+      }
+    })
+
+    // Calcular conversões
+    Object.keys(sdrData).forEach((sdr) => {
+      const data = sdrData[sdr]
+      data.conversaoRM = data.totalLeads > 0 ? (data.reunioesMarcadas / data.totalLeads) * 100 : 0
+      data.conversaoRR = data.reunioesMarcadas > 0 ? (data.reunioesRealizadas / data.reunioesMarcadas) * 100 : 0
+    })
+
+    return sdrData
   }
 
   // Ordem dos tiers
@@ -448,6 +558,114 @@ export function MetasControl({ leads }: MetasControlProps) {
     )
   }
 
+  const SDRConfigModal = () => {
+    const [tempSDRConfig, setTempSDRConfig] = useState<SDRsMetasConfig>(sdrMetasConfig)
+
+    const handleSave = () => {
+      saveSDRMetasConfig(tempSDRConfig)
+      setIsSDRConfigModalOpen(false)
+    }
+
+    const updateSDRConfig = (sdr: string, field: keyof SDRMetasConfig, value: number) => {
+      setTempSDRConfig((prev) => ({
+        ...prev,
+        [sdr]: {
+          ...prev[sdr],
+          [field]: value,
+        },
+      }))
+    }
+
+    return (
+      <Dialog open={isSDRConfigModalOpen} onOpenChange={setIsSDRConfigModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Settings className="w-5 h-5 text-blue-600" />
+              <span>Configurar Metas dos SDRs</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                <strong>💡 Dica:</strong> Configure as metas mensais de Reuniões Marcadas (RM) e Reuniões Realizadas
+                (RR) para cada SDR.
+              </p>
+            </div>
+
+            <div className="grid gap-4">
+              {Object.keys(sdrMetasConfig).map((sdr) => {
+                const config = tempSDRConfig[sdr]
+                if (!config) return null
+
+                return (
+                  <Card key={sdr} className="border-l-4 border-l-blue-500">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div
+                            className={`w-10 h-10 bg-gradient-to-br ${config.color} rounded-lg flex items-center justify-center text-white font-bold shadow-lg`}
+                          >
+                            {config.icon}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-gray-900 capitalize">{sdr}</h3>
+                            <p className="text-sm text-gray-500">Configurações do SDR</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor={`meta-rm-${sdr}`} className="text-sm font-medium">
+                            Meta RM (Reuniões Marcadas)
+                          </Label>
+                          <Input
+                            id={`meta-rm-${sdr}`}
+                            type="number"
+                            value={config.metaRM}
+                            onChange={(e) => updateSDRConfig(sdr, "metaRM", Number(e.target.value))}
+                            className="mt-1"
+                            min="0"
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor={`meta-rr-${sdr}`} className="text-sm font-medium">
+                            Meta RR (Reuniões Realizadas)
+                          </Label>
+                          <Input
+                            id={`meta-rr-${sdr}`}
+                            type="number"
+                            value={config.metaRR}
+                            onChange={(e) => updateSDRConfig(sdr, "metaRR", Number(e.target.value))}
+                            className="mt-1"
+                            min="0"
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4 border-t">
+              <Button variant="outline" onClick={() => setIsSDRConfigModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
+                <Save className="w-4 h-4 mr-2" />
+                Salvar Configurações
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
   // Loading state
   if (isLoading) {
     return (
@@ -461,35 +679,35 @@ export function MetasControl({ leads }: MetasControlProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header Compacto */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-600 via-red-700 to-red-800 p-6 text-white shadow-xl">
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-600 via-red-700 to-red-800 p-4 text-white shadow-xl">
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="relative z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <Target className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                <Target className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">Controle de Metas</h1>
-                <p className="text-red-100 text-sm">Meta/Mês Compra de Leads</p>
+                <h1 className="text-xl font-bold">Controle de Metas</h1>
+                <p className="text-red-100 text-xs">Meta/Mês Compra de Leads</p>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
               <Button
                 variant="outline"
                 onClick={() => {
                   console.log("[v0] Botão Config clicado")
                   setIsConfigModalOpen(true)
                 }}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm text-sm h-8"
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm text-xs h-7 px-2"
               >
                 <Settings className="w-3 h-3 mr-1" />
                 Config
               </Button>
               <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-32 bg-white/10 border-white/20 text-white backdrop-blur-sm h-8 text-sm">
+                <SelectTrigger className="w-28 bg-white/10 border-white/20 text-white backdrop-blur-sm h-7 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -505,29 +723,29 @@ export function MetasControl({ leads }: MetasControlProps) {
       </div>
 
       {/* Cards de Resumo Compactos */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-3">
         <Card className="relative overflow-hidden border-0 shadow-md">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600"></div>
-          <CardContent className="relative z-10 p-4 text-white">
+          <CardContent className="relative z-10 p-3 text-white">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-blue-100 text-xs font-medium mb-1">Meta Total</p>
-                <p className="text-2xl font-bold">{totalMeta}</p>
+                <p className="text-xl font-bold">{totalMeta}</p>
               </div>
-              <Target className="w-8 h-8 text-white/80" />
+              <Target className="w-6 h-6 text-white/80" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="relative overflow-hidden border-0 shadow-md">
           <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-green-600"></div>
-          <CardContent className="relative z-10 p-4 text-white">
+          <CardContent className="relative z-10 p-3 text-white">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-green-100 text-xs font-medium mb-1">Realizado</p>
-                <p className="text-2xl font-bold">{totalRealizado}</p>
+                <p className="text-xl font-bold">{totalRealizado}</p>
               </div>
-              <Award className="w-8 h-8 text-white/80" />
+              <Award className="w-6 h-6 text-white/80" />
             </div>
           </CardContent>
         </Card>
@@ -542,13 +760,13 @@ export function MetasControl({ leads }: MetasControlProps) {
                   : "from-red-500 to-red-600"
             }`}
           ></div>
-          <CardContent className="relative z-10 p-4 text-white">
+          <CardContent className="relative z-10 p-3 text-white">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-white/80 text-xs font-medium mb-1">Performance</p>
-                <p className="text-2xl font-bold">{formatPercentage(percentualGeral)}</p>
+                <p className="text-xl font-bold">{formatPercentage(percentualGeral)}</p>
               </div>
-              <BarChart3 className="w-8 h-8 text-white/80" />
+              <BarChart3 className="w-6 h-6 text-white/80" />
             </div>
           </CardContent>
         </Card>
@@ -556,8 +774,8 @@ export function MetasControl({ leads }: MetasControlProps) {
 
       {/* Tabela Principal Compacta */}
       <Card className="border-0 shadow-lg overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b py-3">
-          <CardTitle className="text-lg font-bold text-gray-800 flex items-center space-x-2">
+        <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b py-2">
+          <CardTitle className="text-base font-bold text-gray-800 flex items-center space-x-2">
             <BarChart3 className="w-4 h-4 text-red-600" />
             <span>Detalhamento por Tier</span>
           </CardTitle>
@@ -567,13 +785,13 @@ export function MetasControl({ leads }: MetasControlProps) {
             <table className="w-full">
               <thead className="bg-gradient-to-r from-red-600 to-red-700 text-white">
                 <tr>
-                  <th className="px-4 py-3 text-left font-bold text-xs">Tier</th>
-                  <th className="px-4 py-3 text-center font-bold text-xs">Meta</th>
-                  <th className="px-4 py-3 text-center font-bold text-xs">Realizado</th>
-                  <th className="px-4 py-3 text-center font-bold text-xs">Ideal/Dia</th>
-                  <th className="px-4 py-3 text-center font-bold text-xs">%</th>
-                  <th className="px-4 py-3 text-center font-bold text-xs">CPMQL</th>
-                  <th className="px-4 py-3 text-center font-bold text-xs">Status</th>
+                  <th className="px-3 py-2 text-left font-bold text-xs">Tier</th>
+                  <th className="px-3 py-2 text-center font-bold text-xs">Meta</th>
+                  <th className="px-3 py-2 text-center font-bold text-xs">Realizado</th>
+                  <th className="px-3 py-2 text-center font-bold text-xs">Ideal/Dia</th>
+                  <th className="px-3 py-2 text-center font-bold text-xs">%</th>
+                  <th className="px-3 py-2 text-center font-bold text-xs">CPMQL</th>
+                  <th className="px-3 py-2 text-center font-bold text-xs">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -590,31 +808,31 @@ export function MetasControl({ leads }: MetasControlProps) {
 
                   return (
                     <tr key={tier} className="hover:bg-gray-50 transition-colors duration-200">
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2">
                         <div className="flex items-center space-x-2">
                           <div
-                            className={`w-6 h-6 bg-gradient-to-br ${meta.color} rounded flex items-center justify-center text-white text-xs font-bold`}
+                            className={`w-5 h-5 bg-gradient-to-br ${meta.color} rounded flex items-center justify-center text-white text-xs font-bold`}
                           >
                             {meta.icon}
                           </div>
-                          <span className="font-medium text-sm text-gray-900">{tier}</span>
+                          <span className="font-medium text-xs text-gray-900">{tier}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="font-bold text-gray-900">{meta.meta}</span>
+                      <td className="px-3 py-2 text-center">
+                        <span className="font-bold text-sm text-gray-900">{meta.meta}</span>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="font-bold text-blue-600">{realizado}</span>
+                      <td className="px-3 py-2 text-center">
+                        <span className="font-bold text-sm text-blue-600">{realizado}</span>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="font-bold text-purple-600">{calculateIdealPorDia(meta.meta)}</span>
+                      <td className="px-3 py-2 text-center">
+                        <span className="font-bold text-sm text-purple-600">{calculateIdealPorDia(meta.meta)}</span>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <Badge className={`${status.color} text-white font-bold text-xs px-2 py-1`}>
+                      <td className="px-3 py-2 text-center">
+                        <Badge className={`${status.color} text-white font-bold text-xs px-1 py-0.5`}>
                           {formatPercentage(percentualMeta)}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-2 text-center">
                         <div className="text-xs">
                           <div className="font-semibold text-gray-600">{formatCurrency(meta.cpmqlMeta)}</div>
                           <div className={`${realizado > 0 ? "text-green-600" : "text-gray-400"}`}>
@@ -622,9 +840,9 @@ export function MetasControl({ leads }: MetasControlProps) {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-2 text-center">
                         <div
-                          className={`w-6 h-6 ${status.color} rounded-full flex items-center justify-center mx-auto`}
+                          className={`w-5 h-5 ${status.color} rounded-full flex items-center justify-center mx-auto`}
                         >
                           <status.icon className="w-3 h-3 text-white" />
                         </div>
@@ -640,25 +858,25 @@ export function MetasControl({ leads }: MetasControlProps) {
 
       {/* Seção dos Arrematadores Compacta */}
       <Card className="border-0 shadow-lg overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-100 border-b py-3">
-          <CardTitle className="text-lg font-bold text-gray-800 flex items-center space-x-2">
+        <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-100 border-b py-2">
+          <CardTitle className="text-base font-bold text-gray-800 flex items-center space-x-2">
             <Users className="w-4 h-4 text-green-600" />
             <span>Leads Comprados por Arrematador</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-4">
+        <CardContent className="p-3">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2 font-semibold text-gray-700">Arrematador</th>
+                  <th className="text-left py-1.5 font-semibold text-gray-700 text-xs">Arrematador</th>
                   {["-100k", ...tierOrder.slice(1, 7), "+40kk"].map((tier) => {
                     const tierConfig = metasConfig[tier]
                     return (
-                      <th key={tier} className="text-center py-2 px-1">
-                        <div className="flex flex-col items-center space-y-1">
+                      <th key={tier} className="text-center py-1.5 px-1">
+                        <div className="flex flex-col items-center space-y-0.5">
                           <div
-                            className={`w-5 h-5 bg-gradient-to-br ${tierConfig?.color} rounded flex items-center justify-center`}
+                            className={`w-4 h-4 bg-gradient-to-br ${tierConfig?.color} rounded flex items-center justify-center`}
                           >
                             <span className="text-xs">{tierConfig?.icon}</span>
                           </div>
@@ -669,7 +887,7 @@ export function MetasControl({ leads }: MetasControlProps) {
                       </th>
                     )
                   })}
-                  <th className="text-center py-2 font-semibold text-gray-700">Total</th>
+                  <th className="text-center py-1.5 font-semibold text-gray-700 text-xs">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -690,28 +908,138 @@ export function MetasControl({ leads }: MetasControlProps) {
 
                     return (
                       <tr key={arr.key} className="border-b hover:bg-gray-50">
-                        <td className="py-3">
+                        <td className="py-2">
                           <div className="flex items-center space-x-2">
                             <div
-                              className={`w-6 h-6 bg-gradient-to-br ${arr.color} rounded flex items-center justify-center text-white font-bold shadow-sm`}
+                              className={`w-5 h-5 bg-gradient-to-br ${arr.color} rounded flex items-center justify-center text-white font-bold shadow-sm`}
                             >
                               <span className="text-xs">{arr.icon}</span>
                             </div>
-                            <span className="font-medium text-gray-900">{arr.name}</span>
+                            <span className="font-medium text-gray-900 text-sm">{arr.name}</span>
                           </div>
                         </td>
                         {["-100k", ...tierOrder.slice(1, 7), "+40kk"].map((tier) => {
                           const leadsCount = data.tierData[tier] || 0
                           return (
-                            <td key={tier} className="text-center py-3 px-1">
-                              <span className={`font-bold ${leadsCount > 0 ? "text-green-600" : "text-gray-400"}`}>
+                            <td key={tier} className="text-center py-2 px-1">
+                              <span
+                                className={`font-bold text-sm ${leadsCount > 0 ? "text-green-600" : "text-gray-400"}`}
+                              >
                                 {leadsCount}
                               </span>
                             </td>
                           )
                         })}
-                        <td className="text-center py-3">
-                          <span className="font-bold text-lg text-blue-600">{data.totalRealizado}</span>
+                        <td className="text-center py-2">
+                          <span className="font-bold text-base text-blue-600">{data.totalRealizado}</span>
+                        </td>
+                      </tr>
+                    )
+                  })
+                })()}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-0 shadow-lg overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b py-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-bold text-gray-800 flex items-center space-x-2">
+              <Calendar className="w-4 h-4 text-blue-600" />
+              <span>Controle de Metas - SDRs</span>
+            </CardTitle>
+            <Button
+              variant="outline"
+              onClick={() => setIsSDRConfigModalOpen(true)}
+              className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 text-xs h-7 px-2"
+            >
+              <Settings className="w-3 h-3 mr-1" />
+              Config SDRs
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+                <tr>
+                  <th className="px-3 py-2 text-left font-bold text-xs">SDR</th>
+                  <th className="px-3 py-2 text-center font-bold text-xs">Leads</th>
+                  <th className="px-3 py-2 text-center font-bold text-xs">Meta RM</th>
+                  <th className="px-3 py-2 text-center font-bold text-xs">RM Real</th>
+                  <th className="px-3 py-2 text-center font-bold text-xs">% L→RM</th>
+                  <th className="px-3 py-2 text-center font-bold text-xs">Meta RR</th>
+                  <th className="px-3 py-2 text-center font-bold text-xs">RR Real</th>
+                  <th className="px-3 py-2 text-center font-bold text-xs">% RM→RR</th>
+                  <th className="px-3 py-2 text-center font-bold text-xs">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(() => {
+                  const sdrData = calculateSDRData()
+
+                  return Object.keys(sdrMetasConfig).map((sdr) => {
+                    const config = sdrMetasConfig[sdr]
+                    const data = sdrData[sdr]
+                    const percentualRM = config.metaRM > 0 ? (data.reunioesMarcadas / config.metaRM) * 100 : 0
+                    const percentualRR = config.metaRR > 0 ? (data.reunioesRealizadas / config.metaRR) * 100 : 0
+                    const statusRM = getStatusBadge(percentualRM)
+                    const statusRR = getStatusBadge(percentualRR)
+
+                    return (
+                      <tr key={sdr} className="hover:bg-gray-50 transition-colors duration-200">
+                        <td className="px-3 py-2">
+                          <div className="flex items-center space-x-2">
+                            <div
+                              className={`w-5 h-5 bg-gradient-to-br ${config.color} rounded flex items-center justify-center text-white text-xs font-bold`}
+                            >
+                              {config.icon}
+                            </div>
+                            <span className="font-medium text-xs text-gray-900 capitalize">{sdr}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="font-bold text-sm text-gray-900">{data.totalLeads}</span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="font-bold text-sm text-blue-600">{config.metaRM}</span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="font-bold text-sm text-green-600">{data.reunioesMarcadas}</span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <Badge className={`${statusRM.color} text-white font-bold text-xs px-1 py-0.5`}>
+                            {formatPercentage(data.conversaoRM)}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="font-bold text-sm text-blue-600">{config.metaRR}</span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className="font-bold text-sm text-green-600">{data.reunioesRealizadas}</span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <Badge className={`${statusRR.color} text-white font-bold text-xs px-1 py-0.5`}>
+                            {formatPercentage(data.conversaoRR)}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <div className="flex space-x-1 justify-center">
+                            <div
+                              className={`w-3 h-3 ${statusRM.color} rounded-full flex items-center justify-center`}
+                              title="Status RM"
+                            >
+                              <Calendar className="w-2 h-2 text-white" />
+                            </div>
+                            <div
+                              className={`w-3 h-3 ${statusRR.color} rounded-full flex items-center justify-center`}
+                              title="Status RR"
+                            >
+                              <CheckCircle className="w-2 h-2 text-white" />
+                            </div>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -725,6 +1053,7 @@ export function MetasControl({ leads }: MetasControlProps) {
 
       {/* Modal de Configuração */}
       <ConfigModal />
+      <SDRConfigModal />
     </div>
   )
 }

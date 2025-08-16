@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useLayoutEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
@@ -21,11 +21,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({})
   const [tempValue, setTempValue] = useState<string>("")
   const [isEditing, setIsEditing] = useState<boolean>(false)
-  const [savedScrollPosition, setSavedScrollPosition] = useState<number>(0)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const scrollPositionRef = useRef<number>(0)
   const isUpdatingRef = useRef<boolean>(false)
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // TODAS as colunas da planilha
   const columns = [
     { key: "nome_empresa", label: "LEAD", width: "200px", type: "text", essential: true },
     {
@@ -130,13 +130,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     { key: "motivo_perda_pv", label: "MOTIVO DE PERDA", width: "150px", type: "text" },
   ]
 
-  // Load column preferences from localStorage
   useEffect(() => {
     const savedColumns = localStorage.getItem("leadsSpreadsheetColumns")
     if (savedColumns) {
       setVisibleColumns(JSON.parse(savedColumns))
     } else {
-      // Default: show essential columns
       const defaultVisible = columns.reduce(
         (acc, col) => {
           acc[col.key] = col.essential || false
@@ -148,51 +146,80 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     }
   }, [])
 
-  // Restore scroll position after leads update
-  useEffect(() => {
-    if (isUpdatingRef.current && scrollContainerRef.current && savedScrollPosition > 0) {
-      const restoreScroll = () => {
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollLeft = savedScrollPosition
+  useLayoutEffect(() => {
+    if (isUpdatingRef.current && scrollContainerRef.current && scrollPositionRef.current > 0) {
+      console.log("[v0] Restaurando posição imediatamente:", scrollPositionRef.current)
+      scrollContainerRef.current.scrollLeft = scrollPositionRef.current
+
+      const container = scrollContainerRef.current
+      const targetPosition = scrollPositionRef.current
+
+      const forceRestore = () => {
+        if (container && container.scrollLeft !== targetPosition) {
+          container.scrollLeft = targetPosition
+          console.log("[v0] Forçando restauração para:", targetPosition, "atual:", container.scrollLeft)
         }
       }
 
-      // Multiple attempts to restore scroll
-      restoreScroll()
-      setTimeout(restoreScroll, 0)
-      setTimeout(restoreScroll, 10)
-      setTimeout(restoreScroll, 50)
-      setTimeout(restoreScroll, 100)
-      setTimeout(restoreScroll, 200)
+      forceRestore()
+      requestAnimationFrame(forceRestore)
+      setTimeout(forceRestore, 0)
+      setTimeout(forceRestore, 1)
+      setTimeout(forceRestore, 10)
+      setTimeout(forceRestore, 50)
 
-      // Reset flag
-      isUpdatingRef.current = false
+      setTimeout(() => {
+        isUpdatingRef.current = false
+        console.log("[v0] Flag resetada")
+      }, 100)
     }
-  }, [leads, savedScrollPosition])
+  }, [leads.length, leads])
 
-  // Save column preferences to localStorage
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const handleScroll = () => {
+      if (!isUpdatingRef.current) {
+        if (scrollTimeoutRef.current) {
+          clearTimeout(scrollTimeoutRef.current)
+        }
+
+        scrollTimeoutRef.current = setTimeout(() => {
+          scrollPositionRef.current = container.scrollLeft
+        }, 50)
+      }
+    }
+
+    container.addEventListener("scroll", handleScroll, { passive: true })
+    return () => {
+      container.removeEventListener("scroll", handleScroll)
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const updateVisibleColumns = (newVisibleColumns: Record<string, boolean>) => {
     setVisibleColumns(newVisibleColumns)
     localStorage.setItem("leadsSpreadsheetColumns", JSON.stringify(newVisibleColumns))
   }
 
-  // Auto-save function with scroll position preservation
   const handleCellEdit = async (leadId: string, field: string, value: any) => {
-    // Save current scroll position
     if (scrollContainerRef.current) {
-      setSavedScrollPosition(scrollContainerRef.current.scrollLeft)
+      scrollPositionRef.current = scrollContainerRef.current.scrollLeft
       isUpdatingRef.current = true
+      console.log("[v0] Salvando posição antes da atualização:", scrollPositionRef.current)
     }
 
     let updates: Partial<Lead> = { [field]: value }
 
-    // Se a DATA DE ASSINATURA foi preenchida, automaticamente considerar que houve venda
     if (field === "data_assinatura" && value && value.trim() !== "") {
       updates = {
         ...updates,
-        data_venda: value, // Usar a mesma data da assinatura como data da venda
-        venda_via_jasson_co: true, // Marcar como venda via Jasson&Co
-        status: "GANHO", // Atualizar status para GANHO
+        data_venda: value,
+        venda_via_jasson_co: true,
+        status: "GANHO",
       }
       console.log("[v0] DATA DE ASSINATURA preenchida - marcando como venda automática:", {
         leadId,
@@ -200,8 +227,16 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       })
     }
 
-    // Save automatically when cell is edited
-    await onUpdateLead(leadId, updates)
+    try {
+      await new Promise<void>((resolve, reject) => {
+        onUpdateLead(leadId, updates)
+        setTimeout(resolve, 10)
+      })
+      console.log("[v0] Lead atualizado com sucesso")
+    } catch (error) {
+      console.error("[v0] Erro ao salvar lead:", error)
+      isUpdatingRef.current = false
+    }
   }
 
   const getCellValue = (lead: Lead, field: string) => {
@@ -324,7 +359,6 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       }
     }
 
-    // Renderização normal da célula
     const displayValue = (() => {
       switch (column.type) {
         case "boolean":
@@ -341,7 +375,6 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
           return value || ""
         case "number":
           if (!value) return ""
-          // Para colunas FEE, mostrar como moeda
           if (column.key === "fee_total" || column.key === "escopo_fechado") {
             const numValue = Number(value)
             return isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -386,13 +419,12 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
-      {/* Header Compacto */}
       <div className="p-3 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <h2 className="text-lg font-bold text-gray-900">📊 Planilha de Leads</h2>
             <span className="text-sm text-gray-500">
-              {visibleColumnsArray.length}/{columns.length} colunas • Auto-save ativo
+              {visibleColumnsArray.length}/{columns.length} colunas
             </span>
           </div>
           <div className="flex items-center space-x-2">
@@ -497,17 +529,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         </div>
       </div>
 
-      {/* Planilha */}
-      <div
-        ref={scrollContainerRef}
-        className="overflow-x-auto max-h-[600px] overflow-y-auto"
-        onScroll={(e) => {
-          // Continuously save scroll position
-          setSavedScrollPosition(e.currentTarget.scrollLeft)
-        }}
-      >
+      <div ref={scrollContainerRef} className="overflow-x-auto max-h-[600px] overflow-y-auto">
         <table className="w-full border-collapse">
-          {/* Header da Tabela */}
           <thead className="bg-red-600 text-white sticky top-0 z-10">
             <tr>
               {visibleColumnsArray.map((column) => (
@@ -522,7 +545,6 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
             </tr>
           </thead>
 
-          {/* Linhas de Dados */}
           <tbody>
             {leads.map((lead, index) => (
               <tr
@@ -544,14 +566,13 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         </table>
       </div>
 
-      {/* Footer */}
       <div className="p-2 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <span>📋 {leads.length} leads</span>
             <span>👁️ {visibleColumnsArray.length} colunas visíveis</span>
           </div>
-          <span className="text-green-600 font-medium">✅ Salvamento automático ativo</span>
+          <span className="text-blue-600 font-medium">💾 Scroll inteligente ativo</span>
         </div>
       </div>
     </div>

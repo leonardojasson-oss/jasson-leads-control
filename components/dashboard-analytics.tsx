@@ -121,13 +121,13 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
     return (
       <Card className="w-full">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg font-semibold text-center" style={{ color }}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold text-center" style={{ color }}>
             {title}
           </CardTitle>
-          <p className="text-sm text-gray-500 text-center">{totalLeads} leads • Funil de Conversão</p>
+          <p className="text-xs text-gray-500 text-center">{totalLeads} leads • Funil de Conversão</p>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-1 p-4">
           <div className="relative flex flex-col items-center space-y-1">
             {stages.map((stage, index) => {
               const maxWidth = 100
@@ -139,28 +139,27 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
               return (
                 <div key={stage.name} className="relative w-full flex justify-center">
                   <div
-                    className="relative flex items-center justify-center text-white font-bold text-sm shadow-lg transition-all duration-300 hover:scale-105"
+                    className="relative flex items-center justify-center text-white font-bold text-xs shadow-lg transition-all duration-300 hover:scale-105"
                     style={{
                       backgroundColor: stage.color,
                       width: `${width}%`,
-                      height: "50px",
+                      height: "35px",
                       clipPath:
                         index === 0
-                          ? "polygon(0 0, 100% 0, 95% 100%, 5% 100%)" // Primeira seção - mais larga
+                          ? "polygon(0 0, 100% 0, 95% 100%, 5% 100%)"
                           : index === stages.length - 1
-                            ? "polygon(10% 0, 90% 0, 85% 100%, 15% 100%)" // Última seção - mais estreita
-                            : "polygon(7% 0, 93% 0, 90% 100%, 10% 100%)", // Seções intermediárias
+                            ? "polygon(10% 0, 90% 0, 85% 100%, 15% 100%)"
+                            : "polygon(7% 0, 93% 0, 90% 100%, 10% 100%)",
                     }}
                   >
                     <div className="text-center">
-                      <div className="font-bold text-lg">{stage.count}</div>
+                      <div className="font-bold text-sm">{stage.count}</div>
                       <div className="text-xs opacity-90">{stage.name}</div>
                     </div>
                   </div>
 
-                  {/* Percentual ao lado */}
                   <div className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-full ml-4">
-                    <div className="bg-gray-100 px-2 py-1 rounded text-xs font-medium text-gray-700">
+                    <div className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-medium text-gray-700">
                       {stage.percentage.toFixed(1)}%
                     </div>
                   </div>
@@ -170,26 +169,26 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
           </div>
 
           {/* Métricas de conversão */}
-          <div className="pt-4 border-t border-gray-200 mt-6">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3">📊 Conversões entre Etapas</h4>
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="bg-blue-50 p-2 rounded">
+          <div className="pt-2 border-t border-gray-200 mt-3">
+            <h4 className="text-xs font-semibold text-gray-700 mb-2">📊 Conversões entre Etapas</h4>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-blue-50 p-1.5 rounded">
                 <span className="text-gray-600">Lead → Contato:</span>
                 <span className="font-bold text-blue-600 ml-1">{funnel.conversions.leadToContato.toFixed(1)}%</span>
               </div>
-              <div className="bg-green-50 p-2 rounded">
+              <div className="bg-green-50 p-1.5 rounded">
                 <span className="text-gray-600">Contato → Agendada:</span>
                 <span className="font-bold text-green-600 ml-1">
                   {funnel.conversions.contatoToAgendada.toFixed(1)}%
                 </span>
               </div>
-              <div className="bg-yellow-50 p-2 rounded">
+              <div className="bg-yellow-50 p-1.5 rounded">
                 <span className="text-gray-600">Agendada → Realizada:</span>
                 <span className="font-bold text-yellow-600 ml-1">
                   {funnel.conversions.agendadaToRealizada.toFixed(1)}%
                 </span>
               </div>
-              <div className="bg-red-50 p-2 rounded">
+              <div className="bg-red-50 p-1.5 rounded">
                 <span className="text-gray-600">Realizada → Venda:</span>
                 <span className="font-bold text-red-600 ml-1">{funnel.conversions.realizadaToVenda.toFixed(1)}%</span>
               </div>
@@ -197,25 +196,25 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
           </div>
 
           {/* FEE MRR e FEE ONE TIME */}
-          <div className="pt-4 border-t border-gray-200">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3">💰 Receita Gerada</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-green-50 p-3 rounded-lg">
+          <div className="pt-2 border-t border-gray-200">
+            <h4 className="text-xs font-semibold text-gray-700 mb-2">💰 Receita Gerada</h4>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-green-50 p-2 rounded-lg">
                 <div className="text-xs text-gray-600 mb-1">FEE MRR (Recorrente)</div>
-                <div className="font-bold text-green-600 text-lg">
+                <div className="font-bold text-green-600 text-base">
                   R$ {funnel.feeMrr.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                 </div>
               </div>
-              <div className="bg-blue-50 p-3 rounded-lg">
+              <div className="bg-blue-50 p-2 rounded-lg">
                 <div className="text-xs text-gray-600 mb-1">FEE ONE TIME (Escopo)</div>
-                <div className="font-bold text-blue-600 text-lg">
+                <div className="font-bold text-blue-600 text-base">
                   R$ {funnel.feeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
-            <div className="mt-2 bg-gray-50 p-2 rounded text-center">
+            <div className="mt-1.5 bg-gray-50 p-1.5 rounded text-center">
               <span className="text-xs text-gray-600">Total: </span>
-              <span className="font-bold text-gray-800">
+              <span className="font-bold text-gray-800 text-sm">
                 R$ {(funnel.feeMrr + funnel.feeOneTime).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </span>
             </div>
@@ -226,18 +225,18 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Funil Geral */}
-      <div className="mb-8">
+      <div className="mb-4">
         <VisualFunnel title="🎯 Funil Geral" funnel={generalFunnel} totalLeads={leads.length} color="#dc2626" />
       </div>
 
       {/* Funis por Closer */}
-      <div className="space-y-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">👥 Funis por Closer</h2>
+      <div className="space-y-4">
+        <h2 className="text-lg font-bold text-gray-900 mb-3">👥 Funis por Closer</h2>
 
         {closerFunnels.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
             {closerFunnels.map((closerFunnel, index) => {
               const colors = [
                 "#2563eb", // Azul
@@ -267,9 +266,9 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
           </div>
         ) : (
           <Card>
-            <CardContent className="p-8 text-center">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <CardContent className="p-6 text-center">
+              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -278,7 +277,7 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum Closer Encontrado</h3>
+              <h3 className="text-base font-semibold text-gray-900 mb-2">Nenhum Closer Encontrado</h3>
               <p className="text-sm text-gray-500">Não foram encontrados leads com closers atribuídos no sistema.</p>
             </CardContent>
           </Card>
@@ -286,11 +285,11 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
       </div>
 
       {/* Funis por SDR */}
-      <div className="space-y-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">🎯 Funis por SDR</h2>
+      <div className="space-y-4">
+        <h2 className="text-lg font-bold text-gray-900 mb-3">🎯 Funis por SDR</h2>
 
         {sdrFunnels.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
             {sdrFunnels.map((sdrFunnel, index) => {
               const colors = [
                 "#16a34a", // Verde
@@ -320,9 +319,9 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
           </div>
         ) : (
           <Card>
-            <CardContent className="p-8 text-center">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <CardContent className="p-6 text-center">
+              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -331,7 +330,7 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum SDR Encontrado</h3>
+              <h3 className="text-base font-semibold text-gray-900 mb-2">Nenhum SDR Encontrado</h3>
               <p className="text-sm text-gray-500">Não foram encontrados leads com SDRs atribuídos no sistema.</p>
             </CardContent>
           </Card>
@@ -340,26 +339,26 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
       {/* Resumo Comparativo */}
       {closerFunnels.length > 0 && (
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-gray-900">
+        <Card className="mt-4">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold text-gray-900">
               📈 Comparativo de Performance - CLOSERs
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-2 font-semibold">Closer</th>
-                    <th className="text-center py-2 font-semibold">Leads</th>
-                    <th className="text-center py-2 font-semibold">Contato</th>
-                    <th className="text-center py-2 font-semibold">Agendadas</th>
-                    <th className="text-center py-2 font-semibold">Realizadas</th>
-                    <th className="text-center py-2 font-semibold">Vendas</th>
-                    <th className="text-center py-2 font-semibold">FEE MRR</th>
-                    <th className="text-center py-2 font-semibold">FEE ONE TIME</th>
-                    <th className="text-center py-2 font-semibold">Taxa Conversão</th>
+                    <th className="text-left py-1.5 font-semibold">Closer</th>
+                    <th className="text-center py-1.5 font-semibold">Leads</th>
+                    <th className="text-center py-1.5 font-semibold">Contato</th>
+                    <th className="text-center py-1.5 font-semibold">Agendadas</th>
+                    <th className="text-center py-1.5 font-semibold">Realizadas</th>
+                    <th className="text-center py-1.5 font-semibold">Vendas</th>
+                    <th className="text-center py-1.5 font-semibold">FEE MRR</th>
+                    <th className="text-center py-1.5 font-semibold">FEE ONE TIME</th>
+                    <th className="text-center py-1.5 font-semibold">Taxa Conversão</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -371,38 +370,38 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
                     return (
                       <tr key={closerFunnel.name} className="border-b hover:bg-gray-50">
-                        <td className="py-3 font-medium">{closerFunnel.name}</td>
-                        <td className="text-center py-3 font-bold text-blue-600">{closerFunnel.funnel.leads.count}</td>
-                        <td className="text-center py-3">
+                        <td className="py-2 font-medium">{closerFunnel.name}</td>
+                        <td className="text-center py-2 font-bold text-blue-600">{closerFunnel.funnel.leads.count}</td>
+                        <td className="text-center py-2">
                           {closerFunnel.funnel.contato.count}
                           <span className="text-xs text-gray-500 ml-1">
                             ({closerFunnel.funnel.contato.percentage.toFixed(1)}%)
                           </span>
                         </td>
-                        <td className="text-center py-3">
+                        <td className="text-center py-2">
                           {closerFunnel.funnel.agendada.count}
                           <span className="text-xs text-gray-500 ml-1">
                             ({closerFunnel.funnel.agendada.percentage.toFixed(1)}%)
                           </span>
                         </td>
-                        <td className="text-center py-3">
+                        <td className="text-center py-2">
                           {closerFunnel.funnel.realizada.count}
                           <span className="text-xs text-gray-500 ml-1">
                             ({closerFunnel.funnel.realizada.percentage.toFixed(1)}%)
                           </span>
                         </td>
-                        <td className="text-center py-3 font-bold text-green-600">
+                        <td className="text-center py-2 font-bold text-green-600">
                           {closerFunnel.funnel.vendas.count}
                         </td>
-                        <td className="text-center py-3 font-bold text-green-600">
+                        <td className="text-center py-2 font-bold text-green-600">
                           R$ {closerFunnel.funnel.feeMrr.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
                         </td>
-                        <td className="text-center py-3 font-bold text-blue-600">
+                        <td className="text-center py-2 font-bold text-blue-600">
                           R$ {closerFunnel.funnel.feeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
                         </td>
-                        <td className="text-center py-3">
+                        <td className="text-center py-2">
                           <span
-                            className={`font-bold px-2 py-1 rounded text-xs ${
+                            className={`font-bold px-1.5 py-0.5 rounded text-xs ${
                               conversionRate >= 10
                                 ? "bg-green-100 text-green-800"
                                 : conversionRate >= 5
@@ -425,24 +424,26 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
       {/* Resumo Comparativo SDRs */}
       {sdrFunnels.length > 0 && (
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-gray-900">📊 Comparativo de Performance - SDRs</CardTitle>
+        <Card className="mt-4">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold text-gray-900">
+              📊 Comparativo de Performance - SDRs
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-2 font-semibold">SDR</th>
-                    <th className="text-center py-2 font-semibold">Leads</th>
-                    <th className="text-center py-2 font-semibold">Contato</th>
-                    <th className="text-center py-2 font-semibold">Agendadas</th>
-                    <th className="text-center py-2 font-semibold">Realizadas</th>
-                    <th className="text-center py-2 font-semibold">Vendas</th>
-                    <th className="text-center py-2 font-semibold">FEE MRR</th>
-                    <th className="text-center py-2 font-semibold">FEE ONE TIME</th>
-                    <th className="text-center py-2 font-semibold">Taxa Conversão</th>
+                    <th className="text-left py-1.5 font-semibold">SDR</th>
+                    <th className="text-center py-1.5 font-semibold">Leads</th>
+                    <th className="text-center py-1.5 font-semibold">Contato</th>
+                    <th className="text-center py-1.5 font-semibold">Agendadas</th>
+                    <th className="text-center py-1.5 font-semibold">Realizadas</th>
+                    <th className="text-center py-1.5 font-semibold">Vendas</th>
+                    <th className="text-center py-1.5 font-semibold">FEE MRR</th>
+                    <th className="text-center py-1.5 font-semibold">FEE ONE TIME</th>
+                    <th className="text-center py-1.5 font-semibold">Taxa Conversão</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -454,36 +455,36 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
                     return (
                       <tr key={sdrFunnel.name} className="border-b hover:bg-gray-50">
-                        <td className="py-3 font-medium">{sdrFunnel.name}</td>
-                        <td className="text-center py-3 font-bold text-blue-600">{sdrFunnel.funnel.leads.count}</td>
-                        <td className="text-center py-3">
+                        <td className="py-2 font-medium">{sdrFunnel.name}</td>
+                        <td className="text-center py-2 font-bold text-blue-600">{sdrFunnel.funnel.leads.count}</td>
+                        <td className="text-center py-2">
                           {sdrFunnel.funnel.contato.count}
                           <span className="text-xs text-gray-500 ml-1">
                             ({sdrFunnel.funnel.contato.percentage.toFixed(1)}%)
                           </span>
                         </td>
-                        <td className="text-center py-3">
+                        <td className="text-center py-2">
                           {sdrFunnel.funnel.agendada.count}
                           <span className="text-xs text-gray-500 ml-1">
                             ({sdrFunnel.funnel.agendada.percentage.toFixed(1)}%)
                           </span>
                         </td>
-                        <td className="text-center py-3">
+                        <td className="text-center py-2">
                           {sdrFunnel.funnel.realizada.count}
                           <span className="text-xs text-gray-500 ml-1">
                             ({sdrFunnel.funnel.realizada.percentage.toFixed(1)}%)
                           </span>
                         </td>
-                        <td className="text-center py-3 font-bold text-green-600">{sdrFunnel.funnel.vendas.count}</td>
-                        <td className="text-center py-3 font-bold text-green-600">
+                        <td className="text-center py-2 font-bold text-green-600">{sdrFunnel.funnel.vendas.count}</td>
+                        <td className="text-center py-2 font-bold text-green-600">
                           R$ {sdrFunnel.funnel.feeMrr.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
                         </td>
-                        <td className="text-center py-3 font-bold text-blue-600">
+                        <td className="text-center py-2 font-bold text-blue-600">
                           R$ {sdrFunnel.funnel.feeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
                         </td>
-                        <td className="text-center py-3">
+                        <td className="text-center py-2">
                           <span
-                            className={`font-bold px-2 py-1 rounded text-xs ${
+                            className={`font-bold px-1.5 py-0.5 rounded text-xs ${
                               conversionRate >= 10
                                 ? "bg-green-100 text-green-800"
                                 : conversionRate >= 5
