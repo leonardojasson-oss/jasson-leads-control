@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Target,
   TrendingUp,
@@ -65,7 +64,8 @@ interface ClosersMetasConfig {
 }
 
 export function MetasControl({ leads }: MetasControlProps) {
-  const [selectedPeriod, setSelectedPeriod] = useState("mes")
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
   const [isSDRConfigModalOpen, setIsSDRConfigModalOpen] = useState(false)
   const [isCloserConfigModalOpen, setIsCloserConfigModalOpen] = useState(false)
@@ -312,35 +312,29 @@ export function MetasControl({ leads }: MetasControlProps) {
   const getFilteredLeads = () => {
     if (!leads || leads.length === 0) return []
 
-    const now = new Date()
     let filteredLeads = leads
 
-    switch (selectedPeriod) {
-      case "hoje":
-        filteredLeads = leads.filter((lead) => {
-          if (!lead.data_hora_compra) return false
-          const leadDate = new Date(lead.data_hora_compra)
-          return leadDate.toDateString() === now.toDateString()
-        })
-        break
-      case "semana":
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-        filteredLeads = leads.filter((lead) => {
-          if (!lead.data_hora_compra) return false
-          const leadDate = new Date(lead.data_hora_compra)
-          return leadDate >= weekAgo
-        })
-        break
-      case "mes":
-        const monthAgo = new Date(now.getFullYear(), now.getMonth(), 1)
-        filteredLeads = leads.filter((lead) => {
-          if (!lead.data_hora_compra) return false
-          const leadDate = new Date(lead.data_hora_compra)
-          return leadDate >= monthAgo
-        })
-        break
-      default:
-        filteredLeads = leads
+    if (startDate || endDate) {
+      filteredLeads = leads.filter((lead) => {
+        if (!lead.data_hora_compra) return false
+        const leadDate = new Date(lead.data_hora_compra)
+
+        if (startDate && endDate) {
+          const start = new Date(startDate)
+          const end = new Date(endDate)
+          end.setHours(23, 59, 59, 999) // Incluir o dia final completo
+          return leadDate >= start && leadDate <= end
+        } else if (startDate) {
+          const start = new Date(startDate)
+          return leadDate >= start
+        } else if (endDate) {
+          const end = new Date(endDate)
+          end.setHours(23, 59, 59, 999)
+          return leadDate <= end
+        }
+
+        return true
+      })
     }
 
     return filteredLeads
@@ -457,14 +451,13 @@ export function MetasControl({ leads }: MetasControlProps) {
         if (lead.data_assinatura) {
           closerData[closer].vendas++
 
-          // Somar valores de FEE
-          if (lead.fee) {
-            // Assumindo que fee é MRR se não especificado
-            closerData[closer].feeMRR += Number(lead.fee) || 0
+          // fee_total = FEE MRR, escopo_fechado = FEE ONE-TIME
+          if (lead.fee_total) {
+            closerData[closer].feeMRR += Number(lead.fee_total) || 0
           }
 
-          if (lead.fee_total) {
-            closerData[closer].feeOneTime += Number(lead.fee_total) || 0
+          if (lead.escopo_fechado) {
+            closerData[closer].feeOneTime += Number(lead.escopo_fechado) || 0
           }
         }
       }
@@ -945,8 +938,7 @@ export function MetasControl({ leads }: MetasControlProps) {
                 <Target className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold">Controle de Metas</h1>
-                <p className="text-red-100 text-xs">Meta/Mês Compra de Leads</p>
+                <h1 className="text-xl font-bold">Controle de Compra de Leads</h1>
               </div>
             </div>
             <div className="flex items-center space-x-2">
@@ -961,17 +953,23 @@ export function MetasControl({ leads }: MetasControlProps) {
                 <Settings className="w-3 h-3 mr-1" />
                 Config
               </Button>
-              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-28 bg-white/10 border-white/20 text-white backdrop-blur-sm h-7 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="hoje">Hoje</SelectItem>
-                  <SelectItem value="semana">Semana</SelectItem>
-                  <SelectItem value="mes">Mês</SelectItem>
-                  <SelectItem value="todos">Todos</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center space-x-1">
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-32 bg-white/10 border-white/20 text-white placeholder-white/60 backdrop-blur-sm h-7 text-xs"
+                  placeholder="Data inicial"
+                />
+                <span className="text-white/80 text-xs">até</span>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-32 bg-white/10 border-white/20 text-white placeholder-white/60 backdrop-blur-sm h-7 text-xs"
+                  placeholder="Data final"
+                />
+              </div>
             </div>
           </div>
         </div>

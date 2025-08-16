@@ -1,6 +1,9 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { BarChart3 } from "lucide-react"
+import { useState } from "react"
 import type { Lead } from "@/app/page"
 
 interface DashboardAnalyticsProps {
@@ -8,6 +11,42 @@ interface DashboardAnalyticsProps {
 }
 
 export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
+
+  const getFilteredLeads = () => {
+    if (!leads || leads.length === 0) return []
+
+    let filteredLeads = leads
+
+    if (startDate || endDate) {
+      filteredLeads = leads.filter((lead) => {
+        if (!lead.data_hora_compra) return false
+        const leadDate = new Date(lead.data_hora_compra)
+
+        if (startDate && endDate) {
+          const start = new Date(startDate)
+          const end = new Date(endDate)
+          end.setHours(23, 59, 59, 999) // Incluir o dia final completo
+          return leadDate >= start && leadDate <= end
+        } else if (startDate) {
+          const start = new Date(startDate)
+          return leadDate >= start
+        } else if (endDate) {
+          const end = new Date(endDate)
+          end.setHours(23, 59, 59, 999)
+          return leadDate <= end
+        }
+
+        return true
+      })
+    }
+
+    return filteredLeads
+  }
+
+  const filteredLeads = getFilteredLeads()
+
   // Função para calcular funil de conversão
   const calculateFunnel = (leadsData: Lead[]) => {
     const totalLeads = leadsData.length
@@ -56,11 +95,9 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
     }
   }
 
-  // Funil geral
-  const generalFunnel = calculateFunnel(leads)
+  const generalFunnel = calculateFunnel(filteredLeads)
 
-  // Funis por closer - agora inclui todos os closers encontrados nos dados
-  const closerStats = leads.reduce(
+  const closerStats = filteredLeads.reduce(
     (acc, lead) => {
       const closer = lead.closer?.toLowerCase()?.trim()
       if (closer && closer !== "") {
@@ -79,8 +116,7 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
     funnel: calculateFunnel(closerLeads),
   }))
 
-  // Funis por SDR com a mesma lógica dos closers
-  const sdrStats = leads.reduce(
+  const sdrStats = filteredLeads.reduce(
     (acc, lead) => {
       const sdr = lead.sdr?.toLowerCase()?.trim()
       if (sdr && sdr !== "") {
@@ -226,9 +262,45 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
   return (
     <div className="space-y-4">
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 p-4 text-white shadow-xl">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="relative z-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                <BarChart3 className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">Dashboard & Analytics</h1>
+                <p className="text-sm text-white/80">Análise de Performance e Funis de Conversão</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1">
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-32 bg-white/10 border-white/20 text-white placeholder-white/60 backdrop-blur-sm h-7 text-xs"
+                  placeholder="Data inicial"
+                />
+                <span className="text-white/80 text-xs">até</span>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-32 bg-white/10 border-white/20 text-white placeholder-white/60 backdrop-blur-sm h-7 text-xs"
+                  placeholder="Data final"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Funil Geral */}
       <div className="mb-4">
-        <VisualFunnel title="🎯 Funil Geral" funnel={generalFunnel} totalLeads={leads.length} color="#dc2626" />
+        <VisualFunnel title="🎯 Funil Geral" funnel={generalFunnel} totalLeads={filteredLeads.length} color="#dc2626" />
       </div>
 
       {/* Funis por Closer */}
