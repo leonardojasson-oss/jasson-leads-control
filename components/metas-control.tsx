@@ -35,9 +35,9 @@ export function MetasControl({ leads }: MetasControlProps) {
 
   // Configuração padrão das metas
   const defaultMetasConfig: MetasConfig = {
-    "100 a 200k": { meta: 35, idealDia: 5, cpmqlMeta: 700, color: "from-emerald-500 to-teal-600", icon: "🎯" },
-    "200 a 400k": { meta: 39, idealDia: 5, cpmqlMeta: 800, color: "from-blue-500 to-cyan-600", icon: "📈" },
-    "400 a 1kk": { meta: 25, idealDia: 3, cpmqlMeta: 1000, color: "from-purple-500 to-indigo-600", icon: "🚀" },
+    "101 a 200k": { meta: 35, idealDia: 5, cpmqlMeta: 700, color: "from-emerald-500 to-teal-600", icon: "🎯" },
+    "201 a 400k": { meta: 39, idealDia: 5, cpmqlMeta: 800, color: "from-blue-500 to-cyan-600", icon: "📈" },
+    "401 a 1kk": { meta: 25, idealDia: 3, cpmqlMeta: 1000, color: "from-purple-500 to-indigo-600", icon: "🚀" },
     "1 a 4kk": { meta: 15, idealDia: 2, cpmqlMeta: 1600, color: "from-orange-500 to-red-600", icon: "⭐" },
     "4 a 16kk": { meta: 3, idealDia: 0, cpmqlMeta: 1800, color: "from-pink-500 to-rose-600", icon: "💎" },
     "16 a 40kk": { meta: 3, idealDia: 0, cpmqlMeta: 2070, color: "from-violet-500 to-purple-600", icon: "👑" },
@@ -97,90 +97,81 @@ export function MetasControl({ leads }: MetasControlProps) {
     return String(value)
   }
 
-  // Mapear faturamento para tiers - CORRIGIDO
+  // Mapear faturamento para tiers - VERSÃO COM REGEX ROBUSTA
   const mapFaturamentoToTier = (faturamento: string): string => {
-    const faturamentoClean = safeString(faturamento).toLowerCase().trim()
+    const faturamentoOriginal = safeString(faturamento)
+
+    const normalizeText = (text: string): string => {
+      return text
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+        .replace(/\s+/g, " ") // Normaliza espaços
+        .trim()
+    }
+
+    const faturamentoNorm = normalizeText(faturamentoOriginal)
+
+    console.log("[v0] DEBUG - Faturamento original:", faturamentoOriginal)
+    console.log("[v0] DEBUG - Faturamento normalizado:", faturamentoNorm)
 
     // Se não há faturamento ou está vazio, vai para -100k
     if (
-      !faturamentoClean ||
-      faturamentoClean === "" ||
-      faturamentoClean === "-" ||
-      faturamentoClean === "null" ||
-      faturamentoClean === "undefined"
+      !faturamentoNorm ||
+      faturamentoNorm === "" ||
+      faturamentoNorm === "-" ||
+      faturamentoNorm === "null" ||
+      faturamentoNorm === "undefined"
     ) {
+      console.log("[v0] DEBUG - Faturamento vazio, indo para -100k")
       return "-100k"
     }
 
-    // Mapeamento específico e correto baseado nos ranges definidos
-
-    // 50 a 70 mil > -100k
-    if (faturamentoClean.includes("50") && faturamentoClean.includes("70")) {
-      return "-100k"
-    }
-
-    // 70 a 100 mil > -100k
-    if (faturamentoClean.includes("70") && faturamentoClean.includes("100")) {
-      return "-100k"
-    }
-
-    // 100 a 200 mil > 100 a 200k
-    if (faturamentoClean.includes("100") && faturamentoClean.includes("200")) {
-      return "100 a 200k"
-    }
-
-    // 200 a 400 mil > 200 a 400k
-    if (faturamentoClean.includes("200") && faturamentoClean.includes("400")) {
-      return "200 a 400k"
-    }
-
-    // 400 a 1 milhão > 400 a 1kk (ESTE É O CASO ESPECÍFICO)
-    if (faturamentoClean.includes("400") || faturamentoClean.includes("401")) {
-      if (
-        faturamentoClean.includes("1 milhão") ||
-        faturamentoClean.includes("1milhão") ||
-        (faturamentoClean.includes("mil") && faturamentoClean.includes("milhão"))
-      ) {
-        return "400 a 1kk"
-      }
-    }
-
-    // 1 a 4 milhões > 1 a 4kk
     if (
-      faturamentoClean.includes("1") &&
-      faturamentoClean.includes("4") &&
-      faturamentoClean.includes("milhão") &&
-      !faturamentoClean.includes("mil")
+      /de\s*5[01]\s*mil\s*(a|à)\s*7[0]\s*mil/i.test(faturamentoNorm) ||
+      /de\s*7[01]\s*mil\s*(a|à)\s*100\s*mil/i.test(faturamentoNorm)
     ) {
+      console.log("[v0] DEBUG - Mapeado para -100k (51-70 mil ou 71-100 mil)")
+      return "-100k"
+    }
+
+    if (/de\s*10[01]\s*mil\s*(a|à)\s*200\s*mil/i.test(faturamentoNorm)) {
+      console.log("[v0] DEBUG - Mapeado para 101 a 200k")
+      return "101 a 200k"
+    }
+
+    if (/de\s*20[01]\s*mil\s*(a|à)\s*400\s*mil/i.test(faturamentoNorm)) {
+      console.log("[v0] DEBUG - Mapeado para 201 a 400k")
+      return "201 a 400k"
+    }
+
+    if (/de\s*40[01]\s*mil\s*(a|à)\s*1\s*(milhao|milhoes)/i.test(faturamentoNorm)) {
+      console.log("[v0] DEBUG - Mapeado para 401 a 1kk")
+      return "401 a 1kk"
+    }
+
+    if (/de\s*1\s*(a|à)\s*4\s*(milhao|milhoes)/i.test(faturamentoNorm)) {
+      console.log("[v0] DEBUG - Mapeado para 1 a 4kk")
       return "1 a 4kk"
     }
 
-    // 4 a 16 milhões > 4 a 16kk
-    if (faturamentoClean.includes("4") && faturamentoClean.includes("16") && faturamentoClean.includes("milhão")) {
+    if (/de\s*4\s*(a|à)\s*16\s*(milhao|milhoes)/i.test(faturamentoNorm)) {
+      console.log("[v0] DEBUG - Mapeado para 4 a 16kk")
       return "4 a 16kk"
     }
 
-    // 16 a 40 milhões > 16 a 40kk
-    if (faturamentoClean.includes("16") && faturamentoClean.includes("40") && faturamentoClean.includes("milhão")) {
+    if (/de\s*16\s*(a|à)\s*40\s*(milhao|milhoes)/i.test(faturamentoNorm)) {
+      console.log("[v0] DEBUG - Mapeado para 16 a 40kk")
       return "16 a 40kk"
     }
 
-    // mais de 40 milhões > +40kk
-    if (
-      faturamentoClean.includes("40") &&
-      faturamentoClean.includes("milhão") &&
-      (faturamentoClean.includes("mais") || faturamentoClean.includes("acima"))
-    ) {
+    if (/(mais\s*de\s*40|acima\s*de\s*40|\+\s*40).*(milhao|milhoes)/i.test(faturamentoNorm)) {
+      console.log("[v0] DEBUG - Mapeado para +40kk")
       return "+40kk"
     }
 
-    // Mapeamentos alternativos mais genéricos
-    if (faturamentoClean.includes("até 100") || faturamentoClean.includes("abaixo de 100")) {
-      return "-100k"
-    }
-
     // Se não conseguiu mapear nada específico, vai para -100k (sem informação)
-    console.log("Faturamento não mapeado:", faturamento, "-> indo para -100k")
+    console.log("[v0] DEBUG - Faturamento não mapeado:", faturamentoOriginal, "-> indo para -100k")
     return "-100k"
   }
 
@@ -250,7 +241,7 @@ export function MetasControl({ leads }: MetasControlProps) {
   }
 
   // Ordem dos tiers
-  const tierOrder = ["100 a 200k", "200 a 400k", "400 a 1kk", "1 a 4kk", "4 a 16kk", "16 a 40kk", "+40kk", "-100k"]
+  const tierOrder = ["-100k", "101 a 200k", "201 a 400k", "401 a 1kk", "1 a 4kk", "4 a 16kk", "16 a 40kk", "+40kk"]
 
   const formatCurrency = (value: number) => {
     return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
@@ -573,8 +564,8 @@ export function MetasControl({ leads }: MetasControlProps) {
                 <tr>
                   <th className="px-4 py-3 text-left font-bold text-xs">Tier</th>
                   <th className="px-4 py-3 text-center font-bold text-xs">Meta</th>
-                  <th className="px-4 py-3 text-center font-bold text-xs">Real</th>
-                  <th className="px-4 py-3 text-center font-bold text-xs">Ideal</th>
+                  <th className="px-4 py-3 text-center font-bold text-xs">Realizado</th>
+                  <th className="px-4 py-3 text-center font-bold text-xs">Ideal/Dia</th>
                   <th className="px-4 py-3 text-center font-bold text-xs">%</th>
                   <th className="px-4 py-3 text-center font-bold text-xs">CPMQL</th>
                   <th className="px-4 py-3 text-center font-bold text-xs">Status</th>
@@ -656,7 +647,7 @@ export function MetasControl({ leads }: MetasControlProps) {
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-2 font-semibold text-gray-700">Arrematador</th>
-                  {tierOrder.slice(0, 6).map((tier) => {
+                  {["-100k", ...tierOrder.slice(1, 7), "+40kk"].map((tier) => {
                     const tierConfig = metasConfig[tier]
                     return (
                       <th key={tier} className="text-center py-2 px-1">
@@ -704,7 +695,7 @@ export function MetasControl({ leads }: MetasControlProps) {
                             <span className="font-medium text-gray-900">{arr.name}</span>
                           </div>
                         </td>
-                        {tierOrder.slice(0, 6).map((tier) => {
+                        {["-100k", ...tierOrder.slice(1, 7), "+40kk"].map((tier) => {
                           const leadsCount = data.tierData[tier] || 0
                           return (
                             <td key={tier} className="text-center py-3 px-1">
@@ -726,9 +717,6 @@ export function MetasControl({ leads }: MetasControlProps) {
           </div>
         </CardContent>
       </Card>
-
-      {/* Modal de Configuração */}
-      <ConfigModal />
     </div>
   )
 }
