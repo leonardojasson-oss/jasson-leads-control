@@ -343,6 +343,8 @@ export function MetasControl({ leads }: MetasControlProps) {
       }))
     }
 
+    console.log("[v0] ConfigModal renderizado, isConfigModalOpen:", isConfigModalOpen)
+
     return (
       <Dialog open={isConfigModalOpen} onOpenChange={setIsConfigModalOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -477,7 +479,10 @@ export function MetasControl({ leads }: MetasControlProps) {
             <div className="flex items-center space-x-3">
               <Button
                 variant="outline"
-                onClick={() => setIsConfigModalOpen(true)}
+                onClick={() => {
+                  console.log("[v0] Botão Config clicado")
+                  setIsConfigModalOpen(true)
+                }}
                 className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm text-sm h-8"
               >
                 <Settings className="w-3 h-3 mr-1" />
@@ -717,6 +722,9 @@ export function MetasControl({ leads }: MetasControlProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Modal de Configuração */}
+      <ConfigModal />
     </div>
   )
 }
