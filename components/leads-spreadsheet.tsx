@@ -83,7 +83,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     { key: "conseguiu_contato", label: "CS", width: "60px", type: "boolean" },
     { key: "reuniao_agendada", label: "RM", width: "60px", type: "boolean" },
     { key: "reuniao_realizada", label: "RR", width: "60px", type: "boolean" },
-    { key: "no_show", label: "NS", width: "60px", type: "boolean" },
+    { key: "ns", label: "NS", width: "60px", type: "boolean" },
     { key: "data_venda", label: "DATA DA MARCAÇÃO", width: "150px", type: "date" },
     { key: "data_fechamento", label: "DATA DA REUNIÃO", width: "150px", type: "date" },
     { key: "faturamento", label: "FATURAMENTO", width: "150px", type: "text" },
@@ -363,7 +363,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         onClick={() => setEditingCell(cellKey)}
         title={`Clique para editar • Valor: ${displayValue}`}
       >
-        {column.key === "status" || column.key === "tem_comentario_lbf" ? (
+        {column.key === "status" || column.key === "tem_comentario_lbf" || column.key === "ns" ? (
           <Badge className="text-xs" variant="outline">
             {displayValue}
           </Badge>
