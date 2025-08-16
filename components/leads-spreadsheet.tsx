@@ -184,8 +184,24 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       isUpdatingRef.current = true
     }
 
+    let updates: Partial<Lead> = { [field]: value }
+
+    // Se a DATA DE ASSINATURA foi preenchida, automaticamente considerar que houve venda
+    if (field === "data_assinatura" && value && value.trim() !== "") {
+      updates = {
+        ...updates,
+        data_venda: value, // Usar a mesma data da assinatura como data da venda
+        venda_via_jasson_co: true, // Marcar como venda via Jasson&Co
+        status: "GANHO", // Atualizar status para GANHO
+      }
+      console.log("[v0] DATA DE ASSINATURA preenchida - marcando como venda automática:", {
+        leadId,
+        data_assinatura: value,
+      })
+    }
+
     // Save automatically when cell is edited
-    await onUpdateLead(leadId, { [field]: value })
+    await onUpdateLead(leadId, updates)
   }
 
   const getCellValue = (lead: Lead, field: string) => {
@@ -338,9 +354,12 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       }
     })()
 
+    const isFirstColumn = column.key === "nome_empresa"
+    const alignmentClasses = isFirstColumn ? "justify-start" : "justify-center"
+
     return (
       <div
-        className="h-8 px-2 py-1 text-xs cursor-pointer hover:bg-gray-100 flex items-center min-h-[32px]"
+        className={`h-8 px-2 py-1 text-xs cursor-pointer hover:bg-gray-100 flex items-center min-h-[32px] ${alignmentClasses}`}
         onClick={() => setEditingCell(cellKey)}
         title={`Clique para editar • Valor: ${displayValue}`}
       >
@@ -349,7 +368,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
             {displayValue}
           </Badge>
         ) : (
-          <span className="truncate w-full">{displayValue}</span>
+          <span className={`truncate ${isFirstColumn ? "w-full" : "w-full text-center"}`}>{displayValue}</span>
         )}
       </div>
     )

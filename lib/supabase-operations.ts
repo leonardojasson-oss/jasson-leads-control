@@ -54,6 +54,7 @@ export type Lead = {
   valor_venda?: number
   data_venda?: string
   data_fechamento?: string
+  data_assinatura?: string
   fee?: number
   escopo_fechado?: string
   fee_total?: number
@@ -252,35 +253,92 @@ export const leadOperations = {
   },
 
   async update(id: string, lead: Partial<Lead>): Promise<Lead | null> {
-    console.log("🔄 === ATUALIZANDO LEAD ===")
-    console.log("🆔 ID:", id)
-    console.log("📝 Dados:", lead)
+    console.log("[v0] === ATUALIZANDO LEAD ===")
+    console.log("[v0] ID:", id)
+    console.log("[v0] Dados recebidos:", lead)
 
     // Sempre atualizar localStorage primeiro
     const localResult = localStorageOperations.update(id, lead)
-    console.log("✅ Lead atualizado no localStorage")
+    console.log("[v0] Lead atualizado no localStorage")
 
     // Tentar atualizar no Supabase se configurado
     if (isSupabaseConfigured && supabase) {
       try {
-        console.log("🌐 Tentando atualizar no Supabase...")
+        console.log("[v0] Tentando atualizar no Supabase...")
 
         const cleanedLead = {
           ...cleanDataForSupabase(lead),
           updated_at: new Date().toISOString(),
         }
+        console.log("[v0] Dados limpos para Supabase:", cleanedLead)
 
-        const { data, error } = await supabase.from("leads").update(cleanedLead).eq("id", id).select().single()
+        if (cleanedLead.data_assinatura !== undefined) {
+          console.log("[v0] Detectado data_assinatura:", cleanedLead.data_assinatura)
 
-        if (error) {
-          console.error("❌ Erro ao atualizar no Supabase:", error)
+          console.log("[v0] Tentando atualização direta com data_assinatura...")
+          const { data, error } = await supabase.from("leads").update(cleanedLead).eq("id", id).select().single()
+
+          if (error) {
+            console.log("[v0] ❌ Erro na atualização direta:", error.message)
+            console.log("[v0] Detalhes do erro:", error)
+
+            // Se falhar, salvar os outros campos e tentar data_assinatura separadamente
+            const { data_assinatura, ...otherFields } = cleanedLead
+            console.log("[v0] Tentando salvar outros campos sem data_assinatura...")
+
+            const { data: partialData, error: partialError } = await supabase
+              .from("leads")
+              .update(otherFields)
+              .eq("id", id)
+              .select()
+              .single()
+
+            if (partialError) {
+              console.error("[v0] ❌ Erro ao atualizar outros campos:", partialError)
+              return localResult
+            } else {
+              console.log("[v0] ✅ Outros campos atualizados no Supabase")
+
+              // Tentar salvar data_assinatura via SQL raw
+              try {
+                console.log("[v0] Tentando salvar data_assinatura separadamente...")
+                const { error: sqlError } = await supabase.from("leads").update({ data_assinatura }).eq("id", id)
+
+                if (sqlError) {
+                  console.log("[v0] ⚠️ Não foi possível salvar data_assinatura no Supabase:", sqlError.message)
+                  console.log("[v0] Detalhes do erro data_assinatura:", sqlError)
+                } else {
+                  console.log("[v0] ✅ data_assinatura salva no Supabase com sucesso!")
+                }
+              } catch (sqlErr) {
+                console.log("[v0] ⚠️ Exceção ao salvar data_assinatura:", sqlErr)
+              }
+
+              return partialData
+            }
+          } else {
+            console.log("[v0] ✅ Lead atualizado no Supabase com data_assinatura - SUCESSO TOTAL!")
+            return data
+          }
         } else {
-          console.log("✅ Lead também atualizado no Supabase")
-          return data
+          // Atualização normal sem data_assinatura
+          console.log("[v0] Atualização normal sem data_assinatura")
+          const { data, error } = await supabase.from("leads").update(cleanedLead).eq("id", id).select().single()
+
+          if (error) {
+            console.error("[v0] ❌ Erro ao atualizar no Supabase:", error)
+            return localResult
+          } else {
+            console.log("[v0] ✅ Lead também atualizado no Supabase")
+            return data
+          }
         }
       } catch (supabaseError) {
-        console.error("❌ Exceção ao atualizar no Supabase:", supabaseError)
+        console.error("[v0] ❌ Exceção ao atualizar no Supabase:", supabaseError)
+        return localResult
       }
+    } else {
+      console.log("[v0] Supabase não configurado, usando apenas localStorage")
     }
 
     return localResult

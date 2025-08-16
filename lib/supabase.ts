@@ -51,6 +51,7 @@ export type Lead = {
   valor_venda?: number
   data_venda?: string
   data_fechamento?: string
+  data_assinatura?: string // Added data_assinatura field to support automatic sale marking
   fee?: number
   escopo_fechado?: string
   fee_total?: number
@@ -166,7 +167,13 @@ export const leadOperations = {
         try {
           // Clean data for Supabase - convert empty strings to null for date fields
           const cleanedLead: any = {}
-          const dateFields = ["data_hora_compra", "data_ultimo_contato", "data_venda", "data_fechamento"]
+          const dateFields = [
+            "data_hora_compra",
+            "data_ultimo_contato",
+            "data_venda",
+            "data_fechamento",
+            "data_assinatura",
+          ]
 
           Object.keys(lead).forEach((key) => {
             const value = (lead as any)[key]

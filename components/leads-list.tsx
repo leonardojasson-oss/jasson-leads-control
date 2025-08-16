@@ -43,13 +43,18 @@ export function LeadsList({ leads, onEditLead, onDeleteLead, onUpdateLead }: Lea
     { value: "CONTRATO NA RUA", label: "Contrato na Rua", color: "bg-lime-100 text-lime-800 border-lime-200" },
     { value: "GANHO", label: "Ganho", color: "bg-emerald-100 text-emerald-800 border-emerald-200" },
     { value: "FOLLOW UP", label: "Follow Up", color: "bg-violet-100 text-violet-800 border-violet-200" },
-    { value: "NO-SHOW", label: "No-Show", color: "bg-rose-100 text-rose-800 border-rose-200" },
+    { value: "NO-SHOW", label: "No-Show", color: "bg-rose-100 text-rose-800 hover:bg-red-50" },
   ]
 
   // Helper function to safely get string value
   const safeString = (value: any): string => {
     if (value === null || value === undefined) return ""
     return String(value)
+  }
+
+  const capitalizeFirstLetter = (str: string) => {
+    if (!str) return ""
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
   }
 
   // Filter leads based on search term and status
@@ -144,7 +149,12 @@ export function LeadsList({ leads, onEditLead, onDeleteLead, onUpdateLead }: Lea
 
   // Handle inline editing
   const handleCellEdit = async (leadId: string, field: string, value: any) => {
-    await onUpdateLead(leadId, { [field]: value })
+    let processedValue = value
+    if (field === "sdr" || field === "closer" || field === "arrematador") {
+      processedValue = capitalizeFirstLetter(safeString(value))
+    }
+
+    await onUpdateLead(leadId, { [field]: processedValue })
     setEditingCell(null)
   }
 
@@ -196,13 +206,20 @@ export function LeadsList({ leads, onEditLead, onDeleteLead, onUpdateLead }: Lea
       }
     }
 
+    const displayValue =
+      field === "status"
+        ? getStatusBadge(value)
+        : field === "sdr" || field === "closer" || field === "arrematador"
+          ? capitalizeFirstLetter(safeString(value)) || "-"
+          : safeString(value) || "-"
+
     return (
       <div
         className="cursor-pointer hover:bg-gray-100 p-1 rounded min-h-[32px] flex items-center"
         onClick={() => setEditingCell(cellKey)}
         title="Clique para editar"
       >
-        {field === "status" ? getStatusBadge(value) : safeString(value) || "-"}
+        {displayValue}
       </div>
     )
   }

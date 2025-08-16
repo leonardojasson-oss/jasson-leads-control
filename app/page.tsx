@@ -241,7 +241,7 @@ export default function LeadsControl() {
     return sum + (isNaN(valor) ? 0 : valor)
   }, 0)
 
-  const contratoAssinado = leads.filter((lead) => lead.status === "CONTRATO ASSINADO").length
+  const contratoAssinado = leads.filter((lead) => lead.status === "CONTRATO ASSINADO" || lead.data_assinatura).length
   const followInfinito = leads.filter((lead) => lead.status === "FOLLOW INFINITO").length
   const tentandoContato = leads.filter((lead) => lead.status === "TENTANDO CONTATO").length
 

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
 import { X, RefreshCw, Sparkles } from "lucide-react"
 import type { Lead } from "@/app/page"
 
@@ -35,7 +36,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     nomeContato: "",
     cargoContato: "",
     email: "",
-    emailCorporativo: "",
+    emailCorporativo: false,
     telefone: "",
     sdr: "",
     closer: "",
@@ -45,7 +46,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     observacoes: "",
     dataUltimoContato: "",
     motivoPerdaPV: "",
-    comentarioLead: "", // ADICIONAR ESTE CAMPO
+    comentarioLead: "",
     temComentarioLBF: false,
     investimentoTrafego: "",
     ticketMedio: "",
@@ -69,10 +70,8 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
 
   const [autoFillData, setAutoFillData] = useState("")
 
-  // Reset form when modal opens/closes
   useEffect(() => {
     if (!isOpen) {
-      // Reset form when closing
       setFormData({
         nomeEmpresa: "",
         produtoMarketing: "",
@@ -89,7 +88,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         nomeContato: "",
         cargoContato: "",
         email: "",
-        emailCorporativo: "",
+        emailCorporativo: false,
         telefone: "",
         sdr: "",
         closer: "",
@@ -99,7 +98,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         observacoes: "",
         dataUltimoContato: "",
         motivoPerdaPV: "",
-        comentarioLead: "", // ADICIONAR na lista de reset
+        comentarioLead: "",
         temComentarioLBF: false,
         investimentoTrafego: "",
         ticketMedio: "",
@@ -124,7 +123,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     }
 
     if (editingLead && isOpen) {
-      // Load editing data - CORRIGIR MAPEAMENTO DOS CAMPOS
       setFormData({
         nomeEmpresa: editingLead.nome_empresa || "",
         produtoMarketing: editingLead.produto_marketing || "",
@@ -141,7 +139,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         nomeContato: editingLead.nome_contato || "",
         cargoContato: editingLead.cargo_contato || "",
         email: editingLead.email || "",
-        emailCorporativo: editingLead.email_corporativo || "",
+        emailCorporativo: editingLead.email_corporativo === "sim" || editingLead.email_corporativo === true,
         telefone: editingLead.telefone || "",
         sdr: editingLead.sdr || "",
         closer: editingLead.closer || "",
@@ -151,7 +149,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         observacoes: editingLead.observacoes || "",
         dataUltimoContato: editingLead.data_ultimo_contato || "",
         motivoPerdaPV: editingLead.motivo_perda_pv || "",
-        comentarioLead: editingLead.comentario_lead || "", // ADICIONAR no mapeamento de edição
+        comentarioLead: editingLead.comentario_lead || "",
         temComentarioLBF: editingLead.tem_comentario_lbf || false,
         investimentoTrafego: editingLead.investimento_trafego || "",
         ticketMedio: editingLead.ticket_medio || "",
@@ -175,6 +173,20 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     }
   }, [editingLead, isOpen])
 
+  useEffect(() => {
+    if (formData.email) {
+      const emailValue = formData.email.toLowerCase()
+      const pessoalDomains = ["gmail", "yahoo", "icloud", "msn", "terra", "bol", "hotmail"]
+
+      const isEmailCorporativo = !pessoalDomains.some((domain) => emailValue.includes(domain))
+
+      setFormData((prev) => ({
+        ...prev,
+        emailCorporativo: isEmailCorporativo,
+      }))
+    }
+  }, [formData.email])
+
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({
       ...prev,
@@ -182,7 +194,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     }))
   }
 
-  // PARSER ESPECÍFICO PARA O FORMATO DOS DADOS
   const parseAutoFillData = (data: string) => {
     console.log("🔄 === INICIANDO PARSER ESPECÍFICO ===")
     console.log("📝 Dados recebidos:", data)
@@ -195,32 +206,27 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     const updates: any = {}
 
     try {
-      // Nome da empresa - primeira linha
       const firstLine = data.split("\n")[0]?.trim()
       if (firstLine && !firstLine.includes("|") && !firstLine.includes(":")) {
         updates.nomeEmpresa = firstLine
         console.log("✅ Empresa encontrada:", firstLine)
       }
 
-      // Produto de Marketing
       const produtoMatch = data.match(/Produto de Marketing\s*\|\s*([^\n]+)/i)
       if (produtoMatch) {
         updates.produtoMarketing = produtoMatch[1].trim()
         console.log("✅ Produto encontrado:", produtoMatch[1].trim())
       }
 
-      // Data e hora
       const dataMatch = data.match(/(\d{2}\/\d{2}\/\d{4})\s*\|\s*(\d{2}:\d{2})/i)
       if (dataMatch) {
         const [, dataStr, horaStr] = dataMatch
-        // Converter para formato datetime-local (YYYY-MM-DDTHH:MM)
         const [dia, mes, ano] = dataStr.split("/")
         const dataFormatada = `${ano}-${mes}-${dia}T${horaStr}`
         updates.dataHoraCompra = dataFormatada
         console.log("✅ Data/Hora encontrada:", dataFormatada)
       }
 
-      // Valor pago
       const valorMatch = data.match(/Valor pago:\s*R\$\s*([\d.,]+)/i)
       if (valorMatch) {
         const valor = valorMatch[1].replace(/\./g, "").replace(",", ".")
@@ -228,18 +234,15 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         console.log("✅ Valor encontrado:", valor)
       }
 
-      // Faturamento
       const faturamentoMatch = data.match(/Faturamento:\s*([^\n]+)/i)
       if (faturamentoMatch) {
         updates.faturamento = faturamentoMatch[1].trim()
         console.log("✅ Faturamento encontrado:", faturamentoMatch[1].trim())
       }
 
-      // Segmento/Nicho
       const segmentoMatch = data.match(/Segmento:\s*([^\n]+)/i)
       if (segmentoMatch) {
         const segmento = segmentoMatch[1].trim()
-        // Mapear valores
         const nichoMap: { [key: string]: string } = {
           serviço: "Serviço",
           servico: "Serviço",
@@ -250,17 +253,17 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
           turismo: "Turismo",
           "e-commerce": "E-commerce",
           ecommerce: "E-commerce",
+          telecom: "Telecom",
+          educacao: "Educação",
         }
         updates.nicho = nichoMap[segmento.toLowerCase()] || segmento
         console.log("✅ Nicho encontrado:", updates.nicho)
       }
 
-      // Região/Cidade
       const regiaoMatch = data.match(/Região:\s*([^\n]+)/i)
       if (regiaoMatch) {
         const regiao = regiaoMatch[1].trim()
         if (regiao !== "-") {
-          // Se tem barra, pegar a primeira parte como cidade
           if (regiao.includes("/")) {
             updates.cidade = regiao.split("/")[0].trim()
             updates.regiao = regiao.split("/")[1]?.trim()
@@ -271,80 +274,68 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         }
       }
 
-      // Canal
       const canalMatch = data.match(/Canal:\s*([^\n]+)/i)
       if (canalMatch && canalMatch[1].trim() !== "-") {
         updates.canal = canalMatch[1].trim()
         console.log("✅ Canal encontrado:", canalMatch[1].trim())
       }
 
-      // CNPJ
       const cnpjMatch = data.match(/CNPJ:\s*([^\n]+)/i)
       if (cnpjMatch && cnpjMatch[1].trim() !== "-") {
         updates.cnpj = cnpjMatch[1].trim()
         console.log("✅ CNPJ encontrado:", cnpjMatch[1].trim())
       }
 
-      // Nome do contato
       const contatoMatch = data.match(/Nome do contato:\s*([^\n]+)/i)
       if (contatoMatch) {
         updates.nomeContato = contatoMatch[1].trim()
         console.log("✅ Contato encontrado:", contatoMatch[1].trim())
       }
 
-      // Email
       const emailMatch = data.match(/E-mail:\s*([^\n]+)/i)
       if (emailMatch) {
         updates.email = emailMatch[1].trim()
         console.log("✅ Email encontrado:", emailMatch[1].trim())
       }
 
-      // Cargo
       const cargoMatch = data.match(/Cargo:\s*([^\n]+)/i)
       if (cargoMatch && cargoMatch[1].trim() !== "-") {
         updates.cargoContato = cargoMatch[1].trim()
         console.log("✅ Cargo encontrado:", cargoMatch[1].trim())
       }
 
-      // Telefone
       const telefoneMatch = data.match(/Telefone:\s*([^\n]+)/i)
       if (telefoneMatch) {
         let telefone = telefoneMatch[1].trim()
-        // Remover +55 se existir e formatar
         telefone = telefone.replace(/^\+55/, "").trim()
         updates.telefone = telefone
         console.log("✅ Telefone encontrado:", telefone)
       }
 
-      // Investimento em tráfego
       const investimentoMatch = data.match(/Investimento em tráfego:\s*([^\n]+)/i)
       if (investimentoMatch && investimentoMatch[1].trim() !== "-") {
         updates.investimentoTrafego = investimentoMatch[1].trim()
         console.log("✅ Investimento encontrado:", investimentoMatch[1].trim())
       }
 
-      // Ticket médio
       const ticketMatch = data.match(/Ticket médio:\s*([^\n]+)/i)
       if (ticketMatch && ticketMatch[1].trim() !== "-") {
         updates.ticketMedio = ticketMatch[1].trim()
         console.log("✅ Ticket médio encontrado:", ticketMatch[1].trim())
       }
 
-      // Quantidade de lojas
       const lojasMatch = data.match(/Qtd\.\s*de lojas:\s*([^\n]+)/i)
       if (lojasMatch && lojasMatch[1].trim() !== "-") {
         updates.qtdLojas = lojasMatch[1].trim()
         console.log("✅ Qtd lojas encontrada:", lojasMatch[1].trim())
       }
 
-      // Quantidade de vendedores
       const vendedoresMatch = data.match(/qtd\.\s*de vendedores:\s*([^\n]+)/i)
       if (vendedoresMatch && vendedoresMatch[1].trim() !== "-") {
         updates.qtdVendedores = vendedoresMatch[1].trim()
         console.log("✅ Qtd vendedores encontrada:", vendedoresMatch[1].trim())
       }
 
-      // Descrição do lead (comentário)
       const descricaoMatch = data.match(/Descrição do lead\s*\n\s*([^\n]*)/i)
       if (descricaoMatch) {
         const descricao = descricaoMatch[1].trim()
@@ -359,17 +350,14 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         }
       }
 
-      // Definir origem como LeadBroker por padrão (já que parece ser o formato padrão)
       updates.origemLead = "leadbroker"
       console.log("✅ Origem definida como LeadBroker")
 
-      // Definir status padrão como Backlog
       updates.status = "BACKLOG"
       console.log("✅ Status definido como Backlog")
 
       console.log("📊 Atualizações encontradas:", updates)
 
-      // Aplicar as atualizações ao formulário
       if (Object.keys(updates).length > 0) {
         setFormData((prev) => {
           const newData = { ...prev, ...updates }
@@ -377,11 +365,9 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
           return newData
         })
 
-        // Limpar o campo de auto-fill
         setAutoFillData("")
         console.log("✅ Campo de auto-fill limpo")
 
-        // Mostrar quantos campos foram preenchidos
         console.log(`✅ ${Object.keys(updates).length} campos preenchidos automaticamente`)
       } else {
         console.log("⚠️ Nenhuma informação reconhecida")
@@ -405,18 +391,21 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
   const handleSave = () => {
     console.log("💾 === SALVANDO LEAD ===")
 
-    // Validação básica - CAMPOS OBRIGATÓRIOS
     const requiredFields = [
       "nomeEmpresa",
       "produtoMarketing",
       "nicho",
+      "dataHoraCompra",
       "valorPagoLead",
       "origemLead",
+      "faturamento",
+      "canal",
       "nomeContato",
       "email",
       "telefone",
       "sdr",
       "arrematador",
+      "anuncios",
     ]
 
     const missingFields = requiredFields.filter((field) => {
@@ -433,7 +422,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     onSave({
       ...formData,
       comentario_lead: formData.comentarioLead,
-      tem_comentario_lbf: formData.comentarioLead ? true : false, // Auto-definir baseado no comentário
+      tem_comentario_lbf: formData.comentarioLead ? true : false,
     })
   }
 
@@ -455,7 +444,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* PREENCHIMENTO AUTOMÁTICO NO CABEÇALHO */}
           {!editingLead && (
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center space-x-2 mb-3">
@@ -490,7 +478,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
             </div>
           )}
 
-          {/* Informações Básicas */}
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <h3 className="text-lg font-semibold text-red-900 mb-4">📋 Informações Básicas *</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -527,11 +514,13 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectItem value="Outro">Outro</SelectItem>
                     <SelectItem value="Turismo">Turismo</SelectItem>
                     <SelectItem value="E-commerce">E-commerce</SelectItem>
+                    <SelectItem value="Telecom">Telecom</SelectItem>
+                    <SelectItem value="Educação">Educação</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="dataHoraCompra">Data/Hora da Compra do Lead</Label>
+                <Label htmlFor="dataHoraCompra">Data/Hora da Compra do Lead *</Label>
                 <Input
                   id="dataHoraCompra"
                   type="datetime-local"
@@ -566,15 +555,8 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          </div>
-
-          {/* Informações Complementares */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Informações Complementares</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="faturamento">Faturamento</Label>
+                <Label htmlFor="faturamento">Faturamento *</Label>
                 <Input
                   id="faturamento"
                   placeholder="Ex: De 401 mil à 1 milhão"
@@ -583,7 +565,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                 />
               </div>
               <div>
-                <Label htmlFor="canal">Canal</Label>
+                <Label htmlFor="canal">Canal *</Label>
                 <Input
                   id="canal"
                   placeholder="Digite o canal"
@@ -591,6 +573,12 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                   onChange={(e) => handleInputChange("canal", e.target.value)}
                 />
               </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Informações Complementares</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="nivelUrgencia">Nível de Urgência</Label>
                 <Select
@@ -651,7 +639,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
             </div>
           </div>
 
-          {/* Informações de Contato */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h3 className="text-lg font-semibold text-blue-900 mb-4">👤 Informações de Contato *</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -684,14 +671,14 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                 />
               </div>
               <div>
-                <Label htmlFor="emailCorporativo">E-mail Corporativo</Label>
-                <Input
-                  id="emailCorporativo"
-                  type="email"
-                  placeholder="contato@empresa.com"
-                  value={formData.emailCorporativo}
-                  onChange={(e) => handleInputChange("emailCorporativo", e.target.value)}
-                />
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="emailCorporativo"
+                    checked={formData.emailCorporativo}
+                    onCheckedChange={(checked) => handleInputChange("emailCorporativo", checked)}
+                  />
+                  <Label htmlFor="emailCorporativo">E-mail Corporativo</Label>
+                </div>
               </div>
               <div>
                 <Label htmlFor="telefone">Telefone *</Label>
@@ -705,7 +692,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
             </div>
           </div>
 
-          {/* Equipe e Processo */}
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
             <h3 className="text-lg font-semibold text-green-900 mb-4">👥 Equipe e Processo *</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -754,7 +740,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                 </Select>
               </div>
               <div>
-                <Label htmlFor="anuncios">Anúncios</Label>
+                <Label htmlFor="anuncios">Anúncios *</Label>
                 <Select value={formData.anuncios} onValueChange={(value) => handleInputChange("anuncios", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione uma opção" />
@@ -768,7 +754,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
             </div>
           </div>
 
-          {/* Status e Acompanhamento */}
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <h3 className="text-lg font-semibold text-yellow-900 mb-4">📈 Status e Acompanhamento</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -808,7 +793,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
             </div>
           </div>
 
-          {/* Observações */}
           <div>
             <Label htmlFor="observacoes">📝 Observações</Label>
             <Textarea
@@ -821,7 +805,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
           </div>
         </div>
 
-        {/* Footer Buttons */}
         <div className="flex justify-end space-x-3 border-t pt-4">
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancelar
