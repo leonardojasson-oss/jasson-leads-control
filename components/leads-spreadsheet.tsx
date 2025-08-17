@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, Settings, Eye, EyeOff, Filter } from "lucide-react"
+import { RefreshCw, Settings, Filter } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { Lead } from "@/app/page"
@@ -23,6 +23,9 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   const [openFilterDropdown, setOpenFilterDropdown] = useState<string | null>(null)
   const [tempValue, setTempValue] = useState<string>("")
   const [isEditing, setIsEditing] = useState<boolean>(false)
+  const [isManuallyEdited, setIsManuallyEdited] = useState<boolean>(false)
+  const [editingPreset, setEditingPreset] = useState<string | null>(null)
+  const [presetColumns, setPresetColumns] = useState<Record<string, string[]>>({})
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const scrollPositionRef = useRef<number>(0)
   const isUpdatingRef = useRef<boolean>(false)
@@ -146,6 +149,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       )
       setVisibleColumns(defaultVisible)
     }
+
+    const savedPresets = localStorage.getItem("leadsSpreadsheetPresets")
+    if (savedPresets) {
+      setPresetColumns(JSON.parse(savedPresets))
+    }
   }, [])
 
   useLayoutEffect(() => {
@@ -205,6 +213,15 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   const updateVisibleColumns = (newVisibleColumns: Record<string, boolean>) => {
     setVisibleColumns(newVisibleColumns)
     localStorage.setItem("leadsSpreadsheetColumns", JSON.stringify(newVisibleColumns))
+  }
+
+  const savePresetConfiguration = (presetKey: string, columns: string[]) => {
+    const newPresetColumns = {
+      ...presetColumns,
+      [presetKey]: columns,
+    }
+    setPresetColumns(newPresetColumns)
+    localStorage.setItem("leadsSpreadsheetPresets", JSON.stringify(newPresetColumns))
   }
 
   const handleCellEdit = async (leadId: string, field: string, value: any) => {
@@ -290,7 +307,10 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
               }}
               onOpenChange={(open) => !open && setEditingCell(null)}
             >
-              <SelectTrigger className="h-7 text-xs border-blue-500">
+              <SelectTrigger
+                className="h-7 text-xs border-blue-500 text-center"
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -313,7 +333,10 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
               }}
               onOpenChange={(open) => !open && setEditingCell(null)}
             >
-              <SelectTrigger className="h-7 text-xs border-blue-500">
+              <SelectTrigger
+                className="h-7 text-xs border-blue-500 text-center"
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -354,7 +377,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
                   setTempValue("")
                 }
               }}
-              className="h-7 text-xs border-blue-500"
+              className="h-7 text-xs border-blue-500 text-center"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}
               autoFocus
             />
           )
@@ -390,20 +414,46 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     })()
 
     const isFirstColumn = column.key === "nome_empresa"
-    const alignmentClasses = isFirstColumn ? "justify-start" : "justify-center"
 
     return (
       <div
-        className={`h-8 px-2 py-1 text-xs cursor-pointer hover:bg-gray-100 flex items-center min-h-[32px] ${alignmentClasses}`}
+        className={`h-8 px-2 py-1 text-xs cursor-pointer hover:bg-gray-100 min-h-[32px]`}
         onClick={() => setEditingCell(cellKey)}
         title={`Clique para editar • Valor: ${displayValue}`}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: isFirstColumn ? "flex-start" : "center",
+          height: "32px",
+        }}
       >
         {column.key === "status" || column.key === "tem_comentario_lbf" || column.key === "ns" ? (
-          <Badge className="text-xs" variant="outline">
+          <Badge
+            className="text-xs"
+            variant="outline"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto",
+              textAlign: "center",
+            }}
+          >
             {displayValue}
           </Badge>
         ) : (
-          <span className={`truncate ${isFirstColumn ? "w-full" : "w-full text-center"}`}>{displayValue}</span>
+          <span
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: isFirstColumn ? "flex-start" : "center",
+              width: "100%",
+              textAlign: isFirstColumn ? "left" : "center",
+              height: "100%",
+            }}
+          >
+            {displayValue}
+          </span>
         )}
       </div>
     )
@@ -415,6 +465,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       [columnKey]: !visibleColumns[columnKey],
     }
     updateVisibleColumns(newVisible)
+    setIsManuallyEdited(true)
   }
 
   const getUniqueValues = (columnKey: string): string[] => {
@@ -538,7 +589,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
                   {uniqueValues.map((value, index) => {
                     const isSelected = activeFilters.includes(value)
                     return (
-                      <div key={index} className="flex items-center space-x-2 hover:bg-gray-50 p-1 rounded">
+                      <div key={index} className="flex items-center space-x-2 hover:bg-gray-100 p-1 rounded">
                         <Checkbox
                           id={`${column.key}-${index}`}
                           checked={isSelected}
@@ -555,7 +606,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
                         />
                         <label
                           htmlFor={`${column.key}-${index}`}
-                          className="text-xs cursor-pointer flex-1 truncate"
+                          className="text-xs cursor-pointer flex-1 truncate text-black bg-white"
                           title={value}
                         >
                           {value || "(Vazio)"}
@@ -595,6 +646,107 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   const visibleColumnsArray = columns.filter((col) => visibleColumns[col.key])
   const filteredLeads = applyFilters(leads)
 
+  const presets = {
+    all: {
+      name: "Todas Colunas",
+      emoji: "📋",
+      columns: presetColumns.all || columns.map((col) => col.key),
+    },
+    complete: {
+      name: "Funil Completo",
+      emoji: "🎯",
+      columns: presetColumns.complete || [
+        "nome_empresa",
+        "status",
+        "observacoes",
+        "tem_comentario_lbf",
+        "data_ultimo_contato",
+        "data_hora_compra",
+        "sdr",
+        "conseguiu_contato",
+        "reuniao_agendada",
+        "reuniao_realizada",
+        "ns",
+        "data_venda",
+        "data_fechamento",
+        "faturamento",
+        "produto",
+        "closer",
+        "observacoes_closer",
+        "fee_total",
+        "escopo_fechado",
+        "data_assinatura",
+        "motivo_perda_pv",
+      ],
+    },
+    sdr: {
+      name: "Funil SDR",
+      emoji: "📞",
+      columns: presetColumns.sdr || [
+        "nome_empresa",
+        "status",
+        "observacoes",
+        "tem_comentario_lbf",
+        "data_ultimo_contato",
+        "data_hora_compra",
+        "sdr",
+        "conseguiu_contato",
+        "reuniao_agendada",
+        "reuniao_realizada",
+        "ns",
+        "data_venda",
+        "data_fechamento",
+        "faturamento",
+        "cargo_contato",
+        "produto",
+      ],
+    },
+    closer: {
+      name: "Funil Closer",
+      emoji: "💰",
+      columns: presetColumns.closer || [
+        "nome_empresa",
+        "status",
+        "observacoes",
+        "tem_comentario_lbf",
+        "reuniao_realizada",
+        "data_fechamento",
+        "faturamento",
+        "cargo_contato",
+        "produto",
+        "closer",
+        "observacoes_closer",
+        "fee_total",
+        "escopo_fechado",
+        "data_assinatura",
+        "motivo_perda_pv",
+      ],
+    },
+  }
+
+  const applyPreset = (presetKey: keyof typeof presets) => {
+    const preset = presets[presetKey]
+    const newVisible = columns.reduce(
+      (acc, col) => {
+        acc[col.key] = preset.columns.includes(col.key)
+        return acc
+      },
+      {} as Record<string, boolean>,
+    )
+
+    updateVisibleColumns(newVisible)
+    setIsManuallyEdited(false)
+  }
+
+  const openPresetConfig = (presetKey: string) => {
+    setEditingPreset(presetKey)
+  }
+
+  const savePresetFromModal = (presetKey: string, selectedColumns: string[]) => {
+    savePresetConfiguration(presetKey, selectedColumns)
+    setEditingPreset(null)
+  }
+
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="p-3 border-b border-gray-200 bg-gray-50">
@@ -630,82 +782,69 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
                   <DialogTitle>Configurar Colunas Visíveis</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-semibold mb-2 text-green-700">✅ Colunas Essenciais</h4>
-                      <div className="space-y-2">
-                        {columns
-                          .filter((col) => col.essential)
-                          .map((col) => (
-                            <div key={col.key} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={col.key}
-                                checked={visibleColumns[col.key] || false}
-                                onCheckedChange={() => toggleColumn(col.key)}
-                              />
-                              <label htmlFor={col.key} className="text-sm font-medium">
-                                {col.label}
-                              </label>
-                            </div>
-                          ))}
-                      </div>
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-gray-900">🎯 Presets de Visualização</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {Object.entries(presets).map(([key, preset]) => (
+                        <div key={key} className="flex items-center space-x-1">
+                          <Button
+                            onClick={() => applyPreset(key as keyof typeof presets)}
+                            variant="outline"
+                            size="sm"
+                            className="justify-start flex-1"
+                          >
+                            {preset.emoji} {preset.name}
+                          </Button>
+                          <Button
+                            onClick={() => openPresetConfig(key)}
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 hover:bg-gray-100"
+                            title={`Configurar ${preset.name}`}
+                          >
+                            ⚙️
+                          </Button>
+                        </div>
+                      ))}
                     </div>
-                    <div>
-                      <h4 className="font-semibold mb-2 text-blue-700">📋 Colunas Adicionais</h4>
-                      <div className="space-y-2">
-                        {columns
-                          .filter((col) => !col.essential)
-                          .map((col) => (
-                            <div key={col.key} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={col.key}
-                                checked={visibleColumns[col.key] || false}
-                                onCheckedChange={() => toggleColumn(col.key)}
-                              />
-                              <label htmlFor={col.key} className="text-sm">
-                                {col.label}
-                              </label>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
+                    {isManuallyEdited && (
+                      <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                        ⚠️ Configuração personalizada ativa. Use um preset para resetar.
+                      </p>
+                    )}
                   </div>
+
+                  <div className="grid grid-cols-3 gap-x-4 gap-y-0.5 max-h-96 overflow-y-auto">
+                    {columns.map((col) => (
+                      <div
+                        key={col.key}
+                        className="flex items-center space-x-2 py-0 px-1 hover:bg-gray-50 rounded leading-none"
+                      >
+                        <Checkbox
+                          id={col.key}
+                          checked={visibleColumns[col.key] || false}
+                          onCheckedChange={() => toggleColumn(col.key)}
+                        />
+                        <label htmlFor={col.key} className="text-sm cursor-pointer flex-1 leading-none">
+                          {col.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+
                   <div className="pt-4 border-t">
-                    <div className="flex space-x-2">
-                      <Button
-                        onClick={() => {
-                          const allVisible = columns.reduce(
-                            (acc, col) => {
-                              acc[col.key] = true
-                              return acc
-                            },
-                            {} as Record<string, boolean>,
-                          )
-                          updateVisibleColumns(allVisible)
-                        }}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <Eye className="w-3 h-3 mr-1" />
-                        Mostrar Todas
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          const essentialOnly = columns.reduce(
-                            (acc, col) => {
-                              acc[col.key] = col.essential || false
-                              return acc
-                            },
-                            {} as Record<string, boolean>,
-                          )
-                          updateVisibleColumns(essentialOnly)
-                        }}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <EyeOff className="w-3 h-3 mr-1" />
-                        Apenas Essenciais
-                      </Button>
+                    <div className="grid grid-cols-4 gap-2">
+                      {Object.entries(presets).map(([key, preset]) => (
+                        <Button
+                          key={key}
+                          onClick={() => applyPreset(key as keyof typeof presets)}
+                          variant="outline"
+                          size="sm"
+                          className="justify-center text-xs"
+                        >
+                          {preset.emoji} {preset.name}
+                        </Button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -718,6 +857,72 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
           </div>
         </div>
       </div>
+
+      {editingPreset && (
+        <Dialog open={!!editingPreset} onOpenChange={() => setEditingPreset(null)}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                Configurar {presets[editingPreset as keyof typeof presets]?.emoji}{" "}
+                {presets[editingPreset as keyof typeof presets]?.name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Selecione quais colunas devem ser exibidas quando este preset for aplicado:
+              </p>
+              <div className="grid grid-cols-3 gap-x-4 gap-y-0.5 max-h-96 overflow-y-auto">
+                {columns.map((col) => {
+                  const currentPreset = presets[editingPreset as keyof typeof presets]
+                  const isChecked = currentPreset.columns.includes(col.key)
+                  return (
+                    <div
+                      key={col.key}
+                      className="flex items-center space-x-2 py-0 px-1 hover:bg-gray-50 rounded leading-none"
+                    >
+                      <Checkbox
+                        id={`preset-${col.key}`}
+                        checked={isChecked}
+                        onCheckedChange={(checked) => {
+                          const currentColumns = presets[editingPreset as keyof typeof presets].columns
+                          const newColumns = checked
+                            ? [...currentColumns, col.key]
+                            : currentColumns.filter((c) => c !== col.key)
+
+                          const updatedPresets = {
+                            ...presets,
+                            [editingPreset]: {
+                              ...presets[editingPreset as keyof typeof presets],
+                              columns: newColumns,
+                            },
+                          }
+                          setPresetColumns(updatedPresets)
+                        }}
+                      />
+                      <label htmlFor={`preset-${col.key}`} className="text-sm cursor-pointer flex-1 leading-none">
+                        {col.label}
+                      </label>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="flex justify-end space-x-2 pt-4 border-t">
+                <Button variant="outline" onClick={() => setEditingPreset(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => {
+                    const currentColumns = presets[editingPreset as keyof typeof presets].columns
+                    savePresetFromModal(editingPreset, currentColumns)
+                  }}
+                >
+                  Salvar Configuração
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <div ref={scrollContainerRef} className="overflow-x-auto max-h-[600px] overflow-y-auto">
         <table className="w-full border-collapse">
