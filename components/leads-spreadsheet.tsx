@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, Settings, Eye, EyeOff } from "lucide-react"
+import { RefreshCw, Settings, Eye, EyeOff, Filter } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import type { Lead } from "@/app/page"
 
 interface LeadsSpreadsheetProps {
@@ -19,6 +20,7 @@ interface LeadsSpreadsheetProps {
 export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpreadsheetProps) {
   const [editingCell, setEditingCell] = useState<string | null>(null)
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({})
+  const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({})
   const [tempValue, setTempValue] = useState<string>("")
   const [isEditing, setIsEditing] = useState<boolean>(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -415,7 +417,174 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     updateVisibleColumns(newVisible)
   }
 
+  const getUniqueValues = (columnKey: string): string[] => {
+    const values = leads.map((lead) => {
+      const value = getCellValue(lead, columnKey)
+      if (value === null || value === undefined) return ""
+
+      const column = columns.find((col) => col.key === columnKey)
+      if (column?.type === "boolean") {
+        return value ? "✅" : "❌"
+      }
+      if (column?.type === "number" && (columnKey === "fee_total" || columnKey === "escopo_fechado")) {
+        const numValue = Number(value)
+        return isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+      }
+      if (column?.type === "date" || column?.type === "datetime-local") {
+        if (!value) return ""
+        try {
+          return new Date(value).toLocaleDateString("pt-BR")
+        } catch {
+          return String(value)
+        }
+      }
+      return String(value)
+    })
+
+    return [...new Set(values)].sort()
+  }
+
+  const applyFilters = (leadsToFilter: Lead[]): Lead[] => {
+    return leadsToFilter.filter((lead) => {
+      return Object.entries(columnFilters).every(([columnKey, selectedValues]) => {
+        if (selectedValues.length === 0) return true
+
+        const value = getCellValue(lead, columnKey)
+        const column = columns.find((col) => col.key === columnKey)
+
+        let displayValue = ""
+        if (value === null || value === undefined) {
+          displayValue = ""
+        } else if (column?.type === "boolean") {
+          displayValue = value ? "✅" : "❌"
+        } else if (column?.type === "number" && (columnKey === "fee_total" || columnKey === "escopo_fechado")) {
+          const numValue = Number(value)
+          displayValue = isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+        } else if (column?.type === "date" || column?.type === "datetime-local") {
+          if (!value) {
+            displayValue = ""
+          } else {
+            try {
+              displayValue = new Date(value).toLocaleDateString("pt-BR")
+            } catch {
+              displayValue = String(value)
+            }
+          }
+        } else {
+          displayValue = String(value)
+        }
+
+        return selectedValues.includes(displayValue)
+      })
+    })
+  }
+
+  const updateColumnFilter = (columnKey: string, selectedValues: string[]) => {
+    setColumnFilters((prev) => ({
+      ...prev,
+      [columnKey]: selectedValues,
+    }))
+  }
+
+  const clearColumnFilter = (columnKey: string) => {
+    setColumnFilters((prev) => {
+      const newFilters = { ...prev }
+      delete newFilters[columnKey]
+      return newFilters
+    })
+  }
+
+  const ColumnFilter = ({ column }: { column: any }) => {
+    const uniqueValues = getUniqueValues(column.key)
+    const activeFilters = columnFilters[column.key] || []
+    const hasActiveFilter = activeFilters.length > 0
+
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-6 w-6 p-0 hover:bg-red-500 ${hasActiveFilter ? "bg-red-500 text-white" : "text-white"}`}
+          >
+            <Filter className="h-3 w-3" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-64 p-0" align="start">
+          <div className="p-3 border-b">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-sm">Filtrar {column.label}</span>
+              {hasActiveFilter && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => clearColumnFilter(column.key)}
+                  className="h-6 px-2 text-xs"
+                >
+                  Limpar
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            <div className="p-2 space-y-1">
+              {uniqueValues.map((value, index) => {
+                const isSelected = activeFilters.includes(value)
+                return (
+                  <div key={index} className="flex items-center space-x-2 hover:bg-gray-50 p-1 rounded">
+                    <Checkbox
+                      id={`${column.key}-${index}`}
+                      checked={isSelected}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          updateColumnFilter(column.key, [...activeFilters, value])
+                        } else {
+                          updateColumnFilter(
+                            column.key,
+                            activeFilters.filter((v) => v !== value),
+                          )
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor={`${column.key}-${index}`}
+                      className="text-xs cursor-pointer flex-1 truncate"
+                      title={value}
+                    >
+                      {value || "(Vazio)"}
+                    </label>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+          <div className="p-2 border-t bg-gray-50">
+            <div className="flex space-x-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => updateColumnFilter(column.key, uniqueValues)}
+                className="flex-1 h-7 text-xs"
+              >
+                Todos
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => updateColumnFilter(column.key, [])}
+                className="flex-1 h-7 text-xs"
+              >
+                Nenhum
+              </Button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    )
+  }
+
   const visibleColumnsArray = columns.filter((col) => visibleColumns[col.key])
+  const filteredLeads = applyFilters(leads)
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
@@ -426,8 +595,20 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
             <span className="text-sm text-gray-500">
               {visibleColumnsArray.length}/{columns.length} colunas
             </span>
+            {Object.keys(columnFilters).length > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                <Filter className="w-3 h-3 mr-1" />
+                {Object.keys(columnFilters).length} filtro(s) ativo(s)
+              </Badge>
+            )}
           </div>
           <div className="flex items-center space-x-2">
+            {Object.keys(columnFilters).length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => setColumnFilters({})} className="h-8 bg-transparent">
+                <Filter className="w-3 h-3 mr-1" />
+                Limpar Filtros
+              </Button>
+            )}
             <Dialog>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 bg-transparent">
@@ -536,17 +717,20 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
               {visibleColumnsArray.map((column) => (
                 <th
                   key={column.key}
-                  className="px-2 py-3 text-xs font-bold uppercase border-r border-red-500 text-center"
+                  className="px-2 py-3 text-xs font-bold uppercase border-r border-red-500 text-center relative"
                   style={{ minWidth: column.width, width: column.width }}
                 >
-                  {column.label}
+                  <div className="flex items-center justify-center space-x-1">
+                    <span className="flex-1">{column.label}</span>
+                    <ColumnFilter column={column} />
+                  </div>
                 </th>
               ))}
             </tr>
           </thead>
 
           <tbody>
-            {leads.map((lead, index) => (
+            {filteredLeads.map((lead, index) => (
               <tr
                 key={lead.id}
                 className={`border-b border-gray-200 hover:bg-gray-50 ${index % 2 === 0 ? "bg-white" : "bg-gray-25"}`}
@@ -569,8 +753,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       <div className="p-2 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <span>📋 {leads.length} leads</span>
+            <span>
+              📋 {filteredLeads.length} de {leads.length} leads
+            </span>
             <span>👁️ {visibleColumnsArray.length} colunas visíveis</span>
+            {Object.keys(columnFilters).length > 0 && <span className="text-blue-600">🔍 Filtros ativos</span>}
           </div>
           <span className="text-blue-600 font-medium">💾 Scroll inteligente ativo</span>
         </div>
