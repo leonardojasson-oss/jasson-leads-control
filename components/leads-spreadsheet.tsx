@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import { RefreshCw, Settings, Eye, EyeOff, Filter } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import type { Lead } from "@/app/page"
 
 interface LeadsSpreadsheetProps {
@@ -21,6 +20,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   const [editingCell, setEditingCell] = useState<string | null>(null)
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({})
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({})
+  const [openFilterDropdown, setOpenFilterDropdown] = useState<string | null>(null)
   const [tempValue, setTempValue] = useState<string>("")
   const [isEditing, setIsEditing] = useState<boolean>(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -498,88 +498,97 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     const uniqueValues = getUniqueValues(column.key)
     const activeFilters = columnFilters[column.key] || []
     const hasActiveFilter = activeFilters.length > 0
+    const isOpen = openFilterDropdown === column.key
 
     return (
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`h-6 w-6 p-0 hover:bg-red-500 ${hasActiveFilter ? "bg-red-500 text-white" : "text-white"}`}
-          >
-            <Filter className="h-3 w-3" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-64 p-0" align="start">
-          <div className="p-3 border-b">
-            <div className="flex items-center justify-between">
-              <span className="font-medium text-sm">Filtrar {column.label}</span>
-              {hasActiveFilter && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => clearColumnFilter(column.key)}
-                  className="h-6 px-2 text-xs"
-                >
-                  Limpar
-                </Button>
-              )}
-            </div>
-          </div>
-          <div className="max-h-64 overflow-y-auto">
-            <div className="p-2 space-y-1">
-              {uniqueValues.map((value, index) => {
-                const isSelected = activeFilters.includes(value)
-                return (
-                  <div key={index} className="flex items-center space-x-2 hover:bg-gray-50 p-1 rounded">
-                    <Checkbox
-                      id={`${column.key}-${index}`}
-                      checked={isSelected}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          updateColumnFilter(column.key, [...activeFilters, value])
-                        } else {
-                          updateColumnFilter(
-                            column.key,
-                            activeFilters.filter((v) => v !== value),
-                          )
-                        }
-                      }}
-                    />
-                    <label
-                      htmlFor={`${column.key}-${index}`}
-                      className="text-xs cursor-pointer flex-1 truncate"
-                      title={value}
+      <div className="relative">
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`h-6 w-6 p-0 hover:bg-red-500 ${hasActiveFilter ? "bg-red-500 text-white" : "text-white"}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            setOpenFilterDropdown(isOpen ? null : column.key)
+          }}
+        >
+          <Filter className="h-3 w-3" />
+        </Button>
+
+        {isOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setOpenFilterDropdown(null)} />
+            <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+              <div className="p-3 border-b">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">Filtrar {column.label}</span>
+                  {hasActiveFilter && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => clearColumnFilter(column.key)}
+                      className="h-6 px-2 text-xs"
                     >
-                      {value || "(Vazio)"}
-                    </label>
-                  </div>
-                )
-              })}
+                      Limpar
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                <div className="p-2 space-y-1">
+                  {uniqueValues.map((value, index) => {
+                    const isSelected = activeFilters.includes(value)
+                    return (
+                      <div key={index} className="flex items-center space-x-2 hover:bg-gray-50 p-1 rounded">
+                        <Checkbox
+                          id={`${column.key}-${index}`}
+                          checked={isSelected}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              updateColumnFilter(column.key, [...activeFilters, value])
+                            } else {
+                              updateColumnFilter(
+                                column.key,
+                                activeFilters.filter((v) => v !== value),
+                              )
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={`${column.key}-${index}`}
+                          className="text-xs cursor-pointer flex-1 truncate"
+                          title={value}
+                        >
+                          {value || "(Vazio)"}
+                        </label>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              <div className="p-2 border-t bg-gray-50">
+                <div className="flex space-x-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => updateColumnFilter(column.key, uniqueValues)}
+                    className="flex-1 h-7 text-xs"
+                  >
+                    Todos
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => updateColumnFilter(column.key, [])}
+                    className="flex-1 h-7 text-xs"
+                  >
+                    Nenhum
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="p-2 border-t bg-gray-50">
-            <div className="flex space-x-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => updateColumnFilter(column.key, uniqueValues)}
-                className="flex-1 h-7 text-xs"
-              >
-                Todos
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => updateColumnFilter(column.key, [])}
-                className="flex-1 h-7 text-xs"
-              >
-                Nenhum
-              </Button>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
+          </>
+        )}
+      </div>
     )
   }
 
