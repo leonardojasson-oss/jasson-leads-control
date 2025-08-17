@@ -86,10 +86,10 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       essential: true,
       options: ["leadbroker", "organico", "indicacao", "facebook", "google", "linkedin"],
     },
-    { key: "conseguiu_contato", label: "CS", width: "60px", type: "boolean" },
-    { key: "reuniao_agendada", label: "RM", width: "60px", type: "boolean" },
-    { key: "reuniao_realizada", label: "RR", width: "60px", type: "boolean" },
-    { key: "ns", label: "NS", width: "60px", type: "boolean" },
+    { key: "conseguiu_contato", label: "CS", width: "60px", type: "tristate" },
+    { key: "reuniao_agendada", label: "RM", width: "60px", type: "tristate" },
+    { key: "reuniao_realizada", label: "RR", width: "60px", type: "tristate" },
+    { key: "ns", label: "NS", width: "60px", type: "tristate" },
     { key: "data_venda", label: "DATA DA MARCAÇÃO", width: "150px", type: "date" },
     { key: "data_fechamento", label: "DATA DA REUNIÃO", width: "150px", type: "date" },
     { key: "faturamento", label: "FATURAMENTO", width: "150px", type: "text" },
@@ -302,6 +302,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         return String(value || "")
       case "boolean":
         return value
+      case "tristate":
+        return value === true ? "true" : value === false ? "false" : ""
       default:
         return String(value || "")
     }
@@ -341,11 +343,13 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
           )
 
         case "boolean":
+        case "tristate":
           return (
             <Select
-              value={value ? "true" : "false"}
+              value={value ? "true" : value === false ? "false" : "none"}
               onValueChange={(newValue) => {
-                handleCellEdit(lead.id, column.key, newValue === "true")
+                const finalValue = newValue === "true" ? true : newValue === "false" ? false : null
+                handleCellEdit(lead.id, column.key, finalValue)
                 setEditingCell(null)
               }}
               onOpenChange={(open) => !open && setEditingCell(null)}
@@ -357,8 +361,9 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="true">✅</SelectItem>
+                <SelectItem value="none">Em branco</SelectItem>
                 <SelectItem value="false">❌</SelectItem>
+                <SelectItem value="true">✅</SelectItem>
               </SelectContent>
             </Select>
           )
@@ -405,7 +410,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     const displayValue = (() => {
       switch (column.type) {
         case "boolean":
-          return value ? "✅" : "❌"
+        case "tristate":
+          return value === true ? "✅" : value === false ? "❌" : ""
         case "date":
         case "datetime-local":
           if (!value) return ""
@@ -444,7 +450,12 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
           height: "32px",
         }}
       >
-        {column.key === "status" || column.key === "tem_comentario_lbf" || column.key === "ns" ? (
+        {column.key === "status" ||
+        column.key === "tem_comentario_lbf" ||
+        column.key === "ns" ||
+        column.key === "conseguiu_contato" ||
+        column.key === "reuniao_agendada" ||
+        column.key === "reuniao_realizada" ? (
           <Badge
             className="text-xs"
             variant="outline"
@@ -491,8 +502,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       if (value === null || value === undefined) return ""
 
       const column = columns.find((col) => col.key === columnKey)
-      if (column?.type === "boolean") {
-        return value ? "✅" : "❌"
+      if (column?.type === "boolean" || column?.type === "tristate") {
+        return value ? "✅" : value === false ? "❌" : ""
       }
       if (column?.type === "number" && (columnKey === "fee_total" || columnKey === "escopo_fechado")) {
         const numValue = Number(value)
@@ -523,8 +534,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         let displayValue = ""
         if (value === null || value === undefined) {
           displayValue = ""
-        } else if (column?.type === "boolean") {
-          displayValue = value ? "✅" : "❌"
+        } else if (column?.type === "boolean" || column?.type === "tristate") {
+          displayValue = value ? "✅" : value === false ? "❌" : ""
         } else if (column?.type === "number" && (columnKey === "fee_total" || columnKey === "escopo_fechado")) {
           const numValue = Number(value)
           displayValue = isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })

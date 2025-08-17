@@ -66,6 +66,10 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     comissaoSDR: "",
     comissaoCloser: "",
     statusComissao: "",
+    cs: null,
+    rm: null,
+    rr: null,
+    ns: null,
   })
 
   const [autoFillData, setAutoFillData] = useState("")
@@ -118,6 +122,10 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         comissaoSDR: "",
         comissaoCloser: "",
         statusComissao: "",
+        cs: null,
+        rm: null,
+        rr: null,
+        ns: null,
       })
       setAutoFillData("")
     }
@@ -169,6 +177,10 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         comissaoSDR: editingLead.comissao_sdr || "",
         comissaoCloser: editingLead.comissao_closer || "",
         statusComissao: editingLead.status_comissao || "",
+        cs: editingLead.cs !== undefined ? editingLead.cs : null,
+        rm: editingLead.rm !== undefined ? editingLead.rm : null,
+        rr: editingLead.rr !== undefined ? editingLead.rr : null,
+        ns: editingLead.ns !== undefined ? editingLead.ns : null,
       })
     }
   }, [editingLead, isOpen])
@@ -260,6 +272,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
           financas: "Finanças",
           finanças: "Finanças",
           franquia: "Franquia",
+          "franquia / franchising": "Franquia",
           telecom: "Telecom",
           "energia solar": "Energia Solar",
           turismo: "Turismo",
@@ -285,23 +298,12 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
 
       const canalMatch = data.match(/Canal:\s*([^\n]+)/i)
       if (canalMatch && canalMatch[1].trim() !== "-") {
-        const canalValue = canalMatch[1].trim().toLowerCase()
-
-        const origemMap: { [key: string]: string } = {
-          leadbroker: "leadbroker",
-          "lead broker": "leadbroker",
-          orgânico: "organico",
-          organico: "organico",
-          indicação: "indicacao",
-          indicacao: "indicacao",
-          facebook: "facebook",
-          google: "google",
-          linkedin: "linkedin",
-        }
-
-        updates.origemLead = origemMap[canalValue] || "leadbroker"
-        console.log("✅ Origem do Lead encontrada:", updates.origemLead)
+        updates.canal = canalMatch[1].trim()
+        console.log("✅ Canal encontrado:", updates.canal)
       }
+
+      updates.origemLead = "leadbroker"
+      console.log("✅ Origem do Lead definida como: LeadBroker")
 
       const cnpjMatch = data.match(/CNPJ:\s*([^\n]+)/i)
       if (cnpjMatch && cnpjMatch[1].trim() !== "-") {
@@ -424,6 +426,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
       "faturamento",
       "canal",
       "nomeContato",
+      "cargoContato",
       "email",
       "telefone",
       "sdr",
@@ -446,6 +449,10 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
       ...formData,
       comentario_lead: formData.comentarioLead,
       tem_comentario_lbf: formData.comentarioLead ? true : false,
+      cs: formData.cs,
+      rm: formData.rm,
+      rr: formData.rr,
+      ns: formData.ns,
     })
   }
 
@@ -680,7 +687,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                 />
               </div>
               <div>
-                <Label htmlFor="cargoContato">Cargo do Contato</Label>
+                <Label htmlFor="cargoContato">Cargo do Contato *</Label>
                 <Select
                   value={formData.cargoContato}
                   onValueChange={(value) => handleInputChange("cargoContato", value)}
@@ -699,7 +706,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectItem value="Analista">Analista</SelectItem>
                     <SelectItem value="Assistente / Funcionário">Assistente / Funcionário</SelectItem>
                     <SelectItem value="Outros">Outros</SelectItem>
-                    <SelectItem value="Não preenchido">Não preenchido</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
