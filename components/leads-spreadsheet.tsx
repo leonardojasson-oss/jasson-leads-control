@@ -26,6 +26,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   const [isManuallyEdited, setIsManuallyEdited] = useState<boolean>(false)
   const [editingPreset, setEditingPreset] = useState<string | null>(null)
   const [presetColumns, setPresetColumns] = useState<Record<string, string[]>>({})
+  const [tempPresetColumns, setTempPresetColumns] = useState<string[]>([])
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const scrollPositionRef = useRef<number>(0)
   const isUpdatingRef = useRef<boolean>(false)
@@ -740,11 +741,14 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
 
   const openPresetConfig = (presetKey: string) => {
     setEditingPreset(presetKey)
+    const currentPreset = presets[presetKey as keyof typeof presets]
+    setTempPresetColumns([...currentPreset.columns])
   }
 
   const savePresetFromModal = (presetKey: string, selectedColumns: string[]) => {
     savePresetConfiguration(presetKey, selectedColumns)
     setEditingPreset(null)
+    setTempPresetColumns([])
   }
 
   return (
@@ -859,7 +863,13 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       </div>
 
       {editingPreset && (
-        <Dialog open={!!editingPreset} onOpenChange={() => setEditingPreset(null)}>
+        <Dialog
+          open={!!editingPreset}
+          onOpenChange={() => {
+            setEditingPreset(null)
+            setTempPresetColumns([])
+          }}
+        >
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
@@ -873,8 +883,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
               </p>
               <div className="grid grid-cols-3 gap-x-4 gap-y-0.5 max-h-96 overflow-y-auto">
                 {columns.map((col) => {
-                  const currentPreset = presets[editingPreset as keyof typeof presets]
-                  const isChecked = currentPreset.columns.includes(col.key)
+                  const isChecked = tempPresetColumns.includes(col.key)
                   return (
                     <div
                       key={col.key}
@@ -884,19 +893,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
                         id={`preset-${col.key}`}
                         checked={isChecked}
                         onCheckedChange={(checked) => {
-                          const currentColumns = presets[editingPreset as keyof typeof presets].columns
-                          const newColumns = checked
-                            ? [...currentColumns, col.key]
-                            : currentColumns.filter((c) => c !== col.key)
-
-                          const updatedPresets = {
-                            ...presets,
-                            [editingPreset]: {
-                              ...presets[editingPreset as keyof typeof presets],
-                              columns: newColumns,
-                            },
+                          if (checked) {
+                            setTempPresetColumns((prev) => [...prev, col.key])
+                          } else {
+                            setTempPresetColumns((prev) => prev.filter((c) => c !== col.key))
                           }
-                          setPresetColumns(updatedPresets)
                         }}
                       />
                       <label htmlFor={`preset-${col.key}`} className="text-sm cursor-pointer flex-1 leading-none">
@@ -907,13 +908,18 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
                 })}
               </div>
               <div className="flex justify-end space-x-2 pt-4 border-t">
-                <Button variant="outline" onClick={() => setEditingPreset(null)}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditingPreset(null)
+                    setTempPresetColumns([])
+                  }}
+                >
                   Cancelar
                 </Button>
                 <Button
                   onClick={() => {
-                    const currentColumns = presets[editingPreset as keyof typeof presets].columns
-                    savePresetFromModal(editingPreset, currentColumns)
+                    savePresetFromModal(editingPreset, tempPresetColumns)
                   }}
                 >
                   Salvar Configuração
