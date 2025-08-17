@@ -113,7 +113,6 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     { key: "regiao", label: "REGIÃO", width: "120px", type: "text" },
     { key: "cargo_contato", label: "CARGO", width: "120px", type: "text" },
     { key: "email", label: "EMAIL", width: "200px", type: "email" },
-    { key: "produto", label: "PRODUTO", width: "150px", type: "text" },
     {
       key: "anuncios",
       label: "ANÚNCIOS",
@@ -132,6 +131,23 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     { key: "observacoes_closer", label: "OBSERVAÇÕES CLOSER", width: "200px", type: "text" },
     { key: "fee_total", label: "FEE MRR", width: "100px", type: "number" },
     { key: "escopo_fechado", label: "FEE ONE-TIME", width: "150px", type: "number" },
+    {
+      key: "produto",
+      label: "PRODUTO",
+      width: "150px",
+      type: "select",
+      options: [
+        "E.C",
+        "E.E",
+        "Assessoria",
+        "E.E + E.C",
+        "Assessoria + E.C",
+        "Assessoria + E.E",
+        "MIV",
+        "Site",
+        "Social Media",
+      ],
+    },
     { key: "data_assinatura", label: "DATA DE ASSINATURA", width: "150px", type: "date" },
     { key: "motivo_perda_pv", label: "MOTIVO DE PERDA", width: "150px", type: "text" },
   ]

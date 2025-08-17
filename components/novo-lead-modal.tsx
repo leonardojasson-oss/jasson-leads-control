@@ -249,12 +249,21 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
           varejo: "Varejo",
           industria: "Indústria",
           indústria: "Indústria",
-          assessoria: "Assessoria",
-          turismo: "Turismo",
           "e-commerce": "E-commerce",
           ecommerce: "E-commerce",
-          telecom: "Telecom",
+          "food service": "Food Service",
           educacao: "Educação",
+          educação: "Educação",
+          imobiliaria: "Imobiliária",
+          imobiliária: "Imobiliária",
+          saas: "SAAS",
+          financas: "Finanças",
+          finanças: "Finanças",
+          franquia: "Franquia",
+          telecom: "Telecom",
+          "energia solar": "Energia Solar",
+          turismo: "Turismo",
+          outro: "Outro",
         }
         updates.nicho = nichoMap[segmento.toLowerCase()] || segmento
         console.log("✅ Nicho encontrado:", updates.nicho)
@@ -276,8 +285,22 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
 
       const canalMatch = data.match(/Canal:\s*([^\n]+)/i)
       if (canalMatch && canalMatch[1].trim() !== "-") {
-        updates.canal = canalMatch[1].trim()
-        console.log("✅ Canal encontrado:", canalMatch[1].trim())
+        const canalValue = canalMatch[1].trim().toLowerCase()
+
+        const origemMap: { [key: string]: string } = {
+          leadbroker: "leadbroker",
+          "lead broker": "leadbroker",
+          orgânico: "organico",
+          organico: "organico",
+          indicação: "indicacao",
+          indicacao: "indicacao",
+          facebook: "facebook",
+          google: "google",
+          linkedin: "linkedin",
+        }
+
+        updates.origemLead = origemMap[canalValue] || "leadbroker"
+        console.log("✅ Origem do Lead encontrada:", updates.origemLead)
       }
 
       const cnpjMatch = data.match(/CNPJ:\s*([^\n]+)/i)
@@ -299,9 +322,15 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
       }
 
       const cargoMatch = data.match(/Cargo:\s*([^\n]+)/i)
-      if (cargoMatch && cargoMatch[1].trim() !== "-") {
-        updates.cargoContato = cargoMatch[1].trim()
-        console.log("✅ Cargo encontrado:", cargoMatch[1].trim())
+      if (cargoMatch) {
+        const cargoValue = cargoMatch[1].trim()
+        if (cargoValue === "-") {
+          updates.cargoContato = "Não preenchido"
+          console.log("✅ Cargo não preenchido, definido como 'Não preenchido'")
+        } else {
+          updates.cargoContato = cargoValue
+          console.log("✅ Cargo encontrado:", cargoValue)
+        }
       }
 
       const telefoneMatch = data.match(/Telefone:\s*([^\n]+)/i)
@@ -349,12 +378,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
           console.log("✅ Lead sem comentário (descrição vazia ou '-')")
         }
       }
-
-      updates.origemLead = "leadbroker"
-      console.log("✅ Origem definida como LeadBroker")
-
-      updates.status = "BACKLOG"
-      console.log("✅ Status definido como Backlog")
 
       console.log("📊 Atualizações encontradas:", updates)
 
@@ -506,16 +529,21 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectValue placeholder="Selecione o nicho" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Estruturação Estratégica">Estruturação Estratégica</SelectItem>
-                    <SelectItem value="Assessoria">Assessoria</SelectItem>
-                    <SelectItem value="Varejo">Varejo</SelectItem>
                     <SelectItem value="Serviço">Serviço</SelectItem>
+                    <SelectItem value="Varejo">Varejo</SelectItem>
                     <SelectItem value="Indústria">Indústria</SelectItem>
-                    <SelectItem value="Outro">Outro</SelectItem>
-                    <SelectItem value="Turismo">Turismo</SelectItem>
                     <SelectItem value="E-commerce">E-commerce</SelectItem>
-                    <SelectItem value="Telecom">Telecom</SelectItem>
+                    <SelectItem value="Food Service">Food Service</SelectItem>
                     <SelectItem value="Educação">Educação</SelectItem>
+                    <SelectItem value="Imobiliária">Imobiliária</SelectItem>
+                    <SelectItem value="SAAS">SAAS</SelectItem>
+                    <SelectItem value="Finanças">Finanças</SelectItem>
+                    <SelectItem value="Franquia">Franquia</SelectItem>
+                    <SelectItem value="Telecom">Telecom</SelectItem>
+                    <SelectItem value="Energia Solar">Energia Solar</SelectItem>
+                    <SelectItem value="Turismo">Turismo</SelectItem>
+                    <SelectItem value="Outro">Outro</SelectItem>
+                    <SelectItem value="Não preenchido">Não preenchido</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -653,12 +681,27 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
               </div>
               <div>
                 <Label htmlFor="cargoContato">Cargo do Contato</Label>
-                <Input
-                  id="cargoContato"
-                  placeholder="Ex: Diretor, Gerente, etc."
+                <Select
                   value={formData.cargoContato}
-                  onChange={(e) => handleInputChange("cargoContato", e.target.value)}
-                />
+                  onValueChange={(value) => handleInputChange("cargoContato", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o cargo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Proprietário(a)">Proprietário(a)</SelectItem>
+                    <SelectItem value="Sócio(a)">Sócio(a)</SelectItem>
+                    <SelectItem value="CEO / Diretor(a) executivo(a)">CEO / Diretor(a) executivo(a)</SelectItem>
+                    <SelectItem value="Diretor(a)">Diretor(a)</SelectItem>
+                    <SelectItem value="Gerente">Gerente</SelectItem>
+                    <SelectItem value="Supervisor(a)">Supervisor(a)</SelectItem>
+                    <SelectItem value="Coordenador(a)">Coordenador(a)</SelectItem>
+                    <SelectItem value="Analista">Analista</SelectItem>
+                    <SelectItem value="Assistente / Funcionário">Assistente / Funcionário</SelectItem>
+                    <SelectItem value="Outros">Outros</SelectItem>
+                    <SelectItem value="Não preenchido">Não preenchido</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="email">E-mail *</Label>
