@@ -572,7 +572,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
             <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg z-50">
               <div className="p-3 border-b">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-sm">Filtrar {column.label}</span>
+                  <span className="font-medium text-sm text-black">FILTRAR {column.label}</span>
                   {hasActiveFilter && (
                     <Button
                       variant="ghost"
@@ -623,7 +623,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
                     variant="outline"
                     size="sm"
                     onClick={() => updateColumnFilter(column.key, uniqueValues)}
-                    className="flex-1 h-7 text-xs"
+                    className="flex-1 h-7 text-xs bg-white hover:bg-gray-100 border-gray-300"
+                    style={{ color: "#000000" }}
                   >
                     Todos
                   </Button>
@@ -631,7 +632,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
                     variant="outline"
                     size="sm"
                     onClick={() => updateColumnFilter(column.key, [])}
-                    className="flex-1 h-7 text-xs"
+                    className="flex-1 h-7 text-xs bg-white hover:bg-gray-100 border-gray-300"
+                    style={{ color: "#000000" }}
                   >
                     Nenhum
                   </Button>
