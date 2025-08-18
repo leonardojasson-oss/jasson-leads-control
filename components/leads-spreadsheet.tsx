@@ -950,6 +950,54 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
                 </div>
               </DialogContent>
             </Dialog>
+            {editingPreset && (
+              <Dialog open={!!editingPreset} onOpenChange={() => setEditingPreset(null)}>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>
+                      Configurar {presets[editingPreset as keyof typeof presets]?.emoji}{" "}
+                      {presets[editingPreset as keyof typeof presets]?.name}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600">Selecione as colunas que devem aparecer neste preset:</p>
+
+                    <div className="grid grid-cols-3 gap-x-4 gap-y-0.5 max-h-96 overflow-y-auto">
+                      {columns.map((col) => (
+                        <div
+                          key={col.key}
+                          className="flex items-center space-x-2 py-0 px-1 hover:bg-gray-50 rounded leading-none"
+                        >
+                          <Checkbox
+                            id={`preset-${col.key}`}
+                            checked={tempPresetColumns.includes(col.key)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setTempPresetColumns([...tempPresetColumns, col.key])
+                              } else {
+                                setTempPresetColumns(tempPresetColumns.filter((k) => k !== col.key))
+                              }
+                            }}
+                          />
+                          <label htmlFor={`preset-${col.key}`} className="text-sm cursor-pointer flex-1 leading-none">
+                            {col.label}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex justify-end space-x-2 pt-4 border-t">
+                      <Button variant="outline" onClick={() => setEditingPreset(null)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={() => savePresetFromModal(editingPreset, tempPresetColumns)}>
+                        Salvar Configuração
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
             <Button variant="outline" onClick={onRefresh} size="sm" className="h-8 bg-transparent">
               <RefreshCw className="w-3 h-3 mr-1" />
               Atualizar
