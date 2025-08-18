@@ -54,18 +54,17 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       options: [
         "BACKLOG",
         "TENTANDO CONTATO",
-        "CONTATO AGENDADO",
+        "QUALI AGENDADA",
         "QUALIFICANDO",
         "REUNIÃO AGENDADA",
-        "REUNIÃO",
         "REUNIÃO REALIZADA",
         "DÚVIDAS E FECHAMENTO",
         "CONTRATO NA RUA",
         "GANHO",
         "FOLLOW UP",
+        "FOLLOW INFINITO",
         "NO-SHOW",
         "DROPADO",
-        "FOLLOW INFINITO",
       ],
     },
     { key: "observacoes", label: "OBSERVAÇÕES SDR", width: "200px", type: "text", essential: true },
@@ -159,7 +158,22 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       ],
     },
     { key: "data_assinatura", label: "DATA DE ASSINATURA", width: "150px", type: "date" },
-    { key: "motivo_perda_pv", label: "MOTIVO DE PERDA", width: "150px", type: "text" },
+    {
+      key: "motivo_perda_pv",
+      label: "MOTIVO DE PERDA",
+      width: "150px",
+      type: "select",
+      options: [
+        "Parou de responder SDR",
+        "Fora do ICP",
+        "Sem verba",
+        "Sem prioridade no momento",
+        "Preferiu concorrente",
+        "Parou de responder Closer",
+        "Sem estrutura interna",
+        "Preferiu internalizar",
+      ],
+    },
   ]
 
   useEffect(() => {
@@ -260,6 +274,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
 
     let updates: Partial<Lead> = { [field]: value }
 
+    // Regra: Se DATA DE ASSINATURA for preenchida → STATUS = "GANHO"
     if (field === "data_assinatura" && value && value.trim() !== "") {
       updates = {
         ...updates,
@@ -267,10 +282,25 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         venda_via_jasson_co: true,
         status: "GANHO",
       }
-      console.log("[v0] DATA DE ASSINATURA preenchida - marcando como venda automática:", {
+      console.log("[v0] DATA DE ASSINATURA preenchida - STATUS alterado para GANHO:", {
         leadId,
         data_assinatura: value,
       })
+    }
+    // Regra: Se RM = ✅ → STATUS = "REUNIÃO AGENDADA"
+    else if (field === "reuniao_agendada" && value === true) {
+      updates.status = "REUNIÃO AGENDADA"
+      console.log("[v0] RM marcado como ✅ - STATUS alterado para REUNIÃO AGENDADA:", leadId)
+    }
+    // Regra: Se RR = ✅ → STATUS = "REUNIÃO REALIZADA"
+    else if (field === "reuniao_realizada" && value === true) {
+      updates.status = "REUNIÃO REALIZADA"
+      console.log("[v0] RR marcado como ✅ - STATUS alterado para REUNIÃO REALIZADA:", leadId)
+    }
+    // Regra: Se RR = ❌ → STATUS = "NO-SHOW"
+    else if (field === "reuniao_realizada" && value === false) {
+      updates.status = "NO-SHOW"
+      console.log("[v0] RR marcado como ❌ - STATUS alterado para NO-SHOW:", leadId)
     }
 
     try {
@@ -618,7 +648,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
             <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg z-50">
               <div className="p-3 border-b">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-sm text-black">FILTRAR {column.label}</span>
+                  <span className="font-medium text-sm text-gray-700">FILTRAR {column.label}</span>
                   {hasActiveFilter && (
                     <Button
                       variant="ghost"

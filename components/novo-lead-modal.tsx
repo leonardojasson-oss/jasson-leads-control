@@ -97,7 +97,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         closer: "",
         arrematador: "",
         anuncios: "",
-        status: "",
+        status: "BACKLOG",
         observacoes: "",
         dataUltimoContato: "",
         motivoPerdaPV: "",
@@ -300,7 +300,9 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
       }
 
       updates.origemLead = "leadbroker"
+      updates.status = "BACKLOG"
       console.log("✅ Origem do Lead definida como: LeadBroker")
+      console.log("✅ STATUS inicial definido como: BACKLOG")
 
       const cnpjMatch = data.match(/CNPJ:\s*([^\n]+)/i)
       if (cnpjMatch && cnpjMatch[1].trim() !== "-") {
