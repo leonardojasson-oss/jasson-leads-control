@@ -65,10 +65,12 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         "FOLLOW INFINITO",
         "NO-SHOW",
         "DROPADO",
+        "PERDIDO",
       ],
     },
     { key: "observacoes", label: "OBSERVAÇÕES SDR", width: "200px", type: "text", essential: true },
     { key: "tem_comentario_lbf", label: "COMENTÁRIO NO FORMS", width: "200px", type: "boolean", essential: true },
+    { key: "link_bant", label: "LINK BANT", width: "180px", type: "text", essential: true },
     { key: "data_ultimo_contato", label: "DATA ÚLTIMO CONTATO", width: "150px", type: "date", essential: true },
     { key: "data_hora_compra", label: "DATA DA COMPRA", width: "150px", type: "datetime-local", essential: true },
     {
@@ -301,6 +303,12 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     else if (field === "reuniao_realizada" && value === false) {
       updates.status = "NO-SHOW"
       console.log("[v0] RR marcado como ❌ - STATUS alterado para NO-SHOW:", leadId)
+    } else if (field === "motivo_perda" && value && value.trim() !== "") {
+      updates.status = "PERDIDO"
+      console.log("[v0] MOTIVO DE PERDA preenchido - STATUS alterado para PERDIDO:", {
+        leadId,
+        motivo_perda: value,
+      })
     }
 
     try {
@@ -341,9 +349,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       case "number":
         return String(value || "")
       case "boolean":
-        return value
+        return value ? "✅" : "❌"
       case "tristate":
         return value === true ? "true" : value === false ? "false" : ""
+      case "text":
+        return value || ""
       default:
         return String(value || "")
     }
@@ -474,6 +484,24 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
           return Number(value).toLocaleString("pt-BR")
         case "email":
           return String(value || "")
+        case "text":
+          if (column.key === "link_bant" && value && typeof value === "string") {
+            const isValidUrl = value.startsWith("http://") || value.startsWith("https://")
+            if (isValidUrl) {
+              return (
+                <a
+                  href={value}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800 underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {value.length > 30 ? `${value.substring(0, 30)}...` : value}
+                </a>
+              )
+            }
+          }
+          return value || ""
         default:
           return String(value || "")
       }
@@ -778,6 +806,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         "status",
         "observacoes",
         "tem_comentario_lbf",
+        "link_bant",
         "data_ultimo_contato",
         "data_hora_compra",
         "sdr",
@@ -804,6 +833,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         "status",
         "observacoes",
         "tem_comentario_lbf",
+        "link_bant",
         "data_ultimo_contato",
         "data_hora_compra",
         "sdr",
@@ -825,6 +855,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         "status",
         "observacoes",
         "tem_comentario_lbf",
+        "link_bant",
         "reuniao_realizada",
         "data_fechamento",
         "faturamento",
