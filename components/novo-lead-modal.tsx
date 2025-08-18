@@ -52,9 +52,9 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     ticketMedio: "",
     qtdLojas: "",
     qtdVendedores: "",
-    conseguiuContato: false,
-    reuniaoAgendada: false,
-    reuniaoRealizada: false,
+    conseguiuContato: null,
+    reuniaoAgendada: null,
+    reuniaoRealizada: null,
     valorProposta: "",
     valorVenda: "",
     dataVenda: "",
@@ -69,7 +69,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     cs: null,
     rm: null,
     rr: null,
-    ns: null,
   })
 
   const [autoFillData, setAutoFillData] = useState("")
@@ -108,9 +107,9 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         ticketMedio: "",
         qtdLojas: "",
         qtdVendedores: "",
-        conseguiuContato: false,
-        reuniaoAgendada: false,
-        reuniaoRealizada: false,
+        conseguiuContato: null,
+        reuniaoAgendada: null,
+        reuniaoRealizada: null,
         valorProposta: "",
         valorVenda: "",
         dataVenda: "",
@@ -125,7 +124,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         cs: null,
         rm: null,
         rr: null,
-        ns: null,
       })
       setAutoFillData("")
     }
@@ -163,9 +161,9 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         ticketMedio: editingLead.ticket_medio || "",
         qtdLojas: editingLead.qtd_lojas || "",
         qtdVendedores: editingLead.qtd_vendedores || "",
-        conseguiuContato: editingLead.conseguiu_contato || false,
-        reuniaoAgendada: editingLead.reuniao_agendada || false,
-        reuniaoRealizada: editingLead.reuniao_realizada || false,
+        conseguiuContato: editingLead.conseguiu_contato !== undefined ? editingLead.conseguiu_contato : null,
+        reuniaoAgendada: editingLead.reuniao_agendada !== undefined ? editingLead.reuniao_agendada : null,
+        reuniaoRealizada: editingLead.reuniao_realizada !== undefined ? editingLead.reuniao_realizada : null,
         valorProposta: editingLead.valor_proposta || "",
         valorVenda: editingLead.valor_venda || "",
         dataVenda: editingLead.data_venda || "",
@@ -180,7 +178,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         cs: editingLead.cs !== undefined ? editingLead.cs : null,
         rm: editingLead.rm !== undefined ? editingLead.rm : null,
         rr: editingLead.rr !== undefined ? editingLead.rr : null,
-        ns: editingLead.ns !== undefined ? editingLead.ns : null,
       })
     }
   }, [editingLead, isOpen])
@@ -452,7 +449,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
       cs: formData.cs,
       rm: formData.rm,
       rr: formData.rr,
-      ns: formData.ns,
     })
   }
 

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, Settings, Filter } from "lucide-react"
+import { RefreshCw, Settings, Filter, Calendar } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { Lead } from "@/app/page"
@@ -27,10 +27,21 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   const [editingPreset, setEditingPreset] = useState<string | null>(null)
   const [presetColumns, setPresetColumns] = useState<Record<string, string[]>>({})
   const [tempPresetColumns, setTempPresetColumns] = useState<string[]>([])
+  const [dateFilterColumn, setDateFilterColumn] = useState<string>("")
+  const [dateFilterStart, setDateFilterStart] = useState<string>("")
+  const [dateFilterEnd, setDateFilterEnd] = useState<string>("")
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const scrollPositionRef = useRef<number>(0)
   const isUpdatingRef = useRef<boolean>(false)
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  const dateFilterOptions = [
+    { value: "data_reuniao", label: "DATA DA REUNIÃO" },
+    { value: "data_ultimo_contato", label: "DATA ÚLTIMO CONTATO" },
+    { value: "data_hora_compra", label: "DATA DA COMPRA" },
+    { value: "data_marcacao", label: "DATA DA MARCAÇÃO" },
+    { value: "data_assinatura", label: "DATA DE ASSINATURA" },
+  ]
 
   const columns = [
     { key: "nome_empresa", label: "LEAD", width: "200px", type: "text", essential: true },
@@ -89,7 +100,6 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     { key: "conseguiu_contato", label: "CS", width: "60px", type: "tristate" },
     { key: "reuniao_agendada", label: "RM", width: "60px", type: "tristate" },
     { key: "reuniao_realizada", label: "RR", width: "60px", type: "tristate" },
-    { key: "ns", label: "NS", width: "60px", type: "tristate" },
     { key: "data_venda", label: "DATA DA MARCAÇÃO", width: "150px", type: "date" },
     { key: "data_fechamento", label: "DATA DA REUNIÃO", width: "150px", type: "date" },
     { key: "faturamento", label: "FATURAMENTO", width: "150px", type: "text" },
@@ -362,8 +372,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Em branco</SelectItem>
-                <SelectItem value="false">❌</SelectItem>
                 <SelectItem value="true">✅</SelectItem>
+                {column.key === "reuniao_realizada" && <SelectItem value="false">❌</SelectItem>}
               </SelectContent>
             </Select>
           )
@@ -411,7 +421,10 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       switch (column.type) {
         case "boolean":
         case "tristate":
-          return value === true ? "✅" : value === false ? "❌" : ""
+          if (column.key === "reuniao_realizada") {
+            return value === true ? "✅" : value === false ? "❌" : ""
+          }
+          return value === true ? "✅" : ""
         case "date":
         case "datetime-local":
           if (!value) return ""
@@ -452,7 +465,6 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       >
         {column.key === "status" ||
         column.key === "tem_comentario_lbf" ||
-        column.key === "ns" ||
         column.key === "conseguiu_contato" ||
         column.key === "reuniao_agendada" ||
         column.key === "reuniao_realizada" ? (
@@ -503,7 +515,10 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
 
       const column = columns.find((col) => col.key === columnKey)
       if (column?.type === "boolean" || column?.type === "tristate") {
-        return value ? "✅" : value === false ? "❌" : ""
+        if (columnKey === "reuniao_realizada") {
+          return value === true ? "✅" : value === false ? "❌" : ""
+        }
+        return value ? "✅" : ""
       }
       if (column?.type === "number" && (columnKey === "fee_total" || columnKey === "escopo_fechado")) {
         const numValue = Number(value)
@@ -535,7 +550,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         if (value === null || value === undefined) {
           displayValue = ""
         } else if (column?.type === "boolean" || column?.type === "tristate") {
-          displayValue = value ? "✅" : value === false ? "❌" : ""
+          if (columnKey === "reuniao_realizada") {
+            displayValue = value === true ? "✅" : value === false ? "❌" : ""
+          } else {
+            displayValue = value ? "✅" : ""
+          }
         } else if (column?.type === "number" && (columnKey === "fee_total" || columnKey === "escopo_fechado")) {
           const numValue = Number(value)
           displayValue = isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -674,7 +693,51 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   }
 
   const visibleColumnsArray = columns.filter((col) => visibleColumns[col.key])
-  const filteredLeads = applyFilters(leads)
+  const filteredLeads = leads.filter((lead) => {
+    // Existing column filters
+    const passesColumnFilters = Object.entries(columnFilters).every(([columnKey, filterValues]) => {
+      if (filterValues.length === 0) return true
+      const column = columns.find((col) => col.key === columnKey)
+      if (!column) return true
+      const cellValue = getCellValue(lead, column)
+      return filterValues.includes(cellValue)
+    })
+
+    // Date filter
+    const passesDateFilter = (() => {
+      if (!dateFilterColumn || !dateFilterStart || !dateFilterEnd) return true
+
+      const leadDateValue = (lead as any)[dateFilterColumn]
+      if (!leadDateValue) return false
+
+      const leadDate = new Date(leadDateValue)
+
+      // Criar datas no fuso horário local em vez de UTC
+      const startDate = new Date(dateFilterStart + "T00:00:00")
+      const endDate = new Date(dateFilterEnd + "T23:59:59.999")
+
+      return leadDate >= startDate && leadDate <= endDate
+    })()
+
+    return passesColumnFilters && passesDateFilter
+  })
+
+  const applyDateFilter = () => {
+    if (!dateFilterColumn) {
+      alert("Por favor, selecione uma coluna para filtrar.")
+      return
+    }
+    if (!dateFilterStart || !dateFilterEnd) {
+      alert("Por favor, selecione as datas de início e fim.")
+      return
+    }
+  }
+
+  const clearDateFilter = () => {
+    setDateFilterColumn("")
+    setDateFilterStart("")
+    setDateFilterEnd("")
+  }
 
   const presets = {
     all: {
@@ -696,7 +759,6 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         "conseguiu_contato",
         "reuniao_agendada",
         "reuniao_realizada",
-        "ns",
         "data_venda",
         "data_fechamento",
         "faturamento",
@@ -723,7 +785,6 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         "conseguiu_contato",
         "reuniao_agendada",
         "reuniao_realizada",
-        "ns",
         "data_venda",
         "data_fechamento",
         "faturamento",
@@ -793,6 +854,12 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
               <Badge variant="secondary" className="text-xs">
                 <Filter className="w-3 h-3 mr-1" />
                 {Object.keys(columnFilters).length} filtro(s) ativo(s)
+              </Badge>
+            )}
+            {dateFilterColumn && dateFilterStart && dateFilterEnd && (
+              <Badge variant="secondary" className="text-xs">
+                <Calendar className="w-3 h-3 mr-1" />
+                Filtro de data ativo
               </Badge>
             )}
           </div>
@@ -891,73 +958,59 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         </div>
       </div>
 
-      {editingPreset && (
-        <Dialog
-          open={!!editingPreset}
-          onOpenChange={() => {
-            setEditingPreset(null)
-            setTempPresetColumns([])
-          }}
-        >
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                Configurar {presets[editingPreset as keyof typeof presets]?.emoji}{" "}
-                {presets[editingPreset as keyof typeof presets]?.name}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600">
-                Selecione quais colunas devem ser exibidas quando este preset for aplicado:
-              </p>
-              <div className="grid grid-cols-3 gap-x-4 gap-y-0.5 max-h-96 overflow-y-auto">
-                {columns.map((col) => {
-                  const isChecked = tempPresetColumns.includes(col.key)
-                  return (
-                    <div
-                      key={col.key}
-                      className="flex items-center space-x-2 py-0 px-1 hover:bg-gray-50 rounded leading-none"
-                    >
-                      <Checkbox
-                        id={`preset-${col.key}`}
-                        checked={isChecked}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setTempPresetColumns((prev) => [...prev, col.key])
-                          } else {
-                            setTempPresetColumns((prev) => prev.filter((c) => c !== col.key))
-                          }
-                        }}
-                      />
-                      <label htmlFor={`preset-${col.key}`} className="text-sm cursor-pointer flex-1 leading-none">
-                        {col.label}
-                      </label>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="flex justify-end space-x-2 pt-4 border-t">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setEditingPreset(null)
-                    setTempPresetColumns([])
-                  }}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={() => {
-                    savePresetFromModal(editingPreset, tempPresetColumns)
-                  }}
-                >
-                  Salvar Configuração
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      <div className="p-4 border-b border-gray-200 bg-gray-25">
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <Calendar className="w-4 h-4 text-gray-600" />
+            <span className="text-sm font-medium text-gray-700">Filtrar por período:</span>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-600">Filtrar por:</label>
+            <Select value={dateFilterColumn} onValueChange={setDateFilterColumn}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Selecione uma coluna" />
+              </SelectTrigger>
+              <SelectContent>
+                {dateFilterOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-600">De:</label>
+            <Input
+              type="date"
+              value={dateFilterStart}
+              onChange={(e) => setDateFilterStart(e.target.value)}
+              className="w-36"
+            />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-600">Até:</label>
+            <Input
+              type="date"
+              value={dateFilterEnd}
+              onChange={(e) => setDateFilterEnd(e.target.value)}
+              className="w-36"
+            />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Button onClick={applyDateFilter} className="h-8">
+              Aplicar Filtro
+            </Button>
+            <Button variant="outline" onClick={clearDateFilter} className="h-8 bg-transparent">
+              Limpar Filtro
+            </Button>
+          </div>
+        </div>
+      </div>
 
       <div ref={scrollContainerRef} className="overflow-x-auto max-h-[600px] overflow-y-auto">
         <table className="w-full border-collapse">
