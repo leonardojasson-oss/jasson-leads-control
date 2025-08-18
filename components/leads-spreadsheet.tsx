@@ -140,6 +140,13 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       options: ["alan", "francisco", "giselle", "leonardo"],
     },
     { key: "observacoes_closer", label: "OBSERVAÇÕES CLOSER", width: "200px", type: "text" },
+    {
+      key: "temperatura",
+      label: "TEMPERATURA",
+      width: "120px",
+      type: "select",
+      options: ["Frio", "Morno", "Quente"],
+    },
     { key: "fee_total", label: "FEE MRR", width: "100px", type: "number" },
     { key: "escopo_fechado", label: "FEE ONE-TIME", width: "150px", type: "number" },
     {
@@ -715,61 +722,67 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   }
 
   const visibleColumnsArray = columns.filter((col) => visibleColumns[col.key])
-  const filteredLeads = leads.filter((lead) => {
-    // Column filters
-    const passesColumnFilters = Object.entries(columnFilters).every(([columnKey, selectedValues]) => {
-      if (selectedValues.length === 0) return true
+  const filteredLeads = leads
+    .filter((lead) => {
+      // Column filters
+      const passesColumnFilters = Object.entries(columnFilters).every(([columnKey, selectedValues]) => {
+        if (selectedValues.length === 0) return true
 
-      const value = getCellValue(lead, columnKey)
-      const column = columns.find((col) => col.key === columnKey)
+        const value = getCellValue(lead, columnKey)
+        const column = columns.find((col) => col.key === columnKey)
 
-      let displayValue = ""
-      if (value === null || value === undefined) {
-        displayValue = ""
-      } else if (column?.type === "boolean" || column?.type === "tristate") {
-        if (columnKey === "reuniao_realizada") {
-          displayValue = value === true ? "✅" : value === false ? "❌" : ""
-        } else {
-          displayValue = value ? "✅" : ""
-        }
-      } else if (column?.type === "number" && (columnKey === "fee_total" || columnKey === "escopo_fechado")) {
-        const numValue = Number(value)
-        displayValue = isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-      } else if (column?.type === "date" || column?.type === "datetime-local") {
-        if (!value) {
+        let displayValue = ""
+        if (value === null || value === undefined) {
           displayValue = ""
-        } else {
-          try {
-            displayValue = new Date(value).toLocaleDateString("pt-BR")
-          } catch {
-            displayValue = String(value)
+        } else if (column?.type === "boolean" || column?.type === "tristate") {
+          if (columnKey === "reuniao_realizada") {
+            displayValue = value === true ? "✅" : value === false ? "❌" : ""
+          } else {
+            displayValue = value ? "✅" : ""
           }
+        } else if (column?.type === "number" && (columnKey === "fee_total" || columnKey === "escopo_fechado")) {
+          const numValue = Number(value)
+          displayValue = isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+        } else if (column?.type === "date" || column?.type === "datetime-local") {
+          if (!value) {
+            displayValue = ""
+          } else {
+            try {
+              displayValue = new Date(value).toLocaleDateString("pt-BR")
+            } catch {
+              displayValue = String(value)
+            }
+          }
+        } else {
+          displayValue = String(value)
         }
-      } else {
-        displayValue = String(value)
-      }
 
-      return selectedValues.includes(displayValue)
+        return selectedValues.includes(displayValue)
+      })
+
+      // Date filter
+      const passesDateFilter = (() => {
+        if (!dateFilterColumn || !dateFilterStart || !dateFilterEnd) return true
+
+        const leadDateValue = (lead as any)[dateFilterColumn]
+        if (!leadDateValue) return false
+
+        const leadDate = new Date(leadDateValue)
+
+        // Criar datas no fuso horário local em vez de UTC
+        const startDate = new Date(dateFilterStart + "T00:00:00")
+        const endDate = new Date(dateFilterEnd + "T23:59:59.999")
+
+        return leadDate >= startDate && leadDate <= endDate
+      })()
+
+      return passesColumnFilters && passesDateFilter
     })
-
-    // Date filter
-    const passesDateFilter = (() => {
-      if (!dateFilterColumn || !dateFilterStart || !dateFilterEnd) return true
-
-      const leadDateValue = (lead as any)[dateFilterColumn]
-      if (!leadDateValue) return false
-
-      const leadDate = new Date(leadDateValue)
-
-      // Criar datas no fuso horário local em vez de UTC
-      const startDate = new Date(dateFilterStart + "T00:00:00")
-      const endDate = new Date(dateFilterEnd + "T23:59:59.999")
-
-      return leadDate >= startDate && leadDate <= endDate
-    })()
-
-    return passesColumnFilters && passesDateFilter
-  })
+    .sort((a, b) => {
+      const dateA = a.data_hora_compra ? new Date(a.data_hora_compra).getTime() : 0
+      const dateB = b.data_hora_compra ? new Date(b.data_hora_compra).getTime() : 0
+      return dateB - dateA // Ordem decrescente (mais recente primeiro)
+    })
 
   const applyDateFilter = () => {
     if (!dateFilterColumn) {
@@ -819,6 +832,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         "produto",
         "closer",
         "observacoes_closer",
+        "temperatura",
         "fee_total",
         "escopo_fechado",
         "data_assinatura",
@@ -863,6 +877,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         "produto",
         "closer",
         "observacoes_closer",
+        "temperatura",
         "fee_total",
         "escopo_fechado",
         "data_assinatura",

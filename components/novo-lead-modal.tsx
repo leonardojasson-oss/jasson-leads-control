@@ -69,6 +69,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     cs: null,
     rm: null,
     rr: null,
+    temperatura: "Frio",
   })
 
   const [autoFillData, setAutoFillData] = useState("")
@@ -124,6 +125,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         cs: null,
         rm: null,
         rr: null,
+        temperatura: "Frio",
       })
       setAutoFillData("")
     }
@@ -178,6 +180,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         cs: editingLead.cs !== undefined ? editingLead.cs : null,
         rm: editingLead.rm !== undefined ? editingLead.rm : null,
         rr: editingLead.rr !== undefined ? editingLead.rr : null,
+        temperatura: editingLead.temperatura || "Frio",
       })
     }
   }, [editingLead, isOpen])
@@ -849,6 +852,25 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                   value={formData.dataUltimoContato}
                   onChange={(e) => handleInputChange("dataUltimoContato", e.target.value)}
                 />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-green-900 mb-4">🌡️ Temperatura do Lead</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="temperatura">Temperatura</Label>
+                <Select value={formData.temperatura} onValueChange={(value) => handleInputChange("temperatura", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a temperatura" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Frio">Frio</SelectItem>
+                    <SelectItem value="Quente">Quente</SelectItem>
+                    <SelectItem value="Morno">Morno</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
