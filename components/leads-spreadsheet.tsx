@@ -541,70 +541,34 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   const getUniqueValues = (columnKey: string): string[] => {
     const values = leads.map((lead) => {
       const value = getCellValue(lead, columnKey)
-      if (value === null || value === undefined) return ""
-
       const column = columns.find((col) => col.key === columnKey)
-      if (column?.type === "boolean" || column?.type === "tristate") {
+
+      if (value === null || value === undefined) {
+        return ""
+      } else if (column?.type === "boolean" || column?.type === "tristate") {
         if (columnKey === "reuniao_realizada") {
           return value === true ? "✅" : value === false ? "❌" : ""
         }
         return value ? "✅" : ""
-      }
-      if (column?.type === "number" && (columnKey === "fee_total" || columnKey === "escopo_fechado")) {
+      } else if (column?.type === "number" && (columnKey === "fee_total" || columnKey === "escopo_fechado")) {
         const numValue = Number(value)
         return isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-      }
-      if (column?.type === "date" || column?.type === "datetime-local") {
-        if (!value) return ""
-        try {
-          return new Date(value).toLocaleDateString("pt-BR")
-        } catch {
-          return String(value)
+      } else if (column?.type === "date" || column?.type === "datetime-local") {
+        if (!value) {
+          return ""
+        } else {
+          try {
+            return new Date(value).toLocaleDateString("pt-BR")
+          } catch {
+            return String(value)
+          }
         }
+      } else {
+        return String(value)
       }
-      return String(value)
     })
 
     return [...new Set(values)].sort()
-  }
-
-  const applyFilters = (leadsToFilter: Lead[]): Lead[] => {
-    return leadsToFilter.filter((lead) => {
-      return Object.entries(columnFilters).every(([columnKey, selectedValues]) => {
-        if (selectedValues.length === 0) return true
-
-        const value = getCellValue(lead, columnKey)
-        const column = columns.find((col) => col.key === columnKey)
-
-        let displayValue = ""
-        if (value === null || value === undefined) {
-          displayValue = ""
-        } else if (column?.type === "boolean" || column?.type === "tristate") {
-          if (columnKey === "reuniao_realizada") {
-            displayValue = value === true ? "✅" : value === false ? "❌" : ""
-          } else {
-            displayValue = value ? "✅" : ""
-          }
-        } else if (column?.type === "number" && (columnKey === "fee_total" || columnKey === "escopo_fechado")) {
-          const numValue = Number(value)
-          displayValue = isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-        } else if (column?.type === "date" || column?.type === "datetime-local") {
-          if (!value) {
-            displayValue = ""
-          } else {
-            try {
-              displayValue = new Date(value).toLocaleDateString("pt-BR")
-            } catch {
-              displayValue = String(value)
-            }
-          }
-        } else {
-          displayValue = String(value)
-        }
-
-        return selectedValues.includes(displayValue)
-      })
-    })
   }
 
   const updateColumnFilter = (columnKey: string, selectedValues: string[]) => {
@@ -724,13 +688,40 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
 
   const visibleColumnsArray = columns.filter((col) => visibleColumns[col.key])
   const filteredLeads = leads.filter((lead) => {
-    // Existing column filters
-    const passesColumnFilters = Object.entries(columnFilters).every(([columnKey, filterValues]) => {
-      if (filterValues.length === 0) return true
+    // Column filters
+    const passesColumnFilters = Object.entries(columnFilters).every(([columnKey, selectedValues]) => {
+      if (selectedValues.length === 0) return true
+
+      const value = getCellValue(lead, columnKey)
       const column = columns.find((col) => col.key === columnKey)
-      if (!column) return true
-      const cellValue = getCellValue(lead, column)
-      return filterValues.includes(cellValue)
+
+      let displayValue = ""
+      if (value === null || value === undefined) {
+        displayValue = ""
+      } else if (column?.type === "boolean" || column?.type === "tristate") {
+        if (columnKey === "reuniao_realizada") {
+          displayValue = value === true ? "✅" : value === false ? "❌" : ""
+        } else {
+          displayValue = value ? "✅" : ""
+        }
+      } else if (column?.type === "number" && (columnKey === "fee_total" || columnKey === "escopo_fechado")) {
+        const numValue = Number(value)
+        displayValue = isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+      } else if (column?.type === "date" || column?.type === "datetime-local") {
+        if (!value) {
+          displayValue = ""
+        } else {
+          try {
+            displayValue = new Date(value).toLocaleDateString("pt-BR")
+          } catch {
+            displayValue = String(value)
+          }
+        }
+      } else {
+        displayValue = String(value)
+      }
+
+      return selectedValues.includes(displayValue)
     })
 
     // Date filter
@@ -767,6 +758,10 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     setDateFilterColumn("")
     setDateFilterStart("")
     setDateFilterEnd("")
+  }
+
+  const clearAllColumnFilters = () => {
+    setColumnFilters({})
   }
 
   const presets = {
@@ -899,6 +894,19 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
                 <Filter className="w-3 h-3 mr-1" />
                 Limpar Filtros
               </Button>
+            )}
+            {Object.keys(columnFilters).some((key) => columnFilters[key].length > 0) && (
+              <div className="mb-4 flex items-center gap-2">
+                <span className="text-sm text-gray-600">Filtros ativos</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearAllColumnFilters}
+                  className="h-7 text-xs bg-transparent"
+                >
+                  Limpar todos os filtros
+                </Button>
+              </div>
             )}
             <Dialog>
               <DialogTrigger asChild>
