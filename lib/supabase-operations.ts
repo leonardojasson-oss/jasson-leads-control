@@ -159,6 +159,29 @@ const cleanDataForSupabase = (data: any): any => {
   return cleaned
 }
 
+export const testSupabaseConnection = async (): Promise<boolean> => {
+  if (!isSupabaseConfigured || !supabase) {
+    console.log("🔍 Supabase não configurado")
+    return false
+  }
+
+  try {
+    console.log("🔍 Testando conexão real com Supabase...")
+    const { data, error } = await supabase.from("leads").select("id").limit(1)
+
+    if (error) {
+      console.error("❌ Erro na conexão Supabase:", error)
+      return false
+    }
+
+    console.log("✅ Conexão Supabase funcionando!")
+    return true
+  } catch (error) {
+    console.error("❌ Exceção ao testar Supabase:", error)
+    return false
+  }
+}
+
 // Operações principais
 export const leadOperations = {
   async getAll(): Promise<Lead[]> {
@@ -182,7 +205,6 @@ export const leadOperations = {
 
       console.log("✅ Dados carregados do Supabase:", data?.length || 0, "leads")
 
-      // Se não há dados no Supabase, verificar se há dados no localStorage para migrar
       if (!data || data.length === 0) {
         const localData = localStorageOperations.getAll()
         if (localData.length > 0) {

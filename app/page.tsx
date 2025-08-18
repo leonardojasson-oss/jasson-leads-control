@@ -10,7 +10,7 @@ import { CommissionControl } from "@/components/commission-control"
 import { DashboardAnalytics } from "@/components/dashboard-analytics"
 import { MetasControl } from "@/components/metas-control"
 import { NovoLeadModal } from "@/components/novo-lead-modal"
-import { leadOperations, type Lead, isSupabaseConfigured } from "@/lib/supabase-operations"
+import { leadOperations, type Lead, isSupabaseConfigured, testSupabaseConnection } from "@/lib/supabase-operations"
 import { LeadsSpreadsheet } from "@/components/leads-spreadsheet"
 
 export type { Lead }
@@ -44,19 +44,19 @@ export default function LeadsControl() {
       setLoading(true)
       setSupabaseStatus("loading")
 
+      const supabaseWorking = await testSupabaseConnection()
+      console.log("🔍 Supabase funcionando:", supabaseWorking)
+
       const loadedLeads = await leadOperations.getAll()
       setLeads(loadedLeads)
       console.log("✅ Leads carregados:", loadedLeads.length)
 
-      // Determinar status da conexão
-      if (isSupabaseConfigured) {
-        // Verificar se os dados vieram do Supabase (têm UUID) ou localStorage (têm timestamp)
-        const hasSupabaseData = loadedLeads.some(
-          (lead) => lead.id.includes("-") && lead.id.length > 10, // UUID format
-        )
-        setSupabaseStatus(hasSupabaseData ? "connected" : "local")
+      if (isSupabaseConfigured && supabaseWorking) {
+        setSupabaseStatus("connected")
+        console.log("✅ Status: Conectado ao Supabase")
       } else {
         setSupabaseStatus("local")
+        console.log("📱 Status: Modo Local")
       }
     } catch (error) {
       console.error("❌ Erro ao carregar leads:", error)
