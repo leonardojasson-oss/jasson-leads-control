@@ -380,6 +380,18 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         }
       }
 
+      const urgenciaMatch = data.match(/Urgência:\s*([^\n]+)/i)
+      if (urgenciaMatch) {
+        const urgencia = urgenciaMatch[1].trim()
+        if (urgencia === "-") {
+          updates.nivelUrgencia = "Não preenchido"
+          console.log("✅ Urgência não preenchida, definida como 'Não preenchido'")
+        } else {
+          updates.nivelUrgencia = urgencia
+          console.log("✅ Urgência encontrada:", urgencia)
+        }
+      }
+
       console.log("📊 Atualizações encontradas:", updates)
 
       if (Object.keys(updates).length > 0) {
@@ -622,10 +634,11 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectValue placeholder="Selecione o nível" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="baixo">Baixo</SelectItem>
-                    <SelectItem value="medio">Médio</SelectItem>
-                    <SelectItem value="alto">Alto</SelectItem>
-                    <SelectItem value="urgente">Urgente</SelectItem>
+                    <SelectItem value="Imediatamente">Imediatamente</SelectItem>
+                    <SelectItem value="Em até três meses">Em até três meses</SelectItem>
+                    <SelectItem value="Em seis meses">Em seis meses</SelectItem>
+                    <SelectItem value="Ainda não sei">Ainda não sei</SelectItem>
+                    <SelectItem value="Não preenchido">Não preenchido</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
