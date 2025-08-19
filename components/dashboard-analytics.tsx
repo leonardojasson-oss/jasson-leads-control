@@ -53,15 +53,16 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
     const contato = leadsData.filter((lead) => lead.conseguiu_contato).length
     const agendada = leadsData.filter((lead) => lead.reuniao_agendada).length
     const realizada = leadsData.filter((lead) => lead.reuniao_realizada).length
-    const vendas = leadsData.filter((lead) => lead.data_fechamento || lead.data_assinatura).length
+    const vendas = leadsData.filter((lead) => lead.data_assinatura && lead.status === "GANHO").length
 
-    // Calcular FEE MRR e FEE ONE TIME
-    const feeMrr = leadsData.reduce((sum, lead) => {
+    const leadsComAssinatura = leadsData.filter((lead) => lead.data_assinatura)
+
+    const feeMrr = leadsComAssinatura.reduce((sum, lead) => {
       const fee = Number.parseFloat(String(lead.fee_total || "0"))
       return sum + (isNaN(fee) ? 0 : fee)
     }, 0)
 
-    const feeOneTime = leadsData.reduce((sum, lead) => {
+    const feeOneTime = leadsComAssinatura.reduce((sum, lead) => {
       const escopo = Number.parseFloat(String(lead.escopo_fechado || "0"))
       return sum + (isNaN(escopo) ? 0 : escopo)
     }, 0)
@@ -96,6 +97,142 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
   }
 
   const generalFunnel = calculateFunnel(filteredLeads)
+
+  const calculateForecast = (leadsData: Lead[]) => {
+    // Definir status que são >= REUNIÃO REALIZADA
+    const statusHierarchy = [
+      "BACKLOG",
+      "TENTANDO CONTATO",
+      "QUALI AGENDADA",
+      "QUALIFICANDO",
+      "REUNIÃO AGENDADA",
+      "REUNIÃO REALIZADA", // A partir daqui são considerados
+      "DÚVIDAS E FECHAMENTO",
+      "CONTRATO NA RUA",
+      "GANHO",
+      "FOLLOW UP",
+      "FOLLOW INFINITO",
+      "NO-SHOW",
+      "PERDIDO",
+    ]
+
+    const minStatusIndex = statusHierarchy.indexOf("REUNIÃO REALIZADA")
+
+    const forecastLeads = leadsData.filter((lead) => {
+      // Deve ter valor de proposta preenchido (FEE MRR e/ou FEE ONE-TIME)
+      const hasFeeValue =
+        (lead.fee_total && Number.parseFloat(String(lead.fee_total)) > 0) ||
+        (lead.escopo_fechado && Number.parseFloat(String(lead.escopo_fechado)) > 0)
+
+      // Deve NÃO ter DATA DE ASSINATURA preenchida
+      const noDataAssinatura = !lead.data_assinatura
+
+      // Deve NÃO ter MOTIVO DE PERDA preenchido
+      const noMotivoPerda = !lead.motivo_perda || lead.motivo_perda.trim() === ""
+
+      // Deve estar em um STATUS >= REUNIÃO REALIZADA
+      const currentStatusIndex = statusHierarchy.indexOf(lead.status || "")
+      const statusQualified = currentStatusIndex >= minStatusIndex && currentStatusIndex !== -1
+
+      return hasFeeValue && noDataAssinatura && noMotivoPerda && statusQualified
+    })
+
+    const quantidade = forecastLeads.length
+
+    const potencialFeeMrr = forecastLeads.reduce((sum, lead) => {
+      const fee = Number.parseFloat(String(lead.fee_total || "0"))
+      return sum + (isNaN(fee) ? 0 : fee)
+    }, 0)
+
+    const potencialFeeOneTime = forecastLeads.reduce((sum, lead) => {
+      const escopo = Number.parseFloat(String(lead.escopo_fechado || "0"))
+      return sum + (isNaN(escopo) ? 0 : escopo)
+    }, 0)
+
+    const totalOportunidade = potencialFeeMrr + potencialFeeOneTime
+
+    return {
+      quantidade,
+      potencialFeeMrr,
+      potencialFeeOneTime,
+      totalOportunidade,
+    }
+  }
+
+  const forecast = calculateForecast(filteredLeads)
+
+  const calculateForecastByCloser = (leadsData: Lead[]) => {
+    const statusHierarchy = [
+      "BACKLOG",
+      "TENTANDO CONTATO",
+      "QUALI AGENDADA",
+      "QUALIFICANDO",
+      "REUNIÃO AGENDADA",
+      "REUNIÃO REALIZADA", // A partir daqui são considerados
+      "DÚVIDAS E FECHAMENTO",
+      "CONTRATO NA RUA",
+      "GANHO",
+      "FOLLOW UP",
+      "FOLLOW INFINITO",
+      "NO-SHOW",
+      "PERDIDO",
+    ]
+
+    const minStatusIndex = statusHierarchy.indexOf("REUNIÃO REALIZADA")
+
+    const forecastLeads = leadsData.filter((lead) => {
+      const hasFeeValue =
+        (lead.fee_total && Number.parseFloat(String(lead.fee_total)) > 0) ||
+        (lead.escopo_fechado && Number.parseFloat(String(lead.escopo_fechado)) > 0)
+      const noDataAssinatura = !lead.data_assinatura
+      const noMotivoPerda = !lead.motivo_perda || lead.motivo_perda.trim() === ""
+      const currentStatusIndex = statusHierarchy.indexOf(lead.status || "")
+      const statusQualified = currentStatusIndex >= minStatusIndex && currentStatusIndex !== -1
+
+      return hasFeeValue && noDataAssinatura && noMotivoPerda && statusQualified
+    })
+
+    const closerForecast = forecastLeads.reduce(
+      (acc, lead) => {
+        const closer = lead.closer?.toLowerCase()?.trim()
+        if (closer && closer !== "") {
+          if (!acc[closer]) {
+            acc[closer] = {
+              name: closer.charAt(0).toUpperCase() + closer.slice(1),
+              quantidade: 0,
+              potencialFeeMrr: 0,
+              potencialFeeOneTime: 0,
+              totalOportunidade: 0,
+            }
+          }
+
+          acc[closer].quantidade += 1
+
+          const feeMrr = Number.parseFloat(String(lead.fee_total || "0"))
+          const feeOneTime = Number.parseFloat(String(lead.escopo_fechado || "0"))
+
+          acc[closer].potencialFeeMrr += isNaN(feeMrr) ? 0 : feeMrr
+          acc[closer].potencialFeeOneTime += isNaN(feeOneTime) ? 0 : feeOneTime
+          acc[closer].totalOportunidade = acc[closer].potencialFeeMrr + acc[closer].potencialFeeOneTime
+        }
+        return acc
+      },
+      {} as Record<
+        string,
+        {
+          name: string
+          quantidade: number
+          potencialFeeMrr: number
+          potencialFeeOneTime: number
+          totalOportunidade: number
+        }
+      >,
+    )
+
+    return Object.values(closerForecast).sort((a, b) => b.totalOportunidade - a.totalOportunidade)
+  }
+
+  const forecastByCloser = calculateForecastByCloser(filteredLeads)
 
   const closerStats = filteredLeads.reduce(
     (acc, lead) => {
@@ -301,6 +438,135 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
       {/* Funil Geral */}
       <div className="mb-4">
         <VisualFunnel title="🎯 Funil Geral" funnel={generalFunnel} totalLeads={filteredLeads.length} color="#dc2626" />
+      </div>
+
+      {/* Forecast – Propostas em Aberto */}
+      <div className="mb-4">
+        <div className="mb-3">
+          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <span className="text-orange-600">📈</span>
+            Forecast – Propostas em Aberto
+          </h2>
+          <p className="text-sm text-gray-500">Potencial de receita futura • Propostas apresentadas mas não fechadas</p>
+        </div>
+
+        {/* Cards horizontais dos indicadores principais */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Propostas Abertas</p>
+                  <p className="text-2xl font-bold text-orange-600">{forecast.quantidade}</p>
+                </div>
+                <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <span className="text-orange-600 text-lg">📋</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Potencial FEE MRR</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    R$ {forecast.potencialFeeMrr.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                  </p>
+                </div>
+                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                  <span className="text-green-600 text-lg">💰</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Potencial FEE ONE-TIME</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    R$ {forecast.potencialFeeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                  </p>
+                </div>
+                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <span className="text-blue-600 text-lg">💎</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total em Oportunidade</p>
+                  <p className="text-2xl font-bold text-orange-700">
+                    R$ {forecast.totalOportunidade.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                  </p>
+                </div>
+                <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <span className="text-orange-700 text-lg">🎯</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Forecast por Closer - Tabela compacta */}
+        {forecastByCloser.length > 0 && (
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <span className="text-purple-600">👥</span>
+                Forecast por Closer
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50">
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Closer</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Propostas</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">FEE MRR</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">FEE ONE-TIME</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {forecastByCloser.map((closer, index) => (
+                      <tr
+                        key={closer.name}
+                        className={`border-b border-gray-100 hover:bg-gray-50 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
+                      >
+                        <td className="py-3 px-4 font-medium text-gray-900">{closer.name}</td>
+                        <td className="text-center py-3 px-4">
+                          <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full font-semibold text-xs">
+                            {closer.quantidade}
+                          </span>
+                        </td>
+                        <td className="text-center py-3 px-4 font-semibold text-green-600">
+                          R$ {closer.potencialFeeMrr.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                        </td>
+                        <td className="text-center py-3 px-4 font-semibold text-blue-600">
+                          R$ {closer.potencialFeeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                        </td>
+                        <td className="text-center py-3 px-4">
+                          <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded font-semibold">
+                            R$ {closer.totalOportunidade.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Funis por Closer */}

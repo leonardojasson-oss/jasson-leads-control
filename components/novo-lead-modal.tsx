@@ -325,15 +325,20 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         console.log("✅ Email encontrado:", emailMatch[1].trim())
       }
 
-      const cargoMatch = data.match(/Cargo:\s*([^\n]+)/i)
+      const cargoMatch = data.match(/Cargo:\s*([^\n]+)|Cargo:\s*\n\s*([^\n]+)/i)
       if (cargoMatch) {
-        const cargoValue = cargoMatch[1].trim()
+        const cargoValue = (cargoMatch[1] || cargoMatch[2])?.trim()
         if (cargoValue === "-") {
-          updates.cargoContato = "Não preenchido"
-          console.log("✅ Cargo não preenchido, definido como 'Não preenchido'")
-        } else {
-          updates.cargoContato = cargoValue
-          console.log("✅ Cargo encontrado:", cargoValue)
+          updates.cargoContato = ""
+          console.log("✅ Cargo não preenchido, deixado em branco")
+        } else if (cargoValue) {
+          if (cargoValue.toLowerCase() === "proprietário") {
+            updates.cargoContato = "Proprietário(a)"
+            console.log("✅ Cargo 'Proprietário' mapeado para 'Proprietário(a)'")
+          } else {
+            updates.cargoContato = cargoValue
+            console.log("✅ Cargo encontrado:", cargoValue)
+          }
         }
       }
 
