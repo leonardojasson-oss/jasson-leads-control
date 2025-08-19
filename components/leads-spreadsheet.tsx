@@ -344,10 +344,17 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         }
         return value || ""
       case "date":
-        if (typeof value === "string" && value.includes("T")) {
-          return value.split("T")[0]
+        if (!value) return ""
+        try {
+          if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+            // Para datas puras (YYYY-MM-DD), criar data no timezone local para evitar subtração de dia
+            const [year, month, day] = value.split("-").map(Number)
+            return new Date(year, month - 1, day).toLocaleDateString("pt-BR")
+          }
+          return new Date(value).toLocaleDateString("pt-BR")
+        } catch {
+          return value
         }
-        return value || ""
       case "time":
         if (typeof value === "string" && value.includes("T")) {
           return value.split("T")[1]?.slice(0, 5) || ""
@@ -476,6 +483,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         case "datetime-local":
           if (!value) return ""
           try {
+            if (column.type === "date" && typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+              // Para datas puras (YYYY-MM-DD), criar data no timezone local para evitar subtração de dia
+              const [year, month, day] = value.split("-").map(Number)
+              return new Date(year, month - 1, day).toLocaleDateString("pt-BR")
+            }
             return new Date(value).toLocaleDateString("pt-BR")
           } catch {
             return value
@@ -593,6 +605,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
           return ""
         } else {
           try {
+            if (column.type === "date" && typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+              // Para datas puras (YYYY-MM-DD), criar data no timezone local para evitar subtração de dia
+              const [year, month, day] = value.split("-").map(Number)
+              return new Date(year, month - 1, day).toLocaleDateString("pt-BR")
+            }
             return new Date(value).toLocaleDateString("pt-BR")
           } catch {
             return String(value)
@@ -748,9 +765,14 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
             displayValue = ""
           } else {
             try {
-              displayValue = new Date(value).toLocaleDateString("pt-BR")
+              if (column.type === "date" && typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+                // Para datas puras (YYYY-MM-DD), criar data no timezone local para evitar subtração de dia
+                const [year, month, day] = value.split("-").map(Number)
+                return new Date(year, month - 1, day).toLocaleDateString("pt-BR")
+              }
+              return new Date(value).toLocaleDateString("pt-BR")
             } catch {
-              displayValue = String(value)
+              return String(value)
             }
           }
         } else {
