@@ -335,6 +335,16 @@ export function MetasControl({ leads }: MetasControlProps) {
 
         return true
       })
+    } else {
+      const now = new Date()
+      const currentMonth = now.getMonth()
+      const currentYear = now.getFullYear()
+
+      filteredLeads = leads.filter((lead) => {
+        if (!lead.data_hora_compra) return false
+        const leadDate = new Date(lead.data_hora_compra)
+        return leadDate.getMonth() === currentMonth && leadDate.getFullYear() === currentYear
+      })
     }
 
     return filteredLeads

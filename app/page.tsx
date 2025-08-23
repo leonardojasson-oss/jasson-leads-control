@@ -390,7 +390,7 @@ export default function LeadsControl() {
         produto: leadData.produto,
         anuncios: leadData.anuncios,
         status: leadData.status || "BACKLOG",
-        observacoes: leadData.observacoes,
+        observacoes_sdr: leadData.observacoes, // ✅ Corrigido: observacoes → observacoes_sdr
         data_ultimo_contato: leadData.dataUltimoContato || null,
         motivo_perda_pv: leadData.motivoPerdaPV,
         tem_comentario_lbf: leadData.temComentarioLBF || false,
@@ -403,15 +403,16 @@ export default function LeadsControl() {
         reuniao_realizada: leadData.reuniaoRealizada,
         valor_proposta: Number.parseFloat(leadData.valorProposta) || null,
         valor_venda: Number.parseFloat(leadData.valorVenda) || null,
-        data_venda: leadData.dataVenda || null,
-        data_fechamento: leadData.dataFechamento || null,
+        data_marcacao: leadData.dataVenda || null, // ✅ Corrigido: data_venda → data_marcacao
+        data_reuniao: leadData.dataFechamento || null, // ✅ Corrigido: data_fechamento → data_reuniao
         fee: Number.parseFloat(leadData.fee) || null,
         escopo_fechado: leadData.escopoFechado,
-        fee_total: Number.parseFloat(leadData.feeTotal) || null,
+        fee_mrr: Number.parseFloat(leadData.feeTotal) || null, // ✅ Corrigido: fee_total → fee_mrr
         venda_via_jasson_co: leadData.vendaViaJassonCo || false,
         comissao_sdr: Number.parseFloat(leadData.comissaoSDR) || null,
         comissao_closer: Number.parseFloat(leadData.comissaoCloser) || null,
         status_comissao: leadData.statusComissao,
+        temperatura: leadData.temperatura || "Frio", // ✅ Adicionado campo temperatura
       }
 
       if (editingLead) {

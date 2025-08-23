@@ -68,7 +68,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         "PERDIDO",
       ],
     },
-    { key: "observacoes", label: "OBSERVAÇÕES SDR", width: "200px", type: "text", essential: true },
+    { key: "observacoes_sdr", label: "OBSERVAÇÕES SDR", width: "200px", type: "text", essential: true },
     { key: "tem_comentario_lbf", label: "COMENTÁRIO NO FORMS", width: "200px", type: "boolean", essential: true },
     { key: "link_bant", label: "LINK BANT", width: "180px", type: "text", essential: true },
     { key: "data_ultimo_contato", label: "DATA ÚLTIMO CONTATO", width: "150px", type: "date", essential: true },
@@ -101,8 +101,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     { key: "conseguiu_contato", label: "CS", width: "60px", type: "tristate" },
     { key: "reuniao_agendada", label: "RM", width: "60px", type: "tristate" },
     { key: "reuniao_realizada", label: "RR", width: "60px", type: "tristate" },
-    { key: "data_venda", label: "DATA DA MARCAÇÃO", width: "150px", type: "date" },
-    { key: "data_fechamento", label: "DATA DA REUNIÃO", width: "150px", type: "date" },
+    { key: "data_marcacao", label: "DATA DA MARCAÇÃO", width: "150px", type: "date" },
+    { key: "data_reuniao", label: "DATA DA REUNIÃO", width: "150px", type: "date" },
     { key: "faturamento", label: "FATURAMENTO", width: "150px", type: "text" },
     {
       key: "nicho",
@@ -147,7 +147,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       type: "select",
       options: ["Frio", "Morno", "Quente"],
     },
-    { key: "fee_total", label: "FEE MRR", width: "100px", type: "number" },
+    { key: "fee_mrr", label: "FEE MRR", width: "100px", type: "number" },
     { key: "escopo_fechado", label: "FEE ONE-TIME", width: "150px", type: "number" },
     {
       key: "produto",
@@ -287,7 +287,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     if (field === "data_assinatura" && value && value.trim() !== "") {
       updates = {
         ...updates,
-        data_venda: value,
+        data_reuniao: value,
         venda_via_jasson_co: true,
         status: "GANHO",
       }
@@ -496,7 +496,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
           return value || ""
         case "number":
           if (!value) return ""
-          if (column.key === "fee_total" || column.key === "escopo_fechado") {
+          if (column.key === "fee_mrr" || column.key === "escopo_fechado") {
             const numValue = Number(value)
             return isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
           }
@@ -597,7 +597,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
           return value === true ? "✅" : value === false ? "❌" : ""
         }
         return value ? "✅" : ""
-      } else if (column?.type === "number" && (columnKey === "fee_total" || columnKey === "escopo_fechado")) {
+      } else if (column?.type === "number" && (columnKey === "fee_mrr" || columnKey === "escopo_fechado")) {
         const numValue = Number(value)
         return isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
       } else if (column?.type === "date" || column?.type === "datetime-local") {
@@ -757,7 +757,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
           } else {
             displayValue = value ? "✅" : ""
           }
-        } else if (column?.type === "number" && (columnKey === "fee_total" || columnKey === "escopo_fechado")) {
+        } else if (column?.type === "number" && (columnKey === "fee_mrr" || columnKey === "escopo_fechado")) {
           const numValue = Number(value)
           displayValue = isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
         } else if (column?.type === "date" || column?.type === "datetime-local") {
@@ -839,7 +839,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       columns: presetColumns.complete || [
         "nome_empresa",
         "status",
-        "observacoes",
+        "observacoes_sdr",
         "tem_comentario_lbf",
         "link_bant",
         "data_ultimo_contato",
@@ -848,14 +848,14 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         "conseguiu_contato",
         "reuniao_agendada",
         "reuniao_realizada",
-        "data_venda",
-        "data_fechamento",
+        "data_marcacao",
+        "data_reuniao",
         "faturamento",
         "produto",
         "closer",
         "observacoes_closer",
         "temperatura",
-        "fee_total",
+        "fee_mrr",
         "escopo_fechado",
         "data_assinatura",
         "motivo_perda_pv",
@@ -867,7 +867,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       columns: presetColumns.sdr || [
         "nome_empresa",
         "status",
-        "observacoes",
+        "observacoes_sdr",
         "tem_comentario_lbf",
         "link_bant",
         "data_ultimo_contato",
@@ -876,8 +876,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         "conseguiu_contato",
         "reuniao_agendada",
         "reuniao_realizada",
-        "data_venda",
-        "data_fechamento",
+        "data_marcacao",
+        "data_reuniao",
         "faturamento",
         "cargo_contato",
         "produto",
@@ -889,18 +889,18 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       columns: presetColumns.closer || [
         "nome_empresa",
         "status",
-        "observacoes",
+        "observacoes_sdr",
         "tem_comentario_lbf",
         "link_bant",
         "reuniao_realizada",
-        "data_fechamento",
+        "data_reuniao",
         "faturamento",
         "cargo_contato",
         "produto",
         "closer",
         "observacoes_closer",
         "temperatura",
-        "fee_total",
+        "fee_mrr",
         "escopo_fechado",
         "data_assinatura",
         "motivo_perda_pv",
