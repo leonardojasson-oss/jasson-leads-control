@@ -178,7 +178,7 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
     const forecastLeads = leadsData.filter((lead) => {
       const hasFeeValue =
-        (lead.fee_total && Number.parseFloat(String(lead.fee_total)) > 0) ||
+        (lead.fee_mrr && Number.parseFloat(String(lead.fee_mrr)) > 0) ||
         (lead.escopo_fechado && Number.parseFloat(String(lead.escopo_fechado)) > 0)
       const noDataAssinatura = !lead.data_assinatura
       const noMotivoPerda = !lead.motivo_perda || lead.motivo_perda.trim() === ""
@@ -191,7 +191,7 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
     const quantidade = forecastLeads.length
 
     const potencialFeeMrr = forecastLeads.reduce((sum, lead) => {
-      const fee = Number.parseFloat(String(lead.fee_total || "0"))
+      const fee = Number.parseFloat(String(lead.fee_mrr || "0"))
       return sum + (isNaN(fee) ? 0 : fee)
     }, 0)
 
@@ -233,7 +233,7 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
     const forecastLeads = leadsData.filter((lead) => {
       const hasFeeValue =
-        (lead.fee_total && Number.parseFloat(String(lead.fee_total)) > 0) ||
+        (lead.fee_mrr && Number.parseFloat(String(lead.fee_mrr)) > 0) ||
         (lead.escopo_fechado && Number.parseFloat(String(lead.escopo_fechado)) > 0)
       const noDataAssinatura = !lead.data_assinatura
       const noMotivoPerda = !lead.motivo_perda || lead.motivo_perda.trim() === ""
@@ -259,7 +259,7 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
           acc[closer].quantidade += 1
 
-          const feeMrr = Number.parseFloat(String(lead.fee_total || "0"))
+          const feeMrr = Number.parseFloat(String(lead.fee_mrr || "0"))
           const feeOneTime = Number.parseFloat(String(lead.escopo_fechado || "0"))
 
           acc[closer].potencialFeeMrr += isNaN(feeMrr) ? 0 : feeMrr
