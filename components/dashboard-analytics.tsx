@@ -2,8 +2,10 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { BarChart3 } from "lucide-react"
-import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { BarChart3, X } from "lucide-react"
+import { useState, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import type { Lead } from "@/app/page"
 
 interface DashboardAnalyticsProps {
@@ -13,32 +15,90 @@ interface DashboardAnalyticsProps {
 export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  useEffect(() => {
+    const fromParam = searchParams.get("from")
+    const toParam = searchParams.get("to")
+
+    if (fromParam && toParam) {
+      setStartDate(fromParam)
+      setEndDate(toParam)
+    } else {
+      const now = new Date()
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+
+      const startDateStr = firstDay.toISOString().split("T")[0]
+      const endDateStr = lastDay.toISOString().split("T")[0]
+
+      setStartDate(startDateStr)
+      setEndDate(endDateStr)
+
+      const newSearchParams = new URLSearchParams(searchParams.toString())
+      newSearchParams.set("from", startDateStr)
+      newSearchParams.set("to", endDateStr)
+      router.replace(`?${newSearchParams.toString()}`, { scroll: false })
+    }
+  }, [searchParams, router])
+
+  const updateURL = (from: string, to: string) => {
+    const newSearchParams = new URLSearchParams(searchParams.toString())
+    if (from && to) {
+      newSearchParams.set("from", from)
+      newSearchParams.set("to", to)
+    } else {
+      newSearchParams.delete("from")
+      newSearchParams.delete("to")
+    }
+    router.replace(`?${newSearchParams.toString()}`, { scroll: false })
+  }
+
+  const clearFilters = () => {
+    const now = new Date()
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+
+    const startDateStr = firstDay.toISOString().split("T")[0]
+    const endDateStr = lastDay.toISOString().split("T")[0]
+
+    setStartDate(startDateStr)
+    setEndDate(endDateStr)
+    updateURL(startDateStr, endDateStr)
+  }
+
+  const handleStartDateChange = (value: string) => {
+    setStartDate(value)
+    if (value && endDate) {
+      updateURL(value, endDate)
+    }
+  }
+
+  const handleEndDateChange = (value: string) => {
+    setEndDate(value)
+    if (startDate && value) {
+      updateURL(startDate, value)
+    }
+  }
 
   const getFilteredLeads = () => {
     if (!leads || leads.length === 0) return []
 
     let filteredLeads = leads
 
-    if (startDate || endDate) {
+    if (startDate && endDate) {
       filteredLeads = leads.filter((lead) => {
         if (!lead.data_hora_compra) return false
         const leadDate = new Date(lead.data_hora_compra)
 
-        if (startDate && endDate) {
-          const start = new Date(startDate)
-          const end = new Date(endDate)
-          end.setHours(23, 59, 59, 999) // Incluir o dia final completo
-          return leadDate >= start && leadDate <= end
-        } else if (startDate) {
-          const start = new Date(startDate)
-          return leadDate >= start
-        } else if (endDate) {
-          const end = new Date(endDate)
-          end.setHours(23, 59, 59, 999)
-          return leadDate <= end
-        }
+        const start = new Date(startDate)
+        start.setHours(0, 0, 0, 0)
 
-        return true
+        const end = new Date(endDate)
+        end.setHours(23, 59, 59, 999)
+
+        return leadDate >= start && leadDate <= end
       })
     }
 
@@ -47,7 +107,6 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
   const filteredLeads = getFilteredLeads()
 
-  // Função para calcular funil de conversão
   const calculateFunnel = (leadsData: Lead[]) => {
     const totalLeads = leadsData.length
     const contato = leadsData.filter((lead) => lead.conseguiu_contato).length
@@ -99,14 +158,13 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
   const generalFunnel = calculateFunnel(filteredLeads)
 
   const calculateForecast = (leadsData: Lead[]) => {
-    // Definir status que são >= REUNIÃO REALIZADA
     const statusHierarchy = [
       "BACKLOG",
       "TENTANDO CONTATO",
       "QUALI AGENDADA",
       "QUALIFICANDO",
       "REUNIÃO AGENDADA",
-      "REUNIÃO REALIZADA", // A partir daqui são considerados
+      "REUNIÃO REALIZADA",
       "DÚVIDAS E FECHAMENTO",
       "CONTRATO NA RUA",
       "GANHO",
@@ -119,18 +177,11 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
     const minStatusIndex = statusHierarchy.indexOf("REUNIÃO REALIZADA")
 
     const forecastLeads = leadsData.filter((lead) => {
-      // Deve ter valor de proposta preenchido (FEE MRR e/ou FEE ONE-TIME)
       const hasFeeValue =
         (lead.fee_total && Number.parseFloat(String(lead.fee_total)) > 0) ||
         (lead.escopo_fechado && Number.parseFloat(String(lead.escopo_fechado)) > 0)
-
-      // Deve NÃO ter DATA DE ASSINATURA preenchida
       const noDataAssinatura = !lead.data_assinatura
-
-      // Deve NÃO ter MOTIVO DE PERDA preenchido
       const noMotivoPerda = !lead.motivo_perda || lead.motivo_perda.trim() === ""
-
-      // Deve estar em um STATUS >= REUNIÃO REALIZADA
       const currentStatusIndex = statusHierarchy.indexOf(lead.status || "")
       const statusQualified = currentStatusIndex >= minStatusIndex && currentStatusIndex !== -1
 
@@ -168,7 +219,7 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
       "QUALI AGENDADA",
       "QUALIFICANDO",
       "REUNIÃO AGENDADA",
-      "REUNIÃO REALIZADA", // A partir daqui são considerados
+      "REUNIÃO REALIZADA",
       "DÚVIDAS E FECHAMENTO",
       "CONTRATO NA RUA",
       "GANHO",
@@ -272,7 +323,6 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
     funnel: calculateFunnel(sdrLeads),
   }))
 
-  // Componente de funil visual
   const VisualFunnel = ({
     title,
     funnel,
@@ -341,7 +391,6 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
             })}
           </div>
 
-          {/* Métricas de conversão */}
           <div className="pt-2 border-t border-gray-200 mt-3">
             <h4 className="text-xs font-semibold text-gray-700 mb-2">📊 Conversões entre Etapas</h4>
             <div className="grid grid-cols-2 gap-2 text-xs">
@@ -368,7 +417,6 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
             </div>
           </div>
 
-          {/* FEE MRR e FEE ONE TIME */}
           <div className="pt-2 border-t border-gray-200">
             <h4 className="text-xs font-semibold text-gray-700 mb-2">💰 Receita Gerada</h4>
             <div className="grid grid-cols-2 gap-2">
@@ -397,6 +445,15 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
     )
   }
 
+  const getDisplayPeriod = () => {
+    if (startDate && endDate) {
+      const start = new Date(startDate).toLocaleDateString("pt-BR")
+      const end = new Date(endDate).toLocaleDateString("pt-BR")
+      return `${start} até ${end}`
+    }
+    return "Período não definido"
+  }
+
   return (
     <div className="space-y-4">
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 p-4 text-white shadow-xl">
@@ -409,38 +466,47 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
               </div>
               <div>
                 <h1 className="text-xl font-bold">Dashboard & Analytics</h1>
-                <p className="text-sm text-white/80">Análise de Performance e Funis de Conversão</p>
+                <p className="text-sm text-white/80">
+                  Análise de Performance e Funis de Conversão • {getDisplayPeriod()}
+                </p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="flex items-center space-x-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Input
                   type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-32 bg-white/10 border-white/20 text-white placeholder-white/60 backdrop-blur-sm h-7 text-xs"
-                  placeholder="Data inicial"
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  className="min-w-[140px] h-9 bg-white/10 border-white/20 text-white placeholder-white/60 backdrop-blur-sm text-sm px-3 rounded-lg border"
+                  placeholder="dd/mm/aaaa"
                 />
-                <span className="text-white/80 text-xs">até</span>
+                <span className="text-white/80 text-sm">até</span>
                 <Input
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-32 bg-white/10 border-white/20 text-white placeholder-white/60 backdrop-blur-sm h-7 text-xs"
-                  placeholder="Data final"
+                  onChange={(e) => handleEndDateChange(e.target.value)}
+                  className="min-w-[140px] h-9 bg-white/10 border-white/20 text-white placeholder-white/60 backdrop-blur-sm text-sm px-3 rounded-lg border"
+                  placeholder="dd/mm/aaaa"
                 />
+                <Button
+                  onClick={clearFilters}
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 px-3 bg-white/10 hover:bg-white/20 text-white border-white/20 border rounded-lg"
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Limpar
+                </Button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Funil Geral */}
       <div className="mb-4">
         <VisualFunnel title="🎯 Funil Geral" funnel={generalFunnel} totalLeads={filteredLeads.length} color="#dc2626" />
       </div>
 
-      {/* Forecast – Propostas em Aberto */}
       <div className="mb-4">
         <div className="mb-3">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -450,7 +516,6 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
           <p className="text-sm text-gray-500">Potencial de receita futura • Propostas apresentadas mas não fechadas</p>
         </div>
 
-        {/* Cards horizontais dos indicadores principais */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <Card className="border border-gray-200 bg-white shadow-sm">
             <CardContent className="p-4">
@@ -515,7 +580,6 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
           </Card>
         </div>
 
-        {/* Forecast por Closer - Tabela compacta */}
         {forecastByCloser.length > 0 && (
           <Card className="border border-gray-200 bg-white shadow-sm">
             <CardHeader className="pb-3">
@@ -569,7 +633,6 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
         )}
       </div>
 
-      {/* Funis por Closer */}
       <div className="space-y-4">
         <h2 className="text-lg font-bold text-gray-900 mb-3">👥 Funis por Closer</h2>
 
@@ -577,16 +640,16 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
             {closerFunnels.map((closerFunnel, index) => {
               const colors = [
-                "#2563eb", // Azul
-                "#dc2626", // Vermelho
-                "#059669", // Verde
-                "#7c3aed", // Roxo
-                "#ea580c", // Laranja
-                "#0891b2", // Ciano
-                "#be123c", // Rosa
-                "#65a30d", // Lima
-                "#4338ca", // Índigo
-                "#c2410c", // Âmbar
+                "#2563eb",
+                "#dc2626",
+                "#059669",
+                "#7c3aed",
+                "#ea580c",
+                "#0891b2",
+                "#be123c",
+                "#65a30d",
+                "#4338ca",
+                "#c2410c",
               ]
 
               const closerColor = colors[index % colors.length]
@@ -622,7 +685,6 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
         )}
       </div>
 
-      {/* Funis por SDR */}
       <div className="space-y-4">
         <h2 className="text-lg font-bold text-gray-900 mb-3">🎯 Funis por SDR</h2>
 
@@ -630,16 +692,16 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
             {sdrFunnels.map((sdrFunnel, index) => {
               const colors = [
-                "#16a34a", // Verde
-                "#dc2626", // Vermelho
-                "#2563eb", // Azul
-                "#7c3aed", // Roxo
-                "#ea580c", // Laranja
-                "#0891b2", // Ciano
-                "#be123c", // Rosa
-                "#65a30d", // Lima
-                "#4338ca", // Índigo
-                "#c2410c", // Âmbar
+                "#16a34a",
+                "#dc2626",
+                "#2563eb",
+                "#7c3aed",
+                "#ea580c",
+                "#0891b2",
+                "#be123c",
+                "#65a30d",
+                "#4338ca",
+                "#c2410c",
               ]
 
               const sdrColor = colors[index % colors.length]
@@ -675,7 +737,6 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
         )}
       </div>
 
-      {/* Resumo Comparativo */}
       {closerFunnels.length > 0 && (
         <Card className="mt-4">
           <CardHeader className="pb-2">
@@ -760,7 +821,6 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
         </Card>
       )}
 
-      {/* Resumo Comparativo SDRs */}
       {sdrFunnels.length > 0 && (
         <Card className="mt-4">
           <CardHeader className="pb-2">
