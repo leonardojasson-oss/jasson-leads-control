@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BarChart3, X } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
@@ -15,25 +16,34 @@ interface DashboardAnalyticsProps {
 export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
+  const [dateFilterColumn, setDateFilterColumn] = useState<string>("")
+  const [dateFilterStart, setDateFilterStart] = useState<string>("")
+  const [dateFilterEnd, setDateFilterEnd] = useState<string>("")
+
   const searchParams = useSearchParams()
   const router = useRouter()
+
+  const dateFilterOptions = [
+    { value: "data_reuniao", label: "DATA DA REUNIÃO" },
+    { value: "data_ultimo_contato", label: "DATA ÚLTIMO CONTATO" },
+    { value: "data_hora_compra", label: "DATA DA COMPRA" },
+    { value: "data_marcacao", label: "DATA DA MARCAÇÃO" },
+    { value: "data_assinatura", label: "DATA DE ASSINATURA" },
+  ]
 
   function pad(n: number) {
     return n.toString().padStart(2, "0")
   }
 
   function getCurrentMonthRangeLocal() {
-    const now = new Date() // local time
+    const now = new Date()
     const year = now.getFullYear()
-    const month = now.getMonth() // 0 = jan
+    const month = now.getMonth()
 
-    // primeiro dia do mês atual às 00:00:00
     const start = new Date(year, month, 1, 0, 0, 0, 0)
-
     const today = new Date()
     const end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999)
 
-    // Formatos de saída usando getDate(), getMonth() e getFullYear() para evitar problemas de timezone
     const fromISO = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`
     const toISO = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
 
@@ -73,7 +83,6 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
   const clearFilters = () => {
     const { fromISO, toISO } = getCurrentMonthRangeLocal()
-
     setStartDate(fromISO)
     setEndDate(toISO)
     updateURL(fromISO, toISO)
@@ -113,6 +122,19 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
       })
     }
 
+    if (dateFilterColumn && dateFilterStart && dateFilterEnd) {
+      filteredLeads = filteredLeads.filter((lead) => {
+        const leadDateValue = (lead as any)[dateFilterColumn]
+        if (!leadDateValue) return false
+
+        const leadDate = new Date(leadDateValue)
+        const startDate = new Date(dateFilterStart + "T00:00:00")
+        const endDate = new Date(dateFilterEnd + "T23:59:59.999")
+
+        return leadDate >= startDate && leadDate <= endDate
+      })
+    }
+
     return filteredLeads
   }
 
@@ -128,7 +150,7 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
     const leadsComAssinatura = leadsData.filter((lead) => lead.data_assinatura)
 
     const feeMrr = leadsComAssinatura.reduce((sum, lead) => {
-      const fee = Number.parseFloat(String(lead.fee_total || "0"))
+      const fee = Number.parseFloat(String(lead.fee_mrr || "0"))
       return sum + (isNaN(fee) ? 0 : fee)
     }, 0)
 
@@ -458,7 +480,6 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
   const getDisplayPeriod = () => {
     if (startDate && endDate) {
-      // Parse manual das datas para evitar conversão UTC
       const [startYear, startMonth, startDay] = startDate.split("-").map(Number)
       const [endYear, endMonth, endDay] = endDate.split("-").map(Number)
 
@@ -473,10 +494,27 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
     return "Período não definido"
   }
 
+  const applyDateFilter = () => {
+    if (!dateFilterColumn) {
+      alert("Por favor, selecione uma coluna para filtrar.")
+      return
+    }
+    if (!dateFilterStart || !dateFilterEnd) {
+      alert("Por favor, selecione as datas de início e fim.")
+      return
+    }
+  }
+
+  const clearDateFilter = () => {
+    setDateFilterColumn("")
+    setDateFilterStart("")
+    setDateFilterEnd("")
+  }
+
   return (
     <div className="space-y-4">
       <div
-        className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white shadow-xl dashboard-header"
+        className="bg-gradient-to-r from-blue-600 to-blue-700 text-white relative overflow-hidden"
         style={{ padding: "12px 16px" }}
       >
         <div className="absolute inset-0 bg-black/10"></div>
@@ -575,25 +613,61 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
             </div>
           </div>
         </div>
+      </div>
 
-        <style jsx>{`
-          @media (max-width: 1024px) {
-            .da-header-row {
-              flex-direction: column !important;
-              align-items: flex-start !important;
-              gap: 8px !important;
-            }
-            .da-datebar {
-              margin-left: 0 !important;
-              flex-wrap: wrap !important;
-              width: 100% !important;
-            }
-            .date-input {
-              flex: 1 1 160px !important;
-              min-width: 140px !important;
-            }
-          }
-        `}</style>
+      <div className="bg-gray-50 border-b px-4 py-3">
+        <div className="flex items-center space-x-4 flex-wrap gap-2">
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-600 whitespace-nowrap">📅 Filtrar por período:</label>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-600">Filtrar por:</label>
+            <Select value={dateFilterColumn} onValueChange={setDateFilterColumn}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Selecione uma coluna" />
+              </SelectTrigger>
+              <SelectContent>
+                {dateFilterOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-600">De:</label>
+            <Input
+              type="date"
+              value={dateFilterStart}
+              onChange={(e) => setDateFilterStart(e.target.value)}
+              className="w-36"
+              placeholder="dd/mm/aaaa"
+            />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-600">Até:</label>
+            <Input
+              type="date"
+              value={dateFilterEnd}
+              onChange={(e) => setDateFilterEnd(e.target.value)}
+              className="w-36"
+              placeholder="dd/mm/aaaa"
+            />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Button onClick={applyDateFilter} className="h-8">
+              Aplicar Filtro
+            </Button>
+            <Button variant="outline" onClick={clearDateFilter} className="h-8 bg-transparent">
+              Limpar Filtro
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div className="mb-4">
