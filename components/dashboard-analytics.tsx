@@ -18,6 +18,28 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
 
+  function pad(n: number) {
+    return n.toString().padStart(2, "0")
+  }
+
+  function getCurrentMonthRangeLocal() {
+    const now = new Date() // local time
+    const year = now.getFullYear()
+    const month = now.getMonth() // 0 = jan
+
+    // primeiro dia do mês atual às 00:00:00
+    const start = new Date(year, month, 1, 0, 0, 0, 0)
+
+    const today = new Date()
+    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999)
+
+    // Formatos de saída usando getDate(), getMonth() e getFullYear() para evitar problemas de timezone
+    const fromISO = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`
+    const toISO = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+
+    return { start, end, fromISO, toISO }
+  }
+
   useEffect(() => {
     const fromParam = searchParams.get("from")
     const toParam = searchParams.get("to")
@@ -26,19 +48,13 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
       setStartDate(fromParam)
       setEndDate(toParam)
     } else {
-      const now = new Date()
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-
-      const startDateStr = firstDay.toISOString().split("T")[0]
-      const endDateStr = lastDay.toISOString().split("T")[0]
-
-      setStartDate(startDateStr)
-      setEndDate(endDateStr)
+      const { fromISO, toISO } = getCurrentMonthRangeLocal()
+      setStartDate(fromISO)
+      setEndDate(toISO)
 
       const newSearchParams = new URLSearchParams(searchParams.toString())
-      newSearchParams.set("from", startDateStr)
-      newSearchParams.set("to", endDateStr)
+      newSearchParams.set("from", fromISO)
+      newSearchParams.set("to", toISO)
       router.replace(`?${newSearchParams.toString()}`, { scroll: false })
     }
   }, [searchParams, router])
@@ -56,16 +72,11 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
   }
 
   const clearFilters = () => {
-    const now = new Date()
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    const { fromISO, toISO } = getCurrentMonthRangeLocal()
 
-    const startDateStr = firstDay.toISOString().split("T")[0]
-    const endDateStr = lastDay.toISOString().split("T")[0]
-
-    setStartDate(startDateStr)
-    setEndDate(endDateStr)
-    updateURL(startDateStr, endDateStr)
+    setStartDate(fromISO)
+    setEndDate(toISO)
+    updateURL(fromISO, toISO)
   }
 
   const handleStartDateChange = (value: string) => {
@@ -447,60 +458,142 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
   const getDisplayPeriod = () => {
     if (startDate && endDate) {
-      const start = new Date(startDate).toLocaleDateString("pt-BR")
-      const end = new Date(endDate).toLocaleDateString("pt-BR")
-      return `${start} até ${end}`
+      // Parse manual das datas para evitar conversão UTC
+      const [startYear, startMonth, startDay] = startDate.split("-").map(Number)
+      const [endYear, endMonth, endDay] = endDate.split("-").map(Number)
+
+      const start = new Date(startYear, startMonth - 1, startDay)
+      const end = new Date(endYear, endMonth - 1, endDay)
+
+      const startFormatted = start.toLocaleDateString("pt-BR")
+      const endFormatted = end.toLocaleDateString("pt-BR")
+
+      return `${startFormatted} até ${endFormatted}`
     }
     return "Período não definido"
   }
 
   return (
     <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 p-4 text-white shadow-xl">
+      <div
+        className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white shadow-xl dashboard-header"
+        style={{ padding: "12px 16px" }}
+      >
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="relative z-10">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                <BarChart3 className="w-4 h-4 text-white" />
-              </div>
-              <div>
+          <div className="da-header-row" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div className="da-title" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                  <BarChart3 className="w-4 h-4 text-white" />
+                </div>
                 <h1 className="text-xl font-bold">Dashboard & Analytics</h1>
-                <p className="text-sm text-white/80">
-                  Análise de Performance e Funis de Conversão • {getDisplayPeriod()}
-                </p>
               </div>
+              <p className="text-sm text-white/80">
+                Análise de Performance e Funis de Conversão • {getDisplayPeriod()}
+              </p>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => handleStartDateChange(e.target.value)}
-                  className="min-w-[140px] h-9 bg-white/10 border-white/20 text-white placeholder-white/60 backdrop-blur-sm text-sm px-3 rounded-lg border"
-                  placeholder="dd/mm/aaaa"
-                />
-                <span className="text-white/80 text-sm">até</span>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => handleEndDateChange(e.target.value)}
-                  className="min-w-[140px] h-9 bg-white/10 border-white/20 text-white placeholder-white/60 backdrop-blur-sm text-sm px-3 rounded-lg border"
-                  placeholder="dd/mm/aaaa"
-                />
-                <Button
-                  onClick={clearFilters}
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 px-3 bg-white/10 hover:bg-white/20 text-white border-white/20 border rounded-lg"
-                >
-                  <X className="w-4 h-4 mr-1" />
-                  Limpar
-                </Button>
-              </div>
+
+            <div
+              className="da-datebar"
+              style={{
+                marginLeft: "auto",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                flexWrap: "nowrap",
+              }}
+            >
+              <label
+                style={{
+                  fontSize: "12px",
+                  color: "rgba(255,255,255,0.85)",
+                  marginRight: "4px",
+                }}
+              >
+                De
+              </label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => handleStartDateChange(e.target.value)}
+                className="date-input"
+                style={{
+                  height: "32px",
+                  minWidth: "150px",
+                  fontSize: "14px",
+                  padding: "0 8px",
+                  borderRadius: "8px",
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  borderColor: "rgba(255,255,255,0.2)",
+                  color: "white",
+                }}
+                placeholder="dd/mm/aaaa"
+              />
+              <label
+                style={{
+                  fontSize: "12px",
+                  color: "rgba(255,255,255,0.85)",
+                  marginRight: "4px",
+                }}
+              >
+                até
+              </label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => handleEndDateChange(e.target.value)}
+                className="date-input"
+                style={{
+                  height: "32px",
+                  minWidth: "150px",
+                  fontSize: "14px",
+                  padding: "0 8px",
+                  borderRadius: "8px",
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  borderColor: "rgba(255,255,255,0.2)",
+                  color: "white",
+                }}
+                placeholder="dd/mm/aaaa"
+              />
+              <Button
+                onClick={clearFilters}
+                className="btn-clear"
+                style={{
+                  height: "32px",
+                  padding: "0 10px",
+                  fontSize: "13px",
+                  borderRadius: "8px",
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  borderColor: "rgba(255,255,255,0.2)",
+                  color: "white",
+                }}
+              >
+                <X className="w-4 h-4 mr-1" />
+                Limpar
+              </Button>
             </div>
           </div>
         </div>
+
+        <style jsx>{`
+          @media (max-width: 1024px) {
+            .da-header-row {
+              flex-direction: column !important;
+              align-items: flex-start !important;
+              gap: 8px !important;
+            }
+            .da-datebar {
+              margin-left: 0 !important;
+              flex-wrap: wrap !important;
+              width: 100% !important;
+            }
+            .date-input {
+              flex: 1 1 160px !important;
+              min-width: 140px !important;
+            }
+          }
+        `}</style>
       </div>
 
       <div className="mb-4">
