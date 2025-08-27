@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from "@/components/ui/checkbox"
 import type { Lead } from "@/app/page"
 import { createClient } from "@supabase/supabase-js"
+import { debounce } from "lodash"
 
 interface LeadsSpreadsheetProps {
   leads: Lead[]
@@ -55,6 +56,83 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null
 
+  const leadsRef = useRef<Lead[]>([])
+  const editingFieldsRef = useRef<Record<string, boolean>>({})
+  const lastUpdateTimesRef = useRef<Record<string, number>>({})
+
+  useEffect(() => {
+    leadsRef.current = leads
+  }, [leads])
+
+  useEffect(() => {
+    editingFieldsRef.current = editingFields
+  }, [editingFields])
+
+  useEffect(() => {
+    lastUpdateTimesRef.current = lastUpdateTimes
+  }, [lastUpdateTimes])
+
+  const [leadsState, setLeads] = useState<Lead[]>(leads)
+
+  const setLeadsIfChanged = useCallback(
+    (nextLeads: Lead[]) => {
+      if (JSON.stringify(leadsRef.current) !== JSON.stringify(nextLeads)) {
+        setLeads(nextLeads)
+      }
+    },
+    [setLeads],
+  )
+
+  const handleRealtimeUpdate = useCallback(
+    (updatedLead: Lead) => {
+      const leadId = updatedLead.id
+      const currentTime = Date.now()
+
+      // Evitar loops de atualização - ignorar se foi atualizado recentemente por este cliente
+      if (lastUpdateTimesRef.current[leadId] && currentTime - lastUpdateTimesRef.current[leadId] < 2000) {
+        console.log("[v0] Ignorando atualização recente para evitar loop:", leadId)
+        return
+      }
+
+      // Identificar campos que estão sendo editados atualmente
+      const fieldsBeingEdited = new Set<string>()
+      Object.keys(editingFieldsRef.current).forEach((key) => {
+        if (key.startsWith(`${leadId}-`)) {
+          const field = key.split("-")[1]
+          fieldsBeingEdited.add(field)
+        }
+      })
+
+      // Mesclar dados: preservar campos em edição, atualizar os demais
+      const currentLead = leadsRef.current.find((lead) => lead.id === leadId)
+      if (!currentLead) return
+
+      const mergedUpdates: Partial<Lead> = {}
+
+      // Copiar apenas campos que não estão sendo editados
+      Object.keys(updatedLead).forEach((key) => {
+        if (!fieldsBeingEdited.has(key)) {
+          mergedUpdates[key as keyof Lead] = updatedLead[key as keyof Lead]
+        }
+      })
+
+      const hasChanges = Object.keys(mergedUpdates).some(
+        (key) => currentLead[key as keyof Lead] !== mergedUpdates[key as keyof Lead],
+      )
+
+      if (!hasChanges) {
+        console.log("[v0] Nenhuma mudança real detectada, ignorando atualização")
+        return
+      }
+
+      // Atualizar silenciosamente apenas a linha específica
+      const updatedLeads = leadsRef.current.map((lead) => (lead.id === leadId ? { ...lead, ...mergedUpdates } : lead))
+
+      setLeadsIfChanged(updatedLeads)
+    },
+    [], // Sem dependências porque usa refs
+  )
+
   useEffect(() => {
     if (!supabase) return
 
@@ -74,7 +152,53 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
 
           if (payload.eventType === "UPDATE" && payload.new) {
             const updatedLead = payload.new as Lead
-            handleRealtimeUpdate(updatedLead)
+
+            const leadId = updatedLead.id
+            const currentTime = Date.now()
+
+            // Evitar loops de atualização - ignorar se foi atualizado recentemente por este cliente
+            if (lastUpdateTimesRef.current[leadId] && currentTime - lastUpdateTimesRef.current[leadId] < 2000) {
+              console.log("[v0] Ignorando atualização recente para evitar loop:", leadId)
+              return
+            }
+
+            // Identificar campos que estão sendo editados atualmente
+            const fieldsBeingEdited = new Set<string>()
+            Object.keys(editingFieldsRef.current).forEach((key) => {
+              if (key.startsWith(`${leadId}-`)) {
+                const field = key.split("-")[1]
+                fieldsBeingEdited.add(field)
+              }
+            })
+
+            // Mesclar dados: preservar campos em edição, atualizar os demais
+            const currentLead = leadsRef.current.find((lead) => lead.id === leadId)
+            if (!currentLead) return
+
+            const mergedUpdates: Partial<Lead> = {}
+
+            // Copiar apenas campos que não estão sendo editados
+            Object.keys(updatedLead).forEach((key) => {
+              if (!fieldsBeingEdited.has(key)) {
+                mergedUpdates[key as keyof Lead] = updatedLead[key as keyof Lead]
+              }
+            })
+
+            const hasChanges = Object.keys(mergedUpdates).some(
+              (key) => currentLead[key as keyof Lead] !== mergedUpdates[key as keyof Lead],
+            )
+
+            if (!hasChanges) {
+              console.log("[v0] Nenhuma mudança real detectada, ignorando atualização")
+              return
+            }
+
+            // Atualizar silenciosamente apenas a linha específica
+            const updatedLeads = leadsRef.current.map((lead) =>
+              lead.id === leadId ? { ...lead, ...mergedUpdates } : lead,
+            )
+
+            setLeadsIfChanged(updatedLeads)
           }
         },
       )
@@ -90,64 +214,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         supabase.removeChannel(subscription)
       }
     }
-  }, [supabase])
-
-  const handleRealtimeUpdate = useCallback(
-    (updatedLead: Lead) => {
-      const leadId = updatedLead.id
-      const currentTime = Date.now()
-
-      // Evitar loops de atualização - ignorar se foi atualizado recentemente por este cliente
-      if (lastUpdateTimes[leadId] && currentTime - lastUpdateTimes[leadId] < 2000) {
-        console.log("[v0] Ignorando atualização recente para evitar loop:", leadId)
-        return
-      }
-
-      // Identificar campos que estão sendo editados atualmente
-      const fieldsBeingEdited = new Set<string>()
-      Object.keys(editingFields).forEach((key) => {
-        if (key.startsWith(`${leadId}-`)) {
-          const field = key.split("-")[1]
-          fieldsBeingEdited.add(field)
-        }
-      })
-
-      // Mesclar dados: preservar campos em edição, atualizar os demais
-      const currentLead = leads.find((lead) => lead.id === leadId)
-      if (!currentLead) return
-
-      const mergedUpdates: Partial<Lead> = {}
-
-      // Para cada campo do lead atualizado
-      Object.keys(updatedLead).forEach((field) => {
-        const fieldKey = field as keyof Lead
-
-        // Se o campo está sendo editado, preservar o valor atual sendo digitado
-        if (fieldsBeingEdited.has(field)) {
-          console.log("[v0] Preservando campo em edição:", field)
-          return
-        }
-
-        // Se o valor mudou, incluir na atualização
-        if (updatedLead[fieldKey] !== currentLead[fieldKey]) {
-          mergedUpdates[fieldKey] = updatedLead[fieldKey]
-          console.log("[v0] Campo atualizado:", field, "de", currentLead[fieldKey], "para", updatedLead[fieldKey])
-        }
-      })
-
-      // Se há atualizações para aplicar, fazer silenciosamente
-      if (Object.keys(mergedUpdates).length > 0) {
-        console.log("[v0] Aplicando mesclagem silenciosa para lead:", leadId, mergedUpdates)
-
-        // Atualizar silenciosamente sem disparar nova sincronização
-        onUpdateLead(leadId, mergedUpdates, true)
-
-        // Registrar timestamp para evitar loops
-        setLastUpdateTimes((prev) => ({ ...prev, [leadId]: currentTime }))
-      }
-    },
-    [leads, editingFields, lastUpdateTimes, onUpdateLead],
-  )
+  }, [supabase]) // Removendo handleRealtimeUpdate das dependências
 
   const debouncedUpdate = useCallback(
     (leadId: string, field: string, value: any) => {
@@ -206,6 +273,22 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       }, 300)
     },
     [pendingUpdates, onUpdateLead],
+  )
+
+  const debouncedCellUpdate = useCallback(
+    debounce((leadId: string, field: string, value: any) => {
+      const lead = leadsRef.current.find((l) => l.id === leadId)
+      if (!lead) return
+
+      // Marcar timestamp da atualização para evitar loops
+      setLastUpdateTimes((prev) => ({
+        ...prev,
+        [leadId]: Date.now(),
+      }))
+
+      onUpdateLead(leadId, { [field]: value })
+    }, 300),
+    [onUpdateLead],
   )
 
   const columns = [
@@ -398,7 +481,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         console.log("[v0] Flag resetada")
       }, 100)
     }
-  }, [leads.length, leads])
+  }, [leadsState.length, leads])
 
   useEffect(() => {
     const container = scrollContainerRef.current
@@ -439,17 +522,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     localStorage.setItem("leadsSpreadsheetPresets", JSON.stringify(newPresetColumns))
   }
 
-  const handleCellEdit = async (leadId: string, field: string, value: any) => {
-    handleCellEditEnd(leadId, field)
+  const handleCellEdit = (leadId: string, field: string, value: any) => {
+    const updatedLeads = leadsRef.current.map((lead) => (lead.id === leadId ? { ...lead, [field]: value } : lead))
+    setLeadsIfChanged(updatedLeads)
 
-    if (scrollContainerRef.current) {
-      scrollPositionRef.current = scrollContainerRef.current.scrollLeft
-      isUpdatingRef.current = true
-      console.log("[v0] Salvando posição antes da atualização:", scrollPositionRef.current)
-    }
-
-    // Usar debounce para atualizações mais suaves
-    debouncedUpdate(leadId, field, value)
+    debouncedCellUpdate(leadId, field, value)
   }
 
   const updateLeadSilently = useCallback(
@@ -820,7 +897,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   }
 
   const visibleColumnsArray = columns.filter((col) => visibleColumns[col.key])
-  const filteredLeads = leads
+  const filteredLeads = leadsState
     .filter((lead) => {
       // Column filters
       const passesColumnFilters = Object.entries(columnFilters).every(([columnKey, selectedValues]) => {
