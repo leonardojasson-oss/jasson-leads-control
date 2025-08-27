@@ -9,6 +9,7 @@ import { RefreshCw, Settings, Filter, Calendar } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { Lead } from "@/app/page"
+import { createClient } from "@supabase/supabase-js"
 
 interface LeadsSpreadsheetProps {
   leads: Lead[]
@@ -38,6 +39,10 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   const [editingFields, setEditingFields] = useState<Record<string, string>>({}) // leadId-field -> valor sendo editado
   const [lastUpdateTimes, setLastUpdateTimes] = useState<Record<string, number>>({}) // leadId -> timestamp da última atualização
 
+  const [realtimeSubscription, setRealtimeSubscription] = useState<any>(null)
+  const [pendingUpdates, setPendingUpdates] = useState<Record<string, Partial<Lead>>>({}) // leadId -> updates pendentes
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
   const dateFilterOptions = [
     { value: "data_reuniao", label: "DATA DA REUNIÃO" },
     { value: "data_ultimo_contato", label: "DATA ÚLTIMO CONTATO" },
@@ -45,6 +50,163 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     { value: "data_marcacao", label: "DATA DA MARCAÇÃO" },
     { value: "data_assinatura", label: "DATA DE ASSINATURA" },
   ]
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null
+
+  useEffect(() => {
+    if (!supabase) return
+
+    console.log("[v0] Configurando subscrição Realtime para leads...")
+
+    const subscription = supabase
+      .channel("leads-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "leads",
+        },
+        (payload) => {
+          console.log("[v0] Mudança detectada via Realtime:", payload)
+
+          if (payload.eventType === "UPDATE" && payload.new) {
+            const updatedLead = payload.new as Lead
+            handleRealtimeUpdate(updatedLead)
+          }
+        },
+      )
+      .subscribe((status) => {
+        console.log("[v0] Status da subscrição Realtime:", status)
+      })
+
+    setRealtimeSubscription(subscription)
+
+    return () => {
+      console.log("[v0] Limpando subscrição Realtime...")
+      if (subscription) {
+        supabase.removeChannel(subscription)
+      }
+    }
+  }, [supabase])
+
+  const handleRealtimeUpdate = useCallback(
+    (updatedLead: Lead) => {
+      const leadId = updatedLead.id
+      const currentTime = Date.now()
+
+      // Evitar loops de atualização - ignorar se foi atualizado recentemente por este cliente
+      if (lastUpdateTimes[leadId] && currentTime - lastUpdateTimes[leadId] < 2000) {
+        console.log("[v0] Ignorando atualização recente para evitar loop:", leadId)
+        return
+      }
+
+      // Identificar campos que estão sendo editados atualmente
+      const fieldsBeingEdited = new Set<string>()
+      Object.keys(editingFields).forEach((key) => {
+        if (key.startsWith(`${leadId}-`)) {
+          const field = key.split("-")[1]
+          fieldsBeingEdited.add(field)
+        }
+      })
+
+      // Mesclar dados: preservar campos em edição, atualizar os demais
+      const currentLead = leads.find((lead) => lead.id === leadId)
+      if (!currentLead) return
+
+      const mergedUpdates: Partial<Lead> = {}
+
+      // Para cada campo do lead atualizado
+      Object.keys(updatedLead).forEach((field) => {
+        const fieldKey = field as keyof Lead
+
+        // Se o campo está sendo editado, preservar o valor atual sendo digitado
+        if (fieldsBeingEdited.has(field)) {
+          console.log("[v0] Preservando campo em edição:", field)
+          return
+        }
+
+        // Se o valor mudou, incluir na atualização
+        if (updatedLead[fieldKey] !== currentLead[fieldKey]) {
+          mergedUpdates[fieldKey] = updatedLead[fieldKey]
+          console.log("[v0] Campo atualizado:", field, "de", currentLead[fieldKey], "para", updatedLead[fieldKey])
+        }
+      })
+
+      // Se há atualizações para aplicar, fazer silenciosamente
+      if (Object.keys(mergedUpdates).length > 0) {
+        console.log("[v0] Aplicando mesclagem silenciosa para lead:", leadId, mergedUpdates)
+
+        // Atualizar silenciosamente sem disparar nova sincronização
+        onUpdateLead(leadId, mergedUpdates, true)
+
+        // Registrar timestamp para evitar loops
+        setLastUpdateTimes((prev) => ({ ...prev, [leadId]: currentTime }))
+      }
+    },
+    [leads, editingFields, lastUpdateTimes, onUpdateLead],
+  )
+
+  const debouncedUpdate = useCallback(
+    (leadId: string, field: string, value: any) => {
+      // Cancelar timeout anterior se existir
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+
+      // Acumular updates pendentes
+      setPendingUpdates((prev) => ({
+        ...prev,
+        [leadId]: {
+          ...prev[leadId],
+          [field]: value,
+        },
+      }))
+
+      // Executar após debounce de 300ms
+      debounceTimeoutRef.current = setTimeout(() => {
+        const updates = pendingUpdates[leadId] || { [field]: value }
+
+        // Aplicar regras de negócio
+        let finalUpdates = { ...updates }
+
+        if (field === "data_assinatura" && value && value.trim() !== "") {
+          finalUpdates = {
+            ...finalUpdates,
+            data_reuniao: value,
+            venda_via_jasson_co: true,
+            status: "GANHO",
+          }
+        } else if (field === "reuniao_agendada" && value === true) {
+          finalUpdates.status = "REUNIÃO AGENDADA"
+        } else if (field === "reuniao_realizada" && value === true) {
+          finalUpdates.status = "REUNIÃO REALIZADA"
+        } else if (field === "reuniao_realizada" && value === false) {
+          finalUpdates.status = "NO-SHOW"
+        } else if (field === "motivo_perda" && value && value.trim() !== "") {
+          finalUpdates.status = "PERDIDO"
+        }
+
+        // Registrar timestamp antes da atualização
+        setLastUpdateTimes((prev) => ({ ...prev, [leadId]: Date.now() }))
+
+        // Executar atualização
+        onUpdateLead(leadId, finalUpdates)
+
+        // Limpar updates pendentes
+        setPendingUpdates((prev) => {
+          const newPending = { ...prev }
+          delete newPending[leadId]
+          return newPending
+        })
+
+        console.log("[v0] Atualização executada após debounce:", leadId, finalUpdates)
+      }, 300)
+    },
+    [pendingUpdates, onUpdateLead],
+  )
 
   const columns = [
     { key: "nome_empresa", label: "LEAD", width: "200px", type: "text", essential: true },
@@ -286,53 +448,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       console.log("[v0] Salvando posição antes da atualização:", scrollPositionRef.current)
     }
 
-    let updates: Partial<Lead> = { [field]: value }
-
-    // Regra: Se DATA DE ASSINATURA for preenchida → STATUS = "GANHO"
-    if (field === "data_assinatura" && value && value.trim() !== "") {
-      updates = {
-        ...updates,
-        data_reuniao: value,
-        venda_via_jasson_co: true,
-        status: "GANHO",
-      }
-      console.log("[v0] DATA DE ASSINATURA preenchida - STATUS alterado para GANHO:", {
-        leadId,
-        data_assinatura: value,
-      })
-    }
-    // Regra: Se RM = ✅ → STATUS = "REUNIÃO AGENDADA"
-    else if (field === "reuniao_agendada" && value === true) {
-      updates.status = "REUNIÃO AGENDADA"
-      console.log("[v0] RM marcado como ✅ - STATUS alterado para REUNIÃO AGENDADA:", leadId)
-    }
-    // Regra: Se RR = ✅ → STATUS = "REUNIÃO REALIZADA"
-    else if (field === "reuniao_realizada" && value === true) {
-      updates.status = "REUNIÃO REALIZADA"
-      console.log("[v0] RR marcado como ✅ - STATUS alterado para REUNIÃO REALIZADA:", leadId)
-    }
-    // Regra: Se RR = ❌ → STATUS = "NO-SHOW"
-    else if (field === "reuniao_realizada" && value === false) {
-      updates.status = "NO-SHOW"
-      console.log("[v0] RR marcado como ❌ - STATUS alterado para NO-SHOW:", leadId)
-    } else if (field === "motivo_perda" && value && value.trim() !== "") {
-      updates.status = "PERDIDO"
-      console.log("[v0] MOTIVO DE PERDA preenchido - STATUS alterado para PERDIDO:", {
-        leadId,
-        motivo_perda: value,
-      })
-    }
-
-    try {
-      await new Promise<void>((resolve, reject) => {
-        onUpdateLead(leadId, updates)
-        setTimeout(resolve, 10)
-      })
-      console.log("[v0] Lead atualizado com sucesso")
-    } catch (error) {
-      console.error("[v0] Erro ao salvar lead:", error)
-      isUpdatingRef.current = false
-    }
+    // Usar debounce para atualizações mais suaves
+    debouncedUpdate(leadId, field, value)
   }
 
   const updateLeadSilently = useCallback(
@@ -431,99 +548,6 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     const cellKey = `${lead.id}-${column.key}`
     const isEditingThisCell = editingCell === cellKey
     const value = getCellValue(lead, column.key)
-
-    if (isEditingThisCell) {
-      switch (column.type) {
-        case "select":
-          return (
-            <Select
-              value={formatValue(value, column.type)}
-              onValueChange={(newValue) => {
-                handleCellEdit(lead.id, column.key, newValue)
-                setEditingCell(null)
-              }}
-              onOpenChange={(open) => !open && setEditingCell(null)}
-            >
-              <SelectTrigger
-                className="h-7 text-xs border-blue-500 text-center"
-                style={{ display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {column.options?.map((option: string) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )
-
-        case "boolean":
-        case "tristate":
-          return (
-            <Select
-              value={value ? "true" : value === false ? "false" : "none"}
-              onValueChange={(newValue) => {
-                const finalValue = newValue === "true" ? true : newValue === "false" ? false : null
-                handleCellEdit(lead.id, column.key, finalValue)
-                setEditingCell(null)
-              }}
-              onOpenChange={(open) => !open && setEditingCell(null)}
-            >
-              <SelectTrigger
-                className="h-7 text-xs border-blue-500 text-center"
-                style={{ display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Em branco</SelectItem>
-                <SelectItem value="true">✅</SelectItem>
-                {column.key === "reuniao_realizada" && <SelectItem value="false">❌</SelectItem>}
-              </SelectContent>
-            </Select>
-          )
-
-        default:
-          return (
-            <Input
-              type={column.type}
-              value={isEditing ? tempValue : formatValue(value, column.type)}
-              onChange={(e) => {
-                setTempValue(e.target.value)
-              }}
-              onFocus={() => {
-                setIsEditing(true)
-                setTempValue(formatValue(value, column.type))
-              }}
-              onBlur={(e) => {
-                handleCellEdit(lead.id, column.key, e.target.value)
-                setEditingCell(null)
-                setIsEditing(false)
-                setTempValue("")
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  handleCellEdit(lead.id, column.key, e.currentTarget.value)
-                  setEditingCell(null)
-                  setIsEditing(false)
-                  setTempValue("")
-                }
-                if (e.key === "Escape") {
-                  setEditingCell(null)
-                  setIsEditing(false)
-                  setTempValue("")
-                }
-              }}
-              className="h-7 text-xs border-blue-500 text-center"
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}
-              autoFocus
-            />
-          )
-      }
-    }
 
     const displayValue = (() => {
       switch (column.type) {
@@ -736,7 +760,10 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
                   {uniqueValues.map((value, index) => {
                     const isSelected = activeFilters.includes(value)
                     return (
-                      <div key={index} className="flex items-center space-x-2 hover:bg-gray-100 p-1 rounded">
+                      <div
+                        key={index}
+                        className="flex items-center space-x-2 py-0 px-1 hover:bg-gray-100 rounded leading-none"
+                      >
                         <Checkbox
                           id={`${column.key}-${index}`}
                           checked={isSelected}
