@@ -64,6 +64,7 @@ export type Lead = {
   status_comissao?: string
   created_at?: string
   updated_at?: string
+  row_version?: number
 }
 
 // Operações localStorage como fallback
@@ -99,6 +100,7 @@ const localStorageOperations = {
       id: Date.now().toString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      row_version: 0,
     }
 
     const leads = this.getAll()
@@ -117,6 +119,7 @@ const localStorageOperations = {
       ...leads[index],
       ...leadUpdate,
       updated_at: new Date().toISOString(),
+      row_version: (leads[index].row_version || 0) + 1,
     }
 
     this.save(leads)
@@ -279,84 +282,56 @@ export const leadOperations = {
     console.log("[v0] ID:", id)
     console.log("[v0] Dados recebidos:", lead)
 
+    const { row_version, ...leadUpdate } = lead
+    const currentRowVersion = row_version || 0
+
     // Sempre atualizar localStorage primeiro
-    const localResult = localStorageOperations.update(id, lead)
+    const localResult = localStorageOperations.update(id, leadUpdate)
     console.log("[v0] Lead atualizado no localStorage")
 
     // Tentar atualizar no Supabase se configurado
     if (isSupabaseConfigured && supabase) {
       try {
-        console.log("[v0] Tentando atualizar no Supabase...")
+        console.log("[v0] Tentando atualizar no Supabase com controle de concorrência...")
+        console.log("[v0] Row version atual:", currentRowVersion)
 
         const cleanedLead = {
-          ...cleanDataForSupabase(lead),
+          ...cleanDataForSupabase(leadUpdate),
           updated_at: new Date().toISOString(),
         }
         console.log("[v0] Dados limpos para Supabase:", cleanedLead)
 
-        if (cleanedLead.data_assinatura !== undefined) {
-          console.log("[v0] Detectado data_assinatura:", cleanedLead.data_assinatura)
+        const { data, error, count } = await supabase
+          .from("leads")
+          .update(cleanedLead)
+          .eq("id", id)
+          .eq("row_version", currentRowVersion)
+          .select()
+          .single()
 
-          console.log("[v0] Tentando atualização direta com data_assinatura...")
-          const { data, error } = await supabase.from("leads").update(cleanedLead).eq("id", id).select().single()
+        if (error || !data) {
+          console.log("[v0] ❌ Conflito de concorrência detectado ou erro:", error?.message)
 
-          if (error) {
-            console.log("[v0] ❌ Erro na atualização direta:", error.message)
-            console.log("[v0] Detalhes do erro:", error)
-
-            // Se falhar, salvar os outros campos e tentar data_assinatura separadamente
-            const { data_assinatura, ...otherFields } = cleanedLead
-            console.log("[v0] Tentando salvar outros campos sem data_assinatura...")
-
-            const { data: partialData, error: partialError } = await supabase
-              .from("leads")
-              .update(otherFields)
-              .eq("id", id)
-              .select()
-              .single()
-
-            if (partialError) {
-              console.error("[v0] ❌ Erro ao atualizar outros campos:", partialError)
-              return localResult
-            } else {
-              console.log("[v0] ✅ Outros campos atualizados no Supabase")
-
-              // Tentar salvar data_assinatura via SQL raw
-              try {
-                console.log("[v0] Tentando salvar data_assinatura separadamente...")
-                const { error: sqlError } = await supabase.from("leads").update({ data_assinatura }).eq("id", id)
-
-                if (sqlError) {
-                  console.log("[v0] ⚠️ Não foi possível salvar data_assinatura no Supabase:", sqlError.message)
-                  console.log("[v0] Detalhes do erro data_assinatura:", sqlError)
-                } else {
-                  console.log("[v0] ✅ data_assinatura salva no Supabase com sucesso!")
-                }
-              } catch (sqlErr) {
-                console.log("[v0] ⚠️ Exceção ao salvar data_assinatura:", sqlErr)
-              }
-
-              return partialData
-            }
-          } else {
-            console.log("[v0] ✅ Lead atualizado no Supabase com data_assinatura - SUCESSO TOTAL!")
-            return data
+          // Check if it's a concurrency conflict (no rows updated)
+          if (count === 0 || error?.message?.includes("row_version")) {
+            console.log("[v0] 🔄 Conflito de concorrência - lead foi modificado por outro usuário")
+            throw new Error("Conflicting update - lead was modified by another user")
           }
-        } else {
-          // Atualização normal sem data_assinatura
-          console.log("[v0] Atualização normal sem data_assinatura")
-          const { data, error } = await supabase.from("leads").update(cleanedLead).eq("id", id).select().single()
 
-          if (error) {
-            console.error("[v0] ❌ Erro ao atualizar no Supabase:", error)
-            return localResult
-          } else {
-            console.log("[v0] ✅ Lead também atualizado no Supabase")
-            return data
-          }
+          console.log("[v0] ❌ Erro na atualização:", error)
+          return localResult
         }
+
+        console.log("[v0] ✅ Lead atualizado no Supabase com controle de concorrência")
+        return data
       } catch (supabaseError) {
         console.error("[v0] ❌ Exceção ao atualizar no Supabase:", supabaseError)
+
+        // Re-throw concurrency errors to be handled by the UI
+        if (supabaseError.message?.includes("Conflicting update")) {
+          throw supabaseError
+        }
+
         return localResult
       }
     } else {
