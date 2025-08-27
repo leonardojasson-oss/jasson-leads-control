@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useLayoutEffect } from "react"
+import { useState, useEffect, useRef, useLayoutEffect, useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
@@ -12,7 +12,7 @@ import type { Lead } from "@/app/page"
 
 interface LeadsSpreadsheetProps {
   leads: Lead[]
-  onUpdateLead: (id: string, updates: Partial<Lead>) => void
+  onUpdateLead: (id: string, updates: Partial<Lead>, silent?: boolean) => void
   onRefresh: () => void
 }
 
@@ -34,6 +34,9 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   const scrollPositionRef = useRef<number>(0)
   const isUpdatingRef = useRef<boolean>(false)
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  const [editingFields, setEditingFields] = useState<Record<string, string>>({}) // leadId-field -> valor sendo editado
+  const [lastUpdateTimes, setLastUpdateTimes] = useState<Record<string, number>>({}) // leadId -> timestamp da última atualização
 
   const dateFilterOptions = [
     { value: "data_reuniao", label: "DATA DA REUNIÃO" },
@@ -275,6 +278,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   }
 
   const handleCellEdit = async (leadId: string, field: string, value: any) => {
+    handleCellEditEnd(leadId, field)
+
     if (scrollContainerRef.current) {
       scrollPositionRef.current = scrollContainerRef.current.scrollLeft
       isUpdatingRef.current = true
@@ -329,6 +334,55 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       isUpdatingRef.current = false
     }
   }
+
+  const updateLeadSilently = useCallback(
+    (updatedLead: Lead) => {
+      const leadKey = updatedLead.id
+      const currentTime = Date.now()
+
+      // Verificar se houve atualização recente para evitar loops
+      if (lastUpdateTimes[leadKey] && currentTime - lastUpdateTimes[leadKey] < 1000) {
+        return
+      }
+
+      // Preservar campos que estão sendo editados
+      const preservedFields: Partial<Lead> = {}
+      Object.keys(editingFields).forEach((key) => {
+        if (key.startsWith(`${leadKey}-`)) {
+          const field = key.split("-")[1]
+          preservedFields[field as keyof Lead] = editingFields[key] as any
+        }
+      })
+
+      // Mesclar dados atualizados com campos preservados
+      const mergedLead = { ...updatedLead, ...preservedFields }
+
+      // Atualizar apenas este lead na lista
+      onUpdateLead(leadKey, mergedLead, true) // true indica atualização silenciosa
+
+      // Registrar timestamp da atualização
+      setLastUpdateTimes((prev) => ({ ...prev, [leadKey]: currentTime }))
+
+      console.log("[v0] Lead atualizado silenciosamente:", leadKey, "campos preservados:", Object.keys(preservedFields))
+    },
+    [editingFields, lastUpdateTimes, onUpdateLead],
+  )
+
+  const handleCellEditStart = useCallback((leadId: string, field: string, currentValue: any) => {
+    const key = `${leadId}-${field}`
+    setEditingFields((prev) => ({ ...prev, [key]: currentValue }))
+    console.log("[v0] Iniciando edição:", key, currentValue)
+  }, [])
+
+  const handleCellEditEnd = useCallback((leadId: string, field: string) => {
+    const key = `${leadId}-${field}`
+    setEditingFields((prev) => {
+      const newState = { ...prev }
+      delete newState[key]
+      return newState
+    })
+    console.log("[v0] Finalizando edição:", key)
+  }, [])
 
   const getCellValue = (lead: Lead, field: string) => {
     return (lead as any)[field]
