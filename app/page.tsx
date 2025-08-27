@@ -23,7 +23,6 @@ import { DashboardAnalytics } from "@/components/dashboard-analytics"
 import { MetasControl } from "@/components/metas-control"
 import { NovoLeadModal } from "@/components/novo-lead-modal"
 import { leadOperations, type Lead, isSupabaseConfigured, testSupabaseConnection } from "@/lib/supabase-operations"
-import { subscribeLeadsRealtime, subscribeDashboardRealtime } from "@/lib/realtime-subscriptions"
 import { LeadsSpreadsheet } from "@/components/leads-spreadsheet"
 
 export type { Lead }
@@ -138,34 +137,11 @@ export default function LeadsControl() {
     },
   }
 
-  const loadLeads = async () => {
-    console.log("🔄 === CARREGANDO LEADS ===")
-    try {
-      setLoading(true)
-      setSupabaseStatus("loading")
-
-      const supabaseWorking = await testSupabaseConnection()
-      console.log("🔍 Supabase funcionando:", supabaseWorking)
-
-      const loadedLeads = await leadOperations.getAll()
-      setLeads(loadedLeads)
-      console.log("✅ Leads carregados:", loadedLeads.length)
-
-      if (isSupabaseConfigured && supabaseWorking) {
-        setSupabaseStatus("connected")
-        console.log("✅ Status: Conectado ao Supabase")
-      } else {
-        setSupabaseStatus("local")
-        console.log("📱 Status: Modo Local")
-      }
-    } catch (error) {
-      console.error("❌ Erro ao carregar leads:", error)
-      setLeads([])
-      setSupabaseStatus("local")
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Carregar leads na inicialização
+  useEffect(() => {
+    loadLeads()
+    loadMetasConfig()
+  }, [])
 
   const loadMetasConfig = () => {
     try {
@@ -219,53 +195,34 @@ export default function LeadsControl() {
     }
   }
 
-  // Carregar leads na inicialização
-  useEffect(() => {
-    let leadsUnsubscribe: (() => void) | null = null
-    let dashboardUnsubscribe: (() => void) | null = null
+  const loadLeads = async () => {
+    console.log("🔄 === CARREGANDO LEADS ===")
+    try {
+      setLoading(true)
+      setSupabaseStatus("loading")
 
-    const setupRealtime = async () => {
-      try {
-        console.log("[v0] Setting up realtime subscriptions...")
+      const supabaseWorking = await testSupabaseConnection()
+      console.log("🔍 Supabase funcionando:", supabaseWorking)
 
-        leadsUnsubscribe = subscribeLeadsRealtime(() => {
-          console.log("[v0] Realtime: Leads changed, reloading...")
-          loadLeads()
-        })
+      const loadedLeads = await leadOperations.getAll()
+      setLeads(loadedLeads)
+      console.log("✅ Leads carregados:", loadedLeads.length)
 
-        dashboardUnsubscribe = subscribeDashboardRealtime(() => {
-          console.log("[v0] Realtime: Dashboard data changed, reloading...")
-          loadLeads()
-        })
-
-        console.log("[v0] Realtime subscriptions established")
-      } catch (error) {
-        console.error("[v0] Error setting up realtime subscriptions:", error)
+      if (isSupabaseConfigured && supabaseWorking) {
+        setSupabaseStatus("connected")
+        console.log("✅ Status: Conectado ao Supabase")
+      } else {
+        setSupabaseStatus("local")
+        console.log("📱 Status: Modo Local")
       }
+    } catch (error) {
+      console.error("❌ Erro ao carregar leads:", error)
+      setLeads([])
+      setSupabaseStatus("local")
+    } finally {
+      setLoading(false)
     }
-
-    loadLeads()
-    loadMetasConfig()
-
-    // Setup realtime after initial load
-    const timer = setTimeout(() => {
-      if (!loading) {
-        setupRealtime()
-      }
-    }, 1000)
-
-    return () => {
-      clearTimeout(timer)
-      if (leadsUnsubscribe) {
-        console.log("[v0] Cleaning up leads realtime subscription")
-        leadsUnsubscribe()
-      }
-      if (dashboardUnsubscribe) {
-        console.log("[v0] Cleaning up dashboard realtime subscription")
-        dashboardUnsubscribe()
-      }
-    }
-  }, [])
+  }
 
   const mapFaturamentoToTier = (faturamento: string): string => {
     const faturamentoOriginal = faturamento || ""
@@ -522,44 +479,26 @@ export default function LeadsControl() {
   }
 
   const handleRefresh = () => {
-    console.log("🔄 === ATUALIZANDO LEADS ===")
-    console.log("🔄 === ATUALIZANDO CONFIGURAÇÕES ===")
     loadLeads()
     loadMetasConfig() // Recarregar metas também
   }
 
   const handleUpdateLead = async (id: string, updates: Partial<Lead>) => {
     try {
-      console.log("[v0] === ATUALIZANDO LEAD COM CONTROLE DE CONCORRÊNCIA ===")
+      console.log("[v0] === ATUALIZANDO LEAD ===")
       console.log("[v0] ID:", id)
       console.log("[v0] Dados recebidos:", updates)
 
-      const currentLead = leads.find((lead) => lead.id === id)
-      if (!currentLead) {
-        throw new Error("Lead não encontrado")
-      }
-
       setLeads((prevLeads) => prevLeads.map((lead) => (lead.id === id ? { ...lead, ...updates } : lead)))
-      console.log("[v0] Lead atualizado otimisticamente no estado local")
+      console.log("[v0] Lead atualizado no localStorage")
 
-      try {
-        console.log("[v0] Tentando atualizar no Supabase com row_version:", currentLead.row_version || 0)
-        await leadOperations.update(id, {
-          ...updates,
-          row_version: currentLead.row_version || 0,
-        })
-        console.log("[v0] ✅ Lead atualizado no Supabase com sucesso")
-      } catch (concurrencyError) {
-        console.error("[v0] Erro de concorrência detectado:", concurrencyError)
-        console.log("[v0] Revertendo atualização otimística e recarregando do servidor...")
-        await loadLeads()
-        alert(
-          "Este lead foi modificado por outro usuário. Suas alterações não foram aplicadas. Os dados foram atualizados com a versão mais recente.",
-        )
-        return
-      }
+      // Atualizar no Supabase em background
+      console.log("[v0] Tentando atualizar no Supabase...")
+      await leadOperations.update(id, updates)
+      console.log("[v0] ✅ Lead também atualizado no Supabase")
     } catch (error) {
       console.error("[v0] Erro ao atualizar lead:", error)
+
       console.log("[v0] Revertendo estado devido ao erro...")
       await loadLeads()
       alert("Erro ao atualizar lead")
