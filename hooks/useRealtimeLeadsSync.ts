@@ -19,6 +19,13 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
   const realtimeDisabledRef = useRef<boolean>(false)
   const realtimeFailureCountRef = useRef<number>(0)
 
+  const selectFnRef = useRef(selectFn)
+  const mergeFnRef = useRef(mergeFn)
+
+  // Atualizar refs sempre que as funções mudarem
+  selectFnRef.current = selectFn
+  mergeFnRef.current = mergeFn
+
   const setLocalEditLock = (leadId: string, field: string, durationMs = 1500) => {
     if (!localEditLocksRef.current.has(leadId)) {
       localEditLocksRef.current.set(leadId, new Map())
@@ -39,58 +46,6 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
     return true
   }
 
-  const processBatchedChanges = useCallback(() => {
-    if (changesBufferRef.current.size === 0) return
-
-    const currentLeads = selectFn()
-    const filteredChanges = new Map<string, Partial<Lead>>()
-
-    // Filtrar mudanças aplicando locks e validação de updated_at
-    changesBufferRef.current.forEach((change, leadId) => {
-      const currentLead = currentLeads.find((l) => l.id === leadId)
-      if (!currentLead) {
-        // Lead novo ou deletado, aplicar mudança completa
-        filteredChanges.set(leadId, change)
-        return
-      }
-
-      const filteredChange: Partial<Lead> = {}
-      let hasValidChanges = false
-
-      Object.entries(change).forEach(([field, value]) => {
-        // Verificar se campo está sob lock local
-        if (isFieldLocked(leadId, field)) {
-          return // Pular campo locked
-        }
-
-        // Verificar updated_at para evitar aplicar mudanças antigas
-        if (change.updated_at && currentLead.updated_at) {
-          const changeTime = new Date(change.updated_at).getTime()
-          const currentTime = new Date(currentLead.updated_at).getTime()
-          if (changeTime <= currentTime) {
-            return // Pular mudança mais antiga
-          }
-        }
-
-        filteredChange[field as keyof Lead] = value
-        hasValidChanges = true
-      })
-
-      if (hasValidChanges) {
-        filteredChanges.set(leadId, filteredChange)
-      }
-    })
-
-    // Aplicar mudanças filtradas se houver alguma
-    if (filteredChanges.size > 0) {
-      console.log("[v0] Aplicando", filteredChanges.size, "mudanças em batch")
-      mergeFn(filteredChanges)
-    }
-
-    // Limpar buffer
-    changesBufferRef.current.clear()
-  }, [selectFn, mergeFn])
-
   const markFieldAsEditing = useCallback((leadId: string, field: string) => {
     setLocalEditLock(leadId, field, 1500)
   }, [])
@@ -102,6 +57,58 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
     }
 
     console.log("[v0] Configurando sincronização apenas com polling...")
+
+    const processBatchedChanges = () => {
+      if (changesBufferRef.current.size === 0) return
+
+      const currentLeads = selectFnRef.current()
+      const filteredChanges = new Map<string, Partial<Lead>>()
+
+      // Filtrar mudanças aplicando locks e validação de updated_at
+      changesBufferRef.current.forEach((change, leadId) => {
+        const currentLead = currentLeads.find((l) => l.id === leadId)
+        if (!currentLead) {
+          // Lead novo ou deletado, aplicar mudança completa
+          filteredChanges.set(leadId, change)
+          return
+        }
+
+        const filteredChange: Partial<Lead> = {}
+        let hasValidChanges = false
+
+        Object.entries(change).forEach(([field, value]) => {
+          // Verificar se campo está sob lock local
+          if (isFieldLocked(leadId, field)) {
+            return // Pular campo locked
+          }
+
+          // Verificar updated_at para evitar aplicar mudanças antigas
+          if (change.updated_at && currentLead.updated_at) {
+            const changeTime = new Date(change.updated_at).getTime()
+            const currentTime = new Date(currentLead.updated_at).getTime()
+            if (changeTime <= currentTime) {
+              return // Pular mudança mais antiga
+            }
+          }
+
+          filteredChange[field as keyof Lead] = value
+          hasValidChanges = true
+        })
+
+        if (hasValidChanges) {
+          filteredChanges.set(leadId, filteredChange)
+        }
+      })
+
+      // Aplicar mudanças filtradas se houver alguma
+      if (filteredChanges.size > 0) {
+        console.log("[v0] Aplicando", filteredChanges.size, "mudanças em batch")
+        mergeFnRef.current(filteredChanges)
+      }
+
+      // Limpar buffer
+      changesBufferRef.current.clear()
+    }
 
     // Setup polling
     if (!pollingIntervalRef.current) {
@@ -134,7 +141,7 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
         } catch (error) {
           console.error("[v0] Exceção no polling:", error)
         }
-      }, 3000) // Aumentar intervalo para 3s para reduzir carga
+      }, 3000)
     }
 
     // Setup batch processing
@@ -161,7 +168,7 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
       changesBufferRef.current.clear()
       localEditLocksRef.current.clear()
     }
-  }, []) // Remover todas as dependências para evitar re-execuções
+  }, []) // Mantendo dependências vazias, mas usando refs para funções atualizadas
 
   return {
     markFieldAsEditing,
