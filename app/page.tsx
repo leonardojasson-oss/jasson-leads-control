@@ -78,7 +78,7 @@ export default function LeadsControl() {
 
   const tabs = [
     { id: "lista", label: "Lista de Leads", active: activeTab === "lista" },
-    { id: "planilha", label: "📊 Planilha", active: activeTab === "planilha" },
+    { id: "planilha", label: "📊 Controle Inbound", active: activeTab === "planilha" }, // alterado de "📊 Planilha" para "📊 Controle Inbound"
     { id: "metas", label: "🎯 Controle de Metas", active: activeTab === "metas" },
     { id: "vendas", label: "Acompanhamento de Vendas", active: activeTab === "vendas" },
     { id: "comissoes", label: "Controle de Comissões", active: activeTab === "comissoes" },

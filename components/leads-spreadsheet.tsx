@@ -939,7 +939,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       <div className="p-3 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <h2 className="text-lg font-bold text-gray-900">📊 Planilha de Leads</h2>
+            <h2 className="text-lg font-bold text-gray-900">📊 Leads Inbound</h2>
             <span className="text-sm text-gray-500">
               {visibleColumnsArray.length}/{columns.length} colunas
             </span>
