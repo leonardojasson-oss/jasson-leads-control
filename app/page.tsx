@@ -13,7 +13,6 @@ import {
   CheckCircle,
   Database,
   Target,
-  TrendingUp,
   Calendar,
 } from "lucide-react"
 import { LeadsList } from "@/components/leads-list"
@@ -71,6 +70,11 @@ export default function LeadsControl() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [supabaseStatus, setSupabaseStatus] = useState<"loading" | "connected" | "local">("loading")
+
+  const [dateFilterType, setDateFilterType] = useState("data_hora_compra")
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
+  const [filteredLeads, setFilteredLeads] = useState<Lead[]>([])
 
   const [metasConfig, setMetasConfig] = useState<MetasConfig>({})
   const [sdrMetasConfig, setSDRMetasConfig] = useState<SDRsMetasConfig>({})
@@ -141,6 +145,9 @@ export default function LeadsControl() {
   useEffect(() => {
     loadLeads()
     loadMetasConfig()
+    const currentMonth = getCurrentMonthRange()
+    setStartDate(currentMonth.start)
+    setEndDate(currentMonth.end)
   }, [])
 
   const loadMetasConfig = () => {
@@ -252,20 +259,51 @@ export default function LeadsControl() {
     return "-100k"
   }
 
-  const getCurrentMonthLeads = () => {
+  const getCurrentMonthRange = () => {
     const now = new Date()
-    const currentMonth = now.getMonth()
-    const currentYear = now.getFullYear()
+    const year = now.getFullYear()
+    const month = now.getMonth()
 
-    return leads.filter((lead) => {
-      if (!lead.data_hora_compra) return false
-      const leadDate = new Date(lead.data_hora_compra)
-      return leadDate.getMonth() === currentMonth && leadDate.getFullYear() === currentYear
-    })
+    const firstDay = new Date(year, month, 1, 0, 0, 0, 0)
+    const lastDay = new Date(year, month + 1, 0, 23, 59, 59, 999)
+
+    const formatDate = (date: Date) => {
+      return date.toISOString().split("T")[0]
+    }
+
+    return {
+      start: formatDate(firstDay),
+      end: formatDate(lastDay),
+    }
   }
 
+  const applyDateFilter = () => {
+    if (!startDate || !endDate) {
+      setFilteredLeads(leads)
+      return
+    }
+
+    const filtered = leads.filter((lead) => {
+      const leadDate = lead[dateFilterType as keyof Lead] as string
+      if (!leadDate) return false
+
+      const date = new Date(leadDate).toISOString().split("T")[0]
+      return date >= startDate && date <= endDate
+    })
+
+    setFilteredLeads(filtered)
+  }
+
+  useEffect(() => {
+    if (leads.length > 0) {
+      applyDateFilter()
+    } else {
+      setFilteredLeads([])
+    }
+  }, [leads, startDate, endDate, dateFilterType])
+
   const calculatePerformanceMetrics = () => {
-    const currentMonthLeads = getCurrentMonthLeads()
+    const currentMonthLeads = filteredLeads.length > 0 ? filteredLeads : leads
 
     // 1. Leads Comprados
     const metaLeadsComprados = Object.values(metasConfig).reduce((sum, config) => sum + (config?.meta || 0), 0)
@@ -321,13 +359,75 @@ export default function LeadsControl() {
     }
   }
 
-  const getPerformanceColor = (percentual: number) => {
+  const calculateHeaderMetrics = () => {
+    let leadsToAnalyze = filteredLeads
+
+    // Se não há leads filtrados, aplicar filtro do mês atual
+    if (filteredLeads.length === 0 && leads.length > 0 && startDate && endDate) {
+      leadsToAnalyze = leads.filter((lead) => {
+        const leadDate = lead[dateFilterType as keyof Lead] as string
+        if (!leadDate) return false
+        const date = new Date(leadDate).toISOString().split("T")[0]
+        return date >= startDate && date <= endDate
+      })
+    }
+
+    // Valor Compra
+    const valorCompra = leadsToAnalyze.reduce((sum, lead) => {
+      const valor = Number.parseFloat(String(lead.valor_pago_lead || "0"))
+      return sum + (isNaN(valor) ? 0 : valor)
+    }, 0)
+
+    const feeMRR = leadsToAnalyze
+      .filter((lead) => lead.data_assinatura)
+      .reduce((sum, lead) => {
+        const valor = Number.parseFloat(String(lead.fee_mrr || "0"))
+        return sum + (isNaN(valor) ? 0 : valor)
+      }, 0)
+
+    // ROAS
+    const feeOneTime = leadsToAnalyze
+      .filter((lead) => lead.data_assinatura)
+      .reduce((sum, lead) => {
+        const valor = Number.parseFloat(String(lead.escopo_fechado || "0"))
+        return sum + (isNaN(valor) ? 0 : valor)
+      }, 0)
+
+    const totalReceita = feeMRR + feeOneTime
+    const roas = valorCompra > 0 ? totalReceita / valorCompra : 0
+
+    // Quantidade de Leads
+    const qtdLeads = leadsToAnalyze.length
+
+    // Ticket Médio
+    const leadsComAssinatura = leadsToAnalyze.filter((lead) => lead.data_assinatura).length
+    const ticketMedio = leadsComAssinatura > 0 ? totalReceita / leadsComAssinatura : 0
+
+    // Custo por Lead
+    const custoPorLead = qtdLeads > 0 ? valorCompra / qtdLeads : 0
+
+    // Quantidade de Vendas
+    const qtdVendas = leadsComAssinatura
+
+    return {
+      valorCompra,
+      feeMRR,
+      roas,
+      qtdLeads,
+      feeOneTime,
+      ticketMedio,
+      custoPorLead,
+      qtdVendas,
+    }
+  }
+
+  const calculatePerformanceColor = (percentual: number) => {
     if (percentual >= 100) return "border-l-green-500"
     if (percentual >= 80) return "border-l-yellow-500"
     return "border-l-red-500"
   }
 
-  const getPerformanceTextColor = (percentual: number) => {
+  const calculatePerformanceTextColor = (percentual: number) => {
     if (percentual >= 100) return "text-green-600"
     if (percentual >= 80) return "text-yellow-600"
     return "text-red-600"
@@ -574,13 +674,13 @@ export default function LeadsControl() {
       case "planilha":
         return <LeadsSpreadsheet leads={leads} onUpdateLead={handleUpdateLead} onRefresh={handleRefresh} />
       case "metas":
-        return <MetasControl leads={leads} />
+        return <MetasControl leads={filteredLeads} />
       case "vendas":
-        return <SalesTracking leads={leads} />
+        return <SalesTracking leads={filteredLeads} />
       case "comissoes":
-        return <CommissionControl leads={leads} />
+        return <CommissionControl leads={filteredLeads} />
       case "dashboard":
-        return <DashboardAnalytics leads={leads} />
+        return <DashboardAnalytics leads={filteredLeads} />
       default:
         return (
           <LeadsList
@@ -594,6 +694,7 @@ export default function LeadsControl() {
   }
 
   const performanceMetrics = calculatePerformanceMetrics()
+  const headerMetrics = calculateHeaderMetrics()
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -634,108 +735,74 @@ export default function LeadsControl() {
         </div>
       </header>
 
-      {/* KPI Cards */}
       <div className="px-6 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4 mb-6">
-          {/* Leads Comprados */}
-          <Card
-            className={`border-l-4 ${getPerformanceColor((performanceMetrics.leadsComprados.realizado / performanceMetrics.leadsComprados.meta) * 100)}`}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <Target className="w-4 h-4 mr-1" />
-                    Leads Comprados
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">{performanceMetrics.leadsComprados.realizado}</p>
-                  <p className="text-xs text-gray-500">Meta: {performanceMetrics.leadsComprados.meta}</p>
-                  <p
-                    className={`text-xs font-medium ${getPerformanceTextColor((performanceMetrics.leadsComprados.realizado / performanceMetrics.leadsComprados.meta) * 100)}`}
-                  >
-                    {performanceMetrics.leadsComprados.meta > 0
-                      ? `${((performanceMetrics.leadsComprados.realizado / performanceMetrics.leadsComprados.meta) * 100).toFixed(1)}%`
-                      : "0%"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Filtro por Data */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Calendar className="w-5 h-5 text-orange-500" />
+              <span className="text-sm font-medium text-gray-700">Filtro por Data</span>
+            </div>
 
-          {/* Investimento */}
-          <Card
-            className={`border-l-4 ${getPerformanceColor((performanceMetrics.investimento.realizado / performanceMetrics.investimento.meta) * 100)}`}
-          >
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">Filtrar por:</span>
+              <select
+                value={dateFilterType}
+                onChange={(e) => setDateFilterType(e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="data_hora_compra">Data Criação</option>
+                <option value="data_marcacao">Data da Marcação</option>
+                <option value="data_reuniao">Data da Reunião</option>
+                <option value="data_assinatura">Data de Assinatura</option>
+                <option value="data_ultimo_contato">Data Último Contato</option>
+              </select>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">De:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">Até:</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+
+            <Button
+              onClick={applyDateFilter}
+              className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 text-sm"
+            >
+              Aplicar
+            </Button>
+          </div>
+        </div>
+
+        {/* Cards de Métricas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {/* Primeira fileira: Valor Compra | FEE MRR | FEE ONE-TIME | ROAS */}
+
+          {/* Valor Compra */}
+          <Card className="border-l-4 border-l-blue-500">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 flex items-center">
                     <DollarSign className="w-4 h-4 mr-1" />
-                    Investimento
+                    Valor Compra
                   </p>
                   <p className="text-2xl font-bold text-gray-900">
-                    R$ {performanceMetrics.investimento.realizado.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Meta: R${" "}
-                    {performanceMetrics.investimento.meta.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                  </p>
-                  <p
-                    className={`text-xs font-medium ${getPerformanceTextColor((performanceMetrics.investimento.realizado / performanceMetrics.investimento.meta) * 100)}`}
-                  >
-                    {performanceMetrics.investimento.meta > 0
-                      ? `${((performanceMetrics.investimento.realizado / performanceMetrics.investimento.meta) * 100).toFixed(1)}%`
-                      : "0%"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* RM (Reuniões Marcadas) */}
-          <Card
-            className={`border-l-4 ${getPerformanceColor((performanceMetrics.rm.realizado / performanceMetrics.rm.meta) * 100)}`}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <Calendar className="w-4 h-4 mr-1" />
-                    RM
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">{performanceMetrics.rm.realizado}</p>
-                  <p className="text-xs text-gray-500">Meta: {performanceMetrics.rm.meta}</p>
-                  <p
-                    className={`text-xs font-medium ${getPerformanceTextColor((performanceMetrics.rm.realizado / performanceMetrics.rm.meta) * 100)}`}
-                  >
-                    {performanceMetrics.rm.meta > 0
-                      ? `${((performanceMetrics.rm.realizado / performanceMetrics.rm.meta) * 100).toFixed(1)}%`
-                      : "0%"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* RR (Reuniões Realizadas) */}
-          <Card
-            className={`border-l-4 ${getPerformanceColor((performanceMetrics.rr.realizado / performanceMetrics.rr.meta) * 100)}`}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                    RR
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">{performanceMetrics.rr.realizado}</p>
-                  <p className="text-xs text-gray-500">Meta: {performanceMetrics.rr.meta}</p>
-                  <p
-                    className={`text-xs font-medium ${getPerformanceTextColor((performanceMetrics.rr.realizado / performanceMetrics.rr.meta) * 100)}`}
-                  >
-                    {performanceMetrics.rr.meta > 0
-                      ? `${((performanceMetrics.rr.realizado / performanceMetrics.rr.meta) * 100).toFixed(1)}%`
-                      : "0%"}
+                    R$ {headerMetrics.valorCompra.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
@@ -743,28 +810,16 @@ export default function LeadsControl() {
           </Card>
 
           {/* FEE MRR */}
-          <Card
-            className={`border-l-4 ${getPerformanceColor((performanceMetrics.feeMRR.realizado / performanceMetrics.feeMRR.meta) * 100)}`}
-          >
+          <Card className="border-l-4 border-l-green-500">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <TrendingUp className="w-4 h-4 mr-1" />
+                    <DollarSign className="w-4 h-4 mr-1" />
                     FEE MRR
                   </p>
                   <p className="text-2xl font-bold text-gray-900">
-                    R$ {performanceMetrics.feeMRR.realizado.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Meta: R$ {performanceMetrics.feeMRR.meta.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                  </p>
-                  <p
-                    className={`text-xs font-medium ${getPerformanceTextColor((performanceMetrics.feeMRR.realizado / performanceMetrics.feeMRR.meta) * 100)}`}
-                  >
-                    {performanceMetrics.feeMRR.meta > 0
-                      ? `${((performanceMetrics.feeMRR.realizado / performanceMetrics.feeMRR.meta) * 100).toFixed(1)}%`
-                      : "0%"}
+                    R$ {headerMetrics.feeMRR.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
                   </p>
                 </div>
               </div>
@@ -772,28 +827,16 @@ export default function LeadsControl() {
           </Card>
 
           {/* FEE ONE-TIME */}
-          <Card
-            className={`border-l-4 ${getPerformanceColor((performanceMetrics.feeOneTime.realizado / performanceMetrics.feeOneTime.meta) * 100)}`}
-          >
+          <Card className="border-l-4 border-l-red-500">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <BarChart3 className="w-4 h-4 mr-1" />
+                    <DollarSign className="w-4 h-4 mr-1" />
                     FEE ONE-TIME
                   </p>
                   <p className="text-2xl font-bold text-gray-900">
-                    R$ {performanceMetrics.feeOneTime.realizado.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Meta: R$ {performanceMetrics.feeOneTime.meta.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                  </p>
-                  <p
-                    className={`text-xs font-medium ${getPerformanceTextColor((performanceMetrics.feeOneTime.realizado / performanceMetrics.feeOneTime.meta) * 100)}`}
-                  >
-                    {performanceMetrics.feeOneTime.meta > 0
-                      ? `${((performanceMetrics.feeOneTime.realizado / performanceMetrics.feeOneTime.meta) * 100).toFixed(1)}%`
-                      : "0%"}
+                    R$ {headerMetrics.feeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
                   </p>
                 </div>
               </div>
@@ -801,16 +844,81 @@ export default function LeadsControl() {
           </Card>
 
           {/* ROAS */}
+          <Card className="border-l-4 border-l-orange-500">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 flex items-center">
+                    <BarChart3 className="w-4 h-4 mr-1" />
+                    ROAS
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900">{headerMetrics.roas.toFixed(2)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Segunda fileira: Qtd. Leads | Ticket Médio | Custo por Lead | Qtd. Vendas */}
+
+          {/* Qtd. Leads */}
           <Card className="border-l-4 border-l-purple-500">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 flex items-center">
                     <Users className="w-4 h-4 mr-1" />
-                    ROAS
+                    Qtd. Leads
                   </p>
-                  <p className="text-2xl font-bold text-gray-900">{performanceMetrics.roas.toFixed(2)}x</p>
-                  <p className="text-xs text-gray-500">Retorno sobre Investimento</p>
+                  <p className="text-2xl font-bold text-gray-900">{headerMetrics.qtdLeads}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Ticket Médio */}
+          <Card className="border-l-4 border-l-yellow-500">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 flex items-center">
+                    <Target className="w-4 h-4 mr-1" />
+                    Ticket Médio
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    R$ {headerMetrics.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Custo por Lead */}
+          <Card className="border-l-4 border-l-indigo-500">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 flex items-center">
+                    <Info className="w-4 h-4 mr-1" />
+                    Custo por Lead
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    R$ {headerMetrics.custoPorLead.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Qtd. Vendas */}
+          <Card className="border-l-4 border-l-teal-500">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 flex items-center">
+                    <CheckCircle className="w-4 h-4 mr-1" />
+                    Qtd. Vendas
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900">{headerMetrics.qtdVendas}</p>
                 </div>
               </div>
             </CardContent>
