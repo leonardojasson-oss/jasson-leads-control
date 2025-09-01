@@ -86,6 +86,10 @@ export default function LeadsControl() {
     mergeFn: (changes: Map<string, Partial<Lead>>) => {
       console.log("[v0] Aplicando mudanças em tempo real:", changes.size, "leads")
 
+      changes.forEach((change, leadId) => {
+        console.log("[v0] Mudança detectada para lead:", leadId, change)
+      })
+
       setLeads((prevLeads) => {
         const updatedLeads = [...prevLeads]
         let hasChanges = false
@@ -110,16 +114,18 @@ export default function LeadsControl() {
             const currentLead = updatedLeads[existingIndex]
             const updatedLead = { ...currentLead, ...change }
 
-            // Verificar se houve mudança real
-            const hasRealChange = Object.keys(change).some(
-              (key) => currentLead[key as keyof Lead] !== change[key as keyof Lead],
-            )
+            console.log("[v0] Comparando lead atual vs mudança:", {
+              leadId,
+              current: Object.keys(change).reduce((acc, key) => {
+                acc[key] = currentLead[key as keyof Lead]
+                return acc
+              }, {} as any),
+              change,
+            })
 
-            if (hasRealChange) {
-              updatedLeads[existingIndex] = updatedLead
-              hasChanges = true
-              console.log("[v0] Lead atualizado:", leadId)
-            }
+            updatedLeads[existingIndex] = updatedLead
+            hasChanges = true
+            console.log("[v0] Lead atualizado:", leadId)
           } else {
             // Adicionar novo lead
             updatedLeads.unshift(change as Lead)
@@ -128,7 +134,13 @@ export default function LeadsControl() {
           }
         })
 
-        return hasChanges ? updatedLeads : prevLeads
+        if (hasChanges) {
+          console.log("[v0] Estado dos leads atualizado, total:", updatedLeads.length)
+          return updatedLeads
+        }
+
+        console.log("[v0] Nenhuma mudança aplicada")
+        return prevLeads
       })
     },
   })
