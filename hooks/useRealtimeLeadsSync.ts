@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useCallback } from "react"
 import { supabase } from "@/lib/supabase-operations"
 import type { Lead } from "@/app/page"
 
@@ -16,7 +16,7 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
   const changesBufferRef = useRef<Map<string, Partial<Lead>>>(new Map())
   const lastSyncTimeRef = useRef<string>(new Date().toISOString())
   const localEditLocksRef = useRef<Map<string, Map<string, number>>>(new Map())
-  const isRealtimeConnectedRef = useRef<boolean>(false)
+  const realtimeFailureCountRef = useRef<number>(0)
 
   const setLocalEditLock = (leadId: string, field: string, durationMs = 1500) => {
     if (!localEditLocksRef.current.has(leadId)) {
@@ -38,7 +38,7 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
     return true
   }
 
-  const processBatchedChanges = () => {
+  const processBatchedChanges = useCallback(() => {
     if (changesBufferRef.current.size === 0) return
 
     const currentLeads = selectFn()
@@ -82,20 +82,21 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
 
     // Aplicar mudanças filtradas se houver alguma
     if (filteredChanges.size > 0) {
+      console.log("[v0] Aplicando", filteredChanges.size, "mudanças em batch")
       mergeFn(filteredChanges)
     }
 
     // Limpar buffer
     changesBufferRef.current.clear()
-  }
+  }, [selectFn, mergeFn])
 
-  const setupRealtimeSync = () => {
+  const setupRealtimeSync = useCallback(() => {
     if (!supabase || channelRef.current) return
 
     console.log("[v0] Configurando Supabase Realtime para leads...")
 
     const channel = supabase
-      .channel("leads:realtime")
+      .channel("leads_sync")
       .on(
         "postgres_changes",
         {
@@ -105,6 +106,7 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
         },
         (payload) => {
           console.log("[v0] Evento Realtime recebido:", payload.eventType, payload.new?.id)
+          realtimeFailureCountRef.current = 0 // Reset contador de falhas
 
           // Acumular mudança no buffer
           if (payload.eventType === "DELETE") {
@@ -116,19 +118,29 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
       )
       .subscribe((status) => {
         console.log("[v0] Status Realtime:", status)
-        isRealtimeConnectedRef.current = status === "SUBSCRIBED"
+
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          realtimeFailureCountRef.current++
+          console.log("[v0] Realtime falhou", realtimeFailureCountRef.current, "vezes")
+
+          // Se falhar muito, desconectar e usar só polling
+          if (realtimeFailureCountRef.current >= 3) {
+            console.log("[v0] Muitas falhas no Realtime, desabilitando...")
+            if (channelRef.current) {
+              channelRef.current.unsubscribe()
+              channelRef.current = null
+            }
+          }
+        }
       })
 
     channelRef.current = channel
-  }
+  }, [])
 
-  const setupPollingSync = () => {
+  const setupPollingSync = useCallback(() => {
     if (pollingIntervalRef.current) return
 
     pollingIntervalRef.current = setInterval(async () => {
-      // Só fazer polling se Realtime não estiver conectado
-      if (isRealtimeConnectedRef.current) return
-
       try {
         console.log("[v0] Executando polling de fallback...")
 
@@ -136,7 +148,8 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
           .from("leads")
           .select("*")
           .gte("updated_at", lastSyncTimeRef.current)
-          .limit(200)
+          .order("updated_at", { ascending: true })
+          .limit(50)
 
         if (error) {
           console.error("[v0] Erro no polling:", error)
@@ -153,25 +166,25 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
 
           // Atualizar último sync time
           const latestTime = Math.max(...data.map((l) => new Date(l.updated_at).getTime()))
-          lastSyncTimeRef.current = new Date(latestTime).toISOString()
+          lastSyncTimeRef.current = new Date(latestTime + 1).toISOString() // +1ms para evitar duplicatas
         }
       } catch (error) {
         console.error("[v0] Exceção no polling:", error)
       }
-    }, 1000)
-  }
+    }, 2000) // Aumentar intervalo para 2s para reduzir carga
+  }, [])
 
-  const setupBatchProcessing = () => {
+  const setupBatchProcessing = useCallback(() => {
     if (batchIntervalRef.current) return
 
     batchIntervalRef.current = setInterval(() => {
       processBatchedChanges()
-    }, 1000)
-  }
+    }, 800) // Reduzir para 800ms para resposta mais rápida
+  }, [processBatchedChanges])
 
-  const markFieldAsEditing = (leadId: string, field: string) => {
+  const markFieldAsEditing = useCallback((leadId: string, field: string) => {
     setLocalEditLock(leadId, field, 1500)
-  }
+  }, [])
 
   useEffect(() => {
     if (!supabase) {
@@ -202,11 +215,10 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
         batchIntervalRef.current = null
       }
 
-      isRealtimeConnectedRef.current = false
       changesBufferRef.current.clear()
       localEditLocksRef.current.clear()
     }
-  }, []) // Dependências vazias para evitar re-execuções
+  }, [setupRealtimeSync, setupPollingSync, setupBatchProcessing]) // Adicionar dependências corretas
 
   return {
     markFieldAsEditing,
