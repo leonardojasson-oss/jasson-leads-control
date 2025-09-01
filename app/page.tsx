@@ -23,6 +23,7 @@ import { MetasControl } from "@/components/metas-control"
 import { NovoLeadModal } from "@/components/novo-lead-modal"
 import { leadOperations, type Lead, isSupabaseConfigured, testSupabaseConnection } from "@/lib/supabase-operations"
 import { LeadsSpreadsheet } from "@/components/leads-spreadsheet"
+import { useRealtimeLeadsSync } from "@/hooks/useRealtimeLeadsSync"
 
 export type { Lead }
 
@@ -79,6 +80,58 @@ export default function LeadsControl() {
   const [metasConfig, setMetasConfig] = useState<MetasConfig>({})
   const [sdrMetasConfig, setSDRMetasConfig] = useState<SDRsMetasConfig>({})
   const [closerMetasConfig, setCloserMetasConfig] = useState<ClosersMetasConfig>({})
+
+  const { markFieldAsEditing } = useRealtimeLeadsSync({
+    selectFn: () => leads,
+    mergeFn: (changes: Map<string, Partial<Lead>>) => {
+      console.log("[v0] Aplicando mudanças em tempo real:", changes.size, "leads")
+
+      setLeads((prevLeads) => {
+        const updatedLeads = [...prevLeads]
+        let hasChanges = false
+
+        changes.forEach((change, leadId) => {
+          // Verificar se é uma deleção
+          if ((change as any)._deleted) {
+            const index = updatedLeads.findIndex((l) => l.id === leadId)
+            if (index !== -1) {
+              updatedLeads.splice(index, 1)
+              hasChanges = true
+              console.log("[v0] Lead removido:", leadId)
+            }
+            return
+          }
+
+          // Encontrar lead existente ou adicionar novo
+          const existingIndex = updatedLeads.findIndex((l) => l.id === leadId)
+
+          if (existingIndex !== -1) {
+            // Atualizar lead existente
+            const currentLead = updatedLeads[existingIndex]
+            const updatedLead = { ...currentLead, ...change }
+
+            // Verificar se houve mudança real
+            const hasRealChange = Object.keys(change).some(
+              (key) => currentLead[key as keyof Lead] !== change[key as keyof Lead],
+            )
+
+            if (hasRealChange) {
+              updatedLeads[existingIndex] = updatedLead
+              hasChanges = true
+              console.log("[v0] Lead atualizado:", leadId)
+            }
+          } else {
+            // Adicionar novo lead
+            updatedLeads.unshift(change as Lead)
+            hasChanges = true
+            console.log("[v0] Novo lead adicionado:", leadId)
+          }
+        })
+
+        return hasChanges ? updatedLeads : prevLeads
+      })
+    },
+  })
 
   const tabs = [
     { id: "lista", label: "Lista de Leads", active: activeTab === "lista" },
@@ -588,6 +641,10 @@ export default function LeadsControl() {
       console.log("[v0] === ATUALIZANDO LEAD ===")
       console.log("[v0] ID:", id)
       console.log("[v0] Dados recebidos:", updates)
+
+      Object.keys(updates).forEach((field) => {
+        markFieldAsEditing(id, field)
+      })
 
       setLeads((prevLeads) => prevLeads.map((lead) => (lead.id === id ? { ...lead, ...updates } : lead)))
       console.log("[v0] Lead atualizado no localStorage")

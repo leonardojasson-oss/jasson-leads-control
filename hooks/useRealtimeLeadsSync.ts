@@ -1,0 +1,214 @@
+"use client"
+
+import { useEffect, useRef } from "react"
+import { supabase } from "@/lib/supabase-operations"
+import type { Lead } from "@/app/page"
+
+interface UseRealtimeLeadsSyncProps {
+  selectFn: () => Lead[]
+  mergeFn: (changes: Map<string, Partial<Lead>>) => void
+}
+
+export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSyncProps) {
+  const channelRef = useRef<any>(null)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const batchIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const changesBufferRef = useRef<Map<string, Partial<Lead>>>(new Map())
+  const lastSyncTimeRef = useRef<string>(new Date().toISOString())
+  const localEditLocksRef = useRef<Map<string, Map<string, number>>>(new Map())
+  const isRealtimeConnectedRef = useRef<boolean>(false)
+
+  const setLocalEditLock = (leadId: string, field: string, durationMs = 1500) => {
+    if (!localEditLocksRef.current.has(leadId)) {
+      localEditLocksRef.current.set(leadId, new Map())
+    }
+    const leadLocks = localEditLocksRef.current.get(leadId)!
+    leadLocks.set(field, Date.now() + durationMs)
+  }
+
+  const isFieldLocked = (leadId: string, field: string): boolean => {
+    const leadLocks = localEditLocksRef.current.get(leadId)
+    if (!leadLocks) return false
+    const lockExpiry = leadLocks.get(field)
+    if (!lockExpiry) return false
+    if (Date.now() > lockExpiry) {
+      leadLocks.delete(field)
+      return false
+    }
+    return true
+  }
+
+  const processBatchedChanges = () => {
+    if (changesBufferRef.current.size === 0) return
+
+    const currentLeads = selectFn()
+    const filteredChanges = new Map<string, Partial<Lead>>()
+
+    // Filtrar mudanças aplicando locks e validação de updated_at
+    changesBufferRef.current.forEach((change, leadId) => {
+      const currentLead = currentLeads.find((l) => l.id === leadId)
+      if (!currentLead) {
+        // Lead novo ou deletado, aplicar mudança completa
+        filteredChanges.set(leadId, change)
+        return
+      }
+
+      const filteredChange: Partial<Lead> = {}
+      let hasValidChanges = false
+
+      Object.entries(change).forEach(([field, value]) => {
+        // Verificar se campo está sob lock local
+        if (isFieldLocked(leadId, field)) {
+          return // Pular campo locked
+        }
+
+        // Verificar updated_at para evitar aplicar mudanças antigas
+        if (change.updated_at && currentLead.updated_at) {
+          const changeTime = new Date(change.updated_at).getTime()
+          const currentTime = new Date(currentLead.updated_at).getTime()
+          if (changeTime <= currentTime) {
+            return // Pular mudança mais antiga
+          }
+        }
+
+        filteredChange[field as keyof Lead] = value
+        hasValidChanges = true
+      })
+
+      if (hasValidChanges) {
+        filteredChanges.set(leadId, filteredChange)
+      }
+    })
+
+    // Aplicar mudanças filtradas se houver alguma
+    if (filteredChanges.size > 0) {
+      mergeFn(filteredChanges)
+    }
+
+    // Limpar buffer
+    changesBufferRef.current.clear()
+  }
+
+  const setupRealtimeSync = () => {
+    if (!supabase || channelRef.current) return
+
+    console.log("[v0] Configurando Supabase Realtime para leads...")
+
+    const channel = supabase
+      .channel("leads:realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "leads",
+        },
+        (payload) => {
+          console.log("[v0] Evento Realtime recebido:", payload.eventType, payload.new?.id)
+
+          // Acumular mudança no buffer
+          if (payload.eventType === "DELETE") {
+            changesBufferRef.current.set(payload.old.id, { id: payload.old.id, _deleted: true } as any)
+          } else if (payload.new) {
+            changesBufferRef.current.set(payload.new.id, payload.new as Partial<Lead>)
+          }
+        },
+      )
+      .subscribe((status) => {
+        console.log("[v0] Status Realtime:", status)
+        isRealtimeConnectedRef.current = status === "SUBSCRIBED"
+      })
+
+    channelRef.current = channel
+  }
+
+  const setupPollingSync = () => {
+    if (pollingIntervalRef.current) return
+
+    pollingIntervalRef.current = setInterval(async () => {
+      // Só fazer polling se Realtime não estiver conectado
+      if (isRealtimeConnectedRef.current) return
+
+      try {
+        console.log("[v0] Executando polling de fallback...")
+
+        const { data, error } = await supabase!
+          .from("leads")
+          .select("*")
+          .gte("updated_at", lastSyncTimeRef.current)
+          .limit(200)
+
+        if (error) {
+          console.error("[v0] Erro no polling:", error)
+          return
+        }
+
+        if (data && data.length > 0) {
+          console.log("[v0] Polling encontrou", data.length, "mudanças")
+
+          // Acumular mudanças no buffer
+          data.forEach((lead) => {
+            changesBufferRef.current.set(lead.id, lead as Partial<Lead>)
+          })
+
+          // Atualizar último sync time
+          const latestTime = Math.max(...data.map((l) => new Date(l.updated_at).getTime()))
+          lastSyncTimeRef.current = new Date(latestTime).toISOString()
+        }
+      } catch (error) {
+        console.error("[v0] Exceção no polling:", error)
+      }
+    }, 1000)
+  }
+
+  const setupBatchProcessing = () => {
+    if (batchIntervalRef.current) return
+
+    batchIntervalRef.current = setInterval(() => {
+      processBatchedChanges()
+    }, 1000)
+  }
+
+  const markFieldAsEditing = (leadId: string, field: string) => {
+    setLocalEditLock(leadId, field, 1500)
+  }
+
+  useEffect(() => {
+    if (!supabase) {
+      console.log("[v0] Supabase não configurado, sincronização desabilitada")
+      return
+    }
+
+    setupRealtimeSync()
+    setupPollingSync()
+    setupBatchProcessing()
+
+    // Cleanup
+    return () => {
+      console.log("[v0] Limpando sincronização Realtime...")
+
+      if (channelRef.current) {
+        channelRef.current.unsubscribe()
+        channelRef.current = null
+      }
+
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+
+      if (batchIntervalRef.current) {
+        clearInterval(batchIntervalRef.current)
+        batchIntervalRef.current = null
+      }
+
+      isRealtimeConnectedRef.current = false
+      changesBufferRef.current.clear()
+      localEditLocksRef.current.clear()
+    }
+  }, []) // Dependências vazias para evitar re-execuções
+
+  return {
+    markFieldAsEditing,
+  }
+}
