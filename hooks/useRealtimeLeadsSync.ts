@@ -16,6 +16,7 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
   const changesBufferRef = useRef<Map<string, Partial<Lead>>>(new Map())
   const lastSyncTimeRef = useRef<string>(new Date().toISOString())
   const localEditLocksRef = useRef<Map<string, Map<string, number>>>(new Map())
+  const realtimeDisabledRef = useRef<boolean>(false)
   const realtimeFailureCountRef = useRef<number>(0)
 
   const setLocalEditLock = (leadId: string, field: string, durationMs = 1500) => {
@@ -90,98 +91,6 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
     changesBufferRef.current.clear()
   }, [selectFn, mergeFn])
 
-  const setupRealtimeSync = useCallback(() => {
-    if (!supabase || channelRef.current) return
-
-    console.log("[v0] Configurando Supabase Realtime para leads...")
-
-    const channel = supabase
-      .channel("leads_sync")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "leads",
-        },
-        (payload) => {
-          console.log("[v0] Evento Realtime recebido:", payload.eventType, payload.new?.id)
-          realtimeFailureCountRef.current = 0 // Reset contador de falhas
-
-          // Acumular mudança no buffer
-          if (payload.eventType === "DELETE") {
-            changesBufferRef.current.set(payload.old.id, { id: payload.old.id, _deleted: true } as any)
-          } else if (payload.new) {
-            changesBufferRef.current.set(payload.new.id, payload.new as Partial<Lead>)
-          }
-        },
-      )
-      .subscribe((status) => {
-        console.log("[v0] Status Realtime:", status)
-
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-          realtimeFailureCountRef.current++
-          console.log("[v0] Realtime falhou", realtimeFailureCountRef.current, "vezes")
-
-          // Se falhar muito, desconectar e usar só polling
-          if (realtimeFailureCountRef.current >= 3) {
-            console.log("[v0] Muitas falhas no Realtime, desabilitando...")
-            if (channelRef.current) {
-              channelRef.current.unsubscribe()
-              channelRef.current = null
-            }
-          }
-        }
-      })
-
-    channelRef.current = channel
-  }, [])
-
-  const setupPollingSync = useCallback(() => {
-    if (pollingIntervalRef.current) return
-
-    pollingIntervalRef.current = setInterval(async () => {
-      try {
-        console.log("[v0] Executando polling de fallback...")
-
-        const { data, error } = await supabase!
-          .from("leads")
-          .select("*")
-          .gte("updated_at", lastSyncTimeRef.current)
-          .order("updated_at", { ascending: true })
-          .limit(50)
-
-        if (error) {
-          console.error("[v0] Erro no polling:", error)
-          return
-        }
-
-        if (data && data.length > 0) {
-          console.log("[v0] Polling encontrou", data.length, "mudanças")
-
-          // Acumular mudanças no buffer
-          data.forEach((lead) => {
-            changesBufferRef.current.set(lead.id, lead as Partial<Lead>)
-          })
-
-          // Atualizar último sync time
-          const latestTime = Math.max(...data.map((l) => new Date(l.updated_at).getTime()))
-          lastSyncTimeRef.current = new Date(latestTime + 1).toISOString() // +1ms para evitar duplicatas
-        }
-      } catch (error) {
-        console.error("[v0] Exceção no polling:", error)
-      }
-    }, 2000) // Aumentar intervalo para 2s para reduzir carga
-  }, [])
-
-  const setupBatchProcessing = useCallback(() => {
-    if (batchIntervalRef.current) return
-
-    batchIntervalRef.current = setInterval(() => {
-      processBatchedChanges()
-    }, 800) // Reduzir para 800ms para resposta mais rápida
-  }, [processBatchedChanges])
-
   const markFieldAsEditing = useCallback((leadId: string, field: string) => {
     setLocalEditLock(leadId, field, 1500)
   }, [])
@@ -192,18 +101,52 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
       return
     }
 
-    setupRealtimeSync()
-    setupPollingSync()
-    setupBatchProcessing()
+    console.log("[v0] Configurando sincronização apenas com polling...")
+
+    // Setup polling
+    if (!pollingIntervalRef.current) {
+      pollingIntervalRef.current = setInterval(async () => {
+        try {
+          const { data, error } = await supabase
+            .from("leads")
+            .select("*")
+            .gte("updated_at", lastSyncTimeRef.current)
+            .order("updated_at", { ascending: true })
+            .limit(50)
+
+          if (error) {
+            console.error("[v0] Erro no polling:", error)
+            return
+          }
+
+          if (data && data.length > 0) {
+            console.log("[v0] Polling encontrou", data.length, "mudanças")
+
+            // Acumular mudanças no buffer
+            data.forEach((lead) => {
+              changesBufferRef.current.set(lead.id, lead as Partial<Lead>)
+            })
+
+            // Atualizar último sync time
+            const latestTime = Math.max(...data.map((l) => new Date(l.updated_at).getTime()))
+            lastSyncTimeRef.current = new Date(latestTime + 1).toISOString()
+          }
+        } catch (error) {
+          console.error("[v0] Exceção no polling:", error)
+        }
+      }, 3000) // Aumentar intervalo para 3s para reduzir carga
+    }
+
+    // Setup batch processing
+    if (!batchIntervalRef.current) {
+      batchIntervalRef.current = setInterval(() => {
+        processBatchedChanges()
+      }, 1000)
+    }
 
     // Cleanup
     return () => {
-      console.log("[v0] Limpando sincronização Realtime...")
-
-      if (channelRef.current) {
-        channelRef.current.unsubscribe()
-        channelRef.current = null
-      }
+      console.log("[v0] Limpando sincronização...")
 
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current)
@@ -218,7 +161,7 @@ export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSync
       changesBufferRef.current.clear()
       localEditLocksRef.current.clear()
     }
-  }, [setupRealtimeSync, setupPollingSync, setupBatchProcessing]) // Adicionar dependências corretas
+  }, []) // Remover todas as dependências para evitar re-execuções
 
   return {
     markFieldAsEditing,
