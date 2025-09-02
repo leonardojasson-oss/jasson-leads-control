@@ -17,6 +17,8 @@ interface LeadsSpreadsheetProps {
 }
 
 export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpreadsheetProps) {
+  console.log("[v0] LeadsSpreadsheet renderizando com", leads.length, "leads")
+
   const [editingCell, setEditingCell] = useState<string | null>(null)
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({})
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({})
@@ -32,8 +34,6 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   const [dateFilterEnd, setDateFilterEnd] = useState<string>("")
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const scrollPositionRef = useRef<number>(0)
-  const isUpdatingRef = useRef<boolean>(false)
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const dateFilterOptions = [
     { value: "data_reuniao", label: "DATA DA REUNIÃO" },
@@ -207,56 +207,26 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   }, [])
 
   useLayoutEffect(() => {
-    if (isUpdatingRef.current && scrollContainerRef.current && scrollPositionRef.current > 0) {
-      console.log("[v0] Restaurando posição imediatamente:", scrollPositionRef.current)
+    console.log("[v0] useLayoutEffect executado - leads.length:", leads.length)
+
+    // Restaurar posição de scroll simples
+    if (scrollContainerRef.current && scrollPositionRef.current > 0) {
       scrollContainerRef.current.scrollLeft = scrollPositionRef.current
-
-      const container = scrollContainerRef.current
-      const targetPosition = scrollPositionRef.current
-
-      const forceRestore = () => {
-        if (container && container.scrollLeft !== targetPosition) {
-          container.scrollLeft = targetPosition
-          console.log("[v0] Forçando restauração para:", targetPosition, "atual:", container.scrollLeft)
-        }
-      }
-
-      forceRestore()
-      requestAnimationFrame(forceRestore)
-      setTimeout(forceRestore, 0)
-      setTimeout(forceRestore, 1)
-      setTimeout(forceRestore, 10)
-      setTimeout(forceRestore, 50)
-
-      setTimeout(() => {
-        isUpdatingRef.current = false
-        console.log("[v0] Flag resetada")
-      }, 100)
+      console.log("[v0] Posição de scroll restaurada:", scrollPositionRef.current)
     }
-  }, [leads.length, leads])
+  }, [leads.length])
 
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
 
     const handleScroll = () => {
-      if (!isUpdatingRef.current) {
-        if (scrollTimeoutRef.current) {
-          clearTimeout(scrollTimeoutRef.current)
-        }
-
-        scrollTimeoutRef.current = setTimeout(() => {
-          scrollPositionRef.current = container.scrollLeft
-        }, 50)
-      }
+      scrollPositionRef.current = container.scrollLeft
     }
 
     container.addEventListener("scroll", handleScroll, { passive: true })
     return () => {
       container.removeEventListener("scroll", handleScroll)
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current)
-      }
     }
   }, [])
 
@@ -277,8 +247,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   const handleCellEdit = async (leadId: string, field: string, value: any) => {
     if (scrollContainerRef.current) {
       scrollPositionRef.current = scrollContainerRef.current.scrollLeft
-      isUpdatingRef.current = true
-      console.log("[v0] Salvando posição antes da atualização:", scrollPositionRef.current)
+      console.log("[v0] Posição salva antes da edição:", scrollPositionRef.current)
     }
 
     let updates: Partial<Lead> = { [field]: value }
@@ -319,14 +288,10 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     }
 
     try {
-      await new Promise<void>((resolve, reject) => {
-        onUpdateLead(leadId, updates)
-        setTimeout(resolve, 10)
-      })
+      onUpdateLead(leadId, updates)
       console.log("[v0] Lead atualizado com sucesso")
     } catch (error) {
       console.error("[v0] Erro ao salvar lead:", error)
-      isUpdatingRef.current = false
     }
   }
 
@@ -682,7 +647,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
                   {uniqueValues.map((value, index) => {
                     const isSelected = activeFilters.includes(value)
                     return (
-                      <div key={index} className="flex items-center space-x-2 hover:bg-gray-100 p-1 rounded">
+                      <div key={index} className="flex items-center space-x-2 py-0 px-1 hover:bg-gray-100 p-1 rounded">
                         <Checkbox
                           id={`${column.key}-${index}`}
                           checked={isSelected}
