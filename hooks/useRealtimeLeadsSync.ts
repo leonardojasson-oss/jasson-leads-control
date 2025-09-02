@@ -1,176 +1,241 @@
 "use client"
 
-import { useEffect, useRef, useCallback } from "react"
-import { supabase } from "@/lib/supabase-operations"
-import type { Lead } from "@/app/page"
+import { useEffect, useRef } from "react"
+import type { RealtimeChannel } from "@supabase/supabase-js"
+import { supabase, isSupabaseConfigured, leadOperations, type Lead } from "@/lib/supabase-operations"
 
-interface UseRealtimeLeadsSyncProps {
-  selectFn: () => Lead[]
-  mergeFn: (changes: Map<string, Partial<Lead>>) => void
-}
-
-export function useRealtimeLeadsSync({ selectFn, mergeFn }: UseRealtimeLeadsSyncProps) {
-  const channelRef = useRef<any>(null)
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const batchIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const changesBufferRef = useRef<Map<string, Partial<Lead>>>(new Map())
-  const lastSyncTimeRef = useRef<string>(new Date().toISOString())
-  const localEditLocksRef = useRef<Map<string, Map<string, number>>>(new Map())
-  const realtimeDisabledRef = useRef<boolean>(false)
-  const realtimeFailureCountRef = useRef<number>(0)
-
-  const selectFnRef = useRef(selectFn)
-  const mergeFnRef = useRef(mergeFn)
-
-  // Atualizar refs sempre que as funções mudarem
-  selectFnRef.current = selectFn
-  mergeFnRef.current = mergeFn
-
-  const setLocalEditLock = (leadId: string, field: string, durationMs = 1500) => {
-    if (!localEditLocksRef.current.has(leadId)) {
-      localEditLocksRef.current.set(leadId, new Map())
+type Params =
+  | {
+      getLeads?: () => Lead[]
+      setLeads?: (updater: (prev: Lead[]) => Lead[]) => void
+      // compat c/ versão antiga:
+      selectFn?: () => Lead[]
+      mergeFn?: (updater: (prev: Lead[]) => Lead[]) => void
     }
-    const leadLocks = localEditLocksRef.current.get(leadId)!
-    leadLocks.set(field, Date.now() + durationMs)
-  }
+  | undefined
 
-  const isFieldLocked = (leadId: string, field: string): boolean => {
-    const leadLocks = localEditLocksRef.current.get(leadId)
-    if (!leadLocks) return false
-    const lockExpiry = leadLocks.get(field)
-    if (!lockExpiry) return false
-    if (Date.now() > lockExpiry) {
-      leadLocks.delete(field)
-      return false
-    }
-    return true
-  }
-
-  const markFieldAsEditing = useCallback((leadId: string, field: string) => {
-    setLocalEditLock(leadId, field, 1500)
-  }, [])
+/**
+ * Realtime (canal único) + buffer/throttle 1s + fallback polling 1s + lock local 1,5s
+ * Compatível com props novas (getLeads/setLeads) E antigas (selectFn/mergeFn).
+ * Resiliente a erros de rede (sem logs ruidosos) e sem loops de render.
+ */
+export function useRealtimeLeadsSync(params?: Params) {
+  // refs para funções passadas por props (com fallbacks seguros)
+  const getRef = useRef<() => Lead[]>(() => [])
+  const setRef = useRef<(updater: (prev: Lead[]) => Lead[]) => void>(() => {})
 
   useEffect(() => {
-    if (!supabase) {
-      console.log("[v0] Supabase não configurado, sincronização desabilitada")
-      return
+    const getLeads = params?.getLeads ?? params?.selectFn
+    const setLeads = params?.setLeads ?? params?.mergeFn
+    if (typeof getLeads === "function") getRef.current = getLeads
+    if (typeof setLeads === "function") {
+      // Para compatibilidade com mergeFn (API antiga), adaptar para nova API
+      if (params?.mergeFn && !params?.setLeads) {
+        setRef.current = (updater) => {
+          const changes = new Map<string, Partial<Lead>>()
+          const currentLeads = getRef.current()
+          const newLeads = updater(currentLeads)
+
+          // Detectar mudanças entre arrays
+          newLeads.forEach((newLead) => {
+            const oldLead = currentLeads.find((l) => l.id === newLead.id)
+            if (!oldLead) {
+              changes.set(newLead.id, newLead)
+            } else {
+              const diff: Partial<Lead> = {}
+              let hasChanges = false
+              Object.keys(newLead).forEach((key) => {
+                if ((newLead as any)[key] !== (oldLead as any)[key]) {
+                  ;(diff as any)[key] = (newLead as any)[key]
+                  hasChanges = true
+                }
+              })
+              if (hasChanges) {
+                changes.set(newLead.id, diff)
+              }
+            }
+          })
+
+          if (changes.size > 0) {
+            params.mergeFn!(changes)
+          }
+        }
+      } else {
+        setRef.current = setLeads
+      }
     }
+  }, [params?.getLeads, params?.selectFn, params?.setLeads, params?.mergeFn])
 
-    console.log("[v0] Configurando sincronização apenas com polling...")
+  const channelRef = useRef<RealtimeChannel | null>(null)
+  const bufferRef = useRef<Map<string, Lead>>(new Map())
+  const lastSeenRef = useRef<string | null>(null) // maior updated_at/created_at visto
+  const connectedRef = useRef(false)
+  const localLocksRef = useRef<Map<string, number>>(new Map()) // id -> expiresAt(ms)
 
-    const processBatchedChanges = () => {
-      if (changesBufferRef.current.size === 0) return
+  /** Trava um lead local por 1.5s após salvar p/ evitar "piscar" */
+  const lockLeadDuringLocalSave = (id: string) => {
+    localLocksRef.current.set(id, Date.now() + 1500)
+  }
 
-      const currentLeads = selectFnRef.current()
-      const filteredChanges = new Map<string, Partial<Lead>>()
+  // Aplica o buffer no máx. 1x/seg (throttle)
+  useEffect(() => {
+    const flush = setInterval(() => {
+      if (bufferRef.current.size === 0) return
+      const changes = Array.from(bufferRef.current.values())
+      bufferRef.current.clear()
 
-      // Filtrar mudanças aplicando locks e validação de updated_at
-      changesBufferRef.current.forEach((change, leadId) => {
-        const currentLead = currentLeads.find((l) => l.id === leadId)
-        if (!currentLead) {
-          // Lead novo ou deletado, aplicar mudança completa
-          filteredChanges.set(leadId, change)
-          return
+      setRef.current((prev) => {
+        if (!changes.length) return prev
+        const byId = new Map(prev.map((l) => [l.id, l]))
+        let changed = false
+
+        for (const remote of changes) {
+          const lock = localLocksRef.current.get(remote.id) ?? 0
+          if (Date.now() < lock) continue
+
+          const current = byId.get(remote.id)
+          if (!current) {
+            byId.set(remote.id, remote)
+            changed = true
+            continue
+          }
+
+          const localTs = current.updated_at ?? current.created_at ?? ""
+          const remoteTs = remote.updated_at ?? remote.created_at ?? ""
+          if (remoteTs && localTs && remoteTs <= localTs) continue
+
+          byId.set(remote.id, { ...current, ...remote })
+          changed = true
         }
 
-        const filteredChange: Partial<Lead> = {}
-        let hasValidChanges = false
+        if (!changed) return prev
+        return Array.from(byId.values())
+      })
+    }, 1000)
+    return () => clearInterval(flush)
+  }, [])
 
-        Object.entries(change).forEach(([field, value]) => {
-          // Verificar se campo está sob lock local
-          if (isFieldLocked(leadId, field)) {
-            return // Pular campo locked
+  // Polling resiliente (1s) — pausa se canal conectado/aba oculta/offline
+  useEffect(() => {
+    let inFlight = false
+    let abort: AbortController | null = null
+
+    const poll = async () => {
+      try {
+        if (connectedRef.current) return
+        if (typeof document !== "undefined" && document.visibilityState !== "visible") return
+        if (typeof navigator !== "undefined" && "onLine" in navigator && !navigator.onLine) return
+        if (inFlight) return
+
+        inFlight = true
+        if (abort) abort.abort()
+        abort = new AbortController()
+
+        // tentativa incremental via Supabase
+        if (isSupabaseConfigured && supabase) {
+          const last = lastSeenRef.current
+          let q = supabase.from("leads").select("*")
+          if (last) q = q.gte("updated_at", last)
+          const { data, error } = await q.order("updated_at", { ascending: false }).limit(200).abortSignal(abort.signal)
+
+          if (!error && data && data.length) {
+            for (const r of data) {
+              bufferRef.current.set(r.id, r)
+              const ts = r.updated_at ?? r.created_at
+              if (ts && (!lastSeenRef.current || ts > lastSeenRef.current)) lastSeenRef.current = ts
+            }
+            inFlight = false
+            return
           }
+          // se erro, cai no fallback silencioso abaixo
+        }
 
-          // Verificar updated_at para evitar aplicar mudanças antigas
-          if (change.updated_at && currentLead.updated_at) {
-            const changeTime = new Date(change.updated_at).getTime()
-            const currentTime = new Date(currentLead.updated_at).getTime()
-            if (changeTime <= currentTime) {
-              return // Pular mudança mais antiga
+        // fallback: usa fonte padrão + comparação rasa
+        const remoteAll = await leadOperations.getAll()
+        const local = getRef.current()
+        const localById = new Map(local.map((l) => [l.id, l]))
+        const remoteById = new Map(remoteAll.map((l) => [l.id, l]))
+
+        const changed: Lead[] = []
+        for (const [id, r] of remoteById) {
+          const curr = localById.get(id)
+          if (!curr) {
+            changed.push(r)
+            continue
+          }
+          const lt = curr.updated_at ?? curr.created_at ?? ""
+          const rt = r.updated_at ?? r.created_at ?? ""
+          if (rt && lt && rt > lt) {
+            changed.push(r)
+            continue
+          }
+          let diff = false
+          for (const k in r) {
+            // @ts-ignore
+            if (r[k] !== (curr as any)[k]) {
+              diff = true
+              break
             }
           }
+          if (diff) changed.push(r)
+        }
 
-          filteredChange[field as keyof Lead] = value
-          hasValidChanges = true
-        })
+        if (changed.length) {
+          for (const r of changed) {
+            bufferRef.current.set(r.id, r)
+            const ts = r.updated_at ?? r.created_at
+            if (ts && (!lastSeenRef.current || ts > lastSeenRef.current)) lastSeenRef.current = ts
+          }
+        }
+      } catch {
+        // silencioso
+      } finally {
+        inFlight = false
+      }
+    }
 
-        if (hasValidChanges) {
-          filteredChanges.set(leadId, filteredChange)
+    const id = setInterval(poll, 1000)
+    return () => {
+      clearInterval(id)
+      if (abort) abort.abort()
+    }
+  }, [])
+
+  // Canal realtime único e estável (sem logs no callback)
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return
+    if (channelRef.current) return
+
+    const ch = supabase
+      .channel("leads:realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "leads" }, (payload: any) => {
+        const row = payload.eventType === "DELETE" ? null : (payload.new as Lead | null)
+        if (row) {
+          bufferRef.current.set(row.id, row)
+          const ts = row.updated_at ?? row.created_at
+          if (ts && (!lastSeenRef.current || ts > lastSeenRef.current)) lastSeenRef.current = ts
+        } else if (payload.old?.id) {
+          bufferRef.current.set(payload.old.id as string, { id: payload.old.id, status: "REMOVIDO" } as any)
         }
       })
 
-      // Aplicar mudanças filtradas se houver alguma
-      if (filteredChanges.size > 0) {
-        console.log("[v0] Aplicando", filteredChanges.size, "mudanças em batch")
-        mergeFnRef.current(filteredChanges)
+    ch.subscribe((status) => {
+      connectedRef.current = status === "SUBSCRIBED"
+      if (typeof window !== "undefined") {
+        console.debug("[realtime] status:", status, "channels:", (supabase as any)?.getChannels?.()?.length)
       }
+    })
 
-      // Limpar buffer
-      changesBufferRef.current.clear()
-    }
-
-    // Setup polling
-    if (!pollingIntervalRef.current) {
-      pollingIntervalRef.current = setInterval(async () => {
-        try {
-          const { data, error } = await supabase
-            .from("leads")
-            .select("*")
-            .gte("updated_at", lastSyncTimeRef.current)
-            .order("updated_at", { ascending: true })
-            .limit(50)
-
-          if (error) {
-            console.error("[v0] Erro no polling:", error)
-            return
-          }
-
-          if (data && data.length > 0) {
-            console.log("[v0] Polling encontrou", data.length, "mudanças")
-
-            // Acumular mudanças no buffer
-            data.forEach((lead) => {
-              changesBufferRef.current.set(lead.id, lead as Partial<Lead>)
-            })
-
-            // Atualizar último sync time
-            const latestTime = Math.max(...data.map((l) => new Date(l.updated_at).getTime()))
-            lastSyncTimeRef.current = new Date(latestTime + 1).toISOString()
-          }
-        } catch (error) {
-          console.error("[v0] Exceção no polling:", error)
-        }
-      }, 3000)
-    }
-
-    // Setup batch processing
-    if (!batchIntervalRef.current) {
-      batchIntervalRef.current = setInterval(() => {
-        processBatchedChanges()
-      }, 1000)
-    }
-
-    // Cleanup
+    channelRef.current = ch
     return () => {
-      console.log("[v0] Limpando sincronização...")
-
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-        pollingIntervalRef.current = null
+      try {
+        if (channelRef.current) supabase.removeChannel(channelRef.current)
+      } finally {
+        channelRef.current = null
+        connectedRef.current = false
       }
-
-      if (batchIntervalRef.current) {
-        clearInterval(batchIntervalRef.current)
-        batchIntervalRef.current = null
-      }
-
-      changesBufferRef.current.clear()
-      localEditLocksRef.current.clear()
     }
-  }, []) // Mantendo dependências vazias, mas usando refs para funções atualizadas
+  }, [])
 
-  return {
-    markFieldAsEditing,
-  }
+  return { lockLeadDuringLocalSave }
 }
