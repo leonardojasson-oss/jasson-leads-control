@@ -81,68 +81,9 @@ export default function LeadsControl() {
   const [sdrMetasConfig, setSDRMetasConfig] = useState<SDRsMetasConfig>({})
   const [closerMetasConfig, setCloserMetasConfig] = useState<ClosersMetasConfig>({})
 
-  const { markFieldAsEditing } = useRealtimeLeadsSync({
-    selectFn: () => leads,
-    mergeFn: (changes: Map<string, Partial<Lead>>) => {
-      console.log("[v0] Aplicando mudanças em tempo real:", changes.size, "leads")
-
-      changes.forEach((change, leadId) => {
-        console.log("[v0] Mudança detectada para lead:", leadId, change)
-      })
-
-      setLeads((prevLeads) => {
-        const updatedLeads = [...prevLeads]
-        let hasChanges = false
-
-        changes.forEach((change, leadId) => {
-          // Verificar se é uma deleção
-          if ((change as any)._deleted) {
-            const index = updatedLeads.findIndex((l) => l.id === leadId)
-            if (index !== -1) {
-              updatedLeads.splice(index, 1)
-              hasChanges = true
-              console.log("[v0] Lead removido:", leadId)
-            }
-            return
-          }
-
-          // Encontrar lead existente ou adicionar novo
-          const existingIndex = updatedLeads.findIndex((l) => l.id === leadId)
-
-          if (existingIndex !== -1) {
-            // Atualizar lead existente
-            const currentLead = updatedLeads[existingIndex]
-            const updatedLead = { ...currentLead, ...change }
-
-            console.log("[v0] Comparando lead atual vs mudança:", {
-              leadId,
-              current: Object.keys(change).reduce((acc, key) => {
-                acc[key] = currentLead[key as keyof Lead]
-                return acc
-              }, {} as any),
-              change,
-            })
-
-            updatedLeads[existingIndex] = updatedLead
-            hasChanges = true
-            console.log("[v0] Lead atualizado:", leadId)
-          } else {
-            // Adicionar novo lead
-            updatedLeads.unshift(change as Lead)
-            hasChanges = true
-            console.log("[v0] Novo lead adicionado:", leadId)
-          }
-        })
-
-        if (hasChanges) {
-          console.log("[v0] Estado dos leads atualizado, total:", updatedLeads.length)
-          return updatedLeads
-        }
-
-        console.log("[v0] Nenhuma mudança aplicada")
-        return prevLeads
-      })
-    },
+  const { markFieldAsEditing, lockLeadDuringLocalSave } = useRealtimeLeadsSync({
+    getLeads: () => leads,
+    setLeads: (updater) => setLeads(updater),
   })
 
   const tabs = [
@@ -650,27 +591,14 @@ export default function LeadsControl() {
 
   const handleUpdateLead = async (id: string, updates: Partial<Lead>) => {
     try {
-      console.log("[v0] === ATUALIZANDO LEAD ===")
-      console.log("[v0] ID:", id)
-      console.log("[v0] Dados recebidos:", updates)
+      lockLeadDuringLocalSave(id)
 
-      Object.keys(updates).forEach((field) => {
-        markFieldAsEditing(id, field)
-      })
+      const withTs: Partial<Lead> = { ...updates, updated_at: new Date().toISOString() }
+      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...withTs } : l)))
 
-      setLeads((prevLeads) => prevLeads.map((lead) => (lead.id === id ? { ...lead, ...updates } : lead)))
-      console.log("[v0] Lead atualizado no localStorage")
-
-      // Atualizar no Supabase em background
-      console.log("[v0] Tentando atualizar no Supabase...")
-      await leadOperations.update(id, updates)
-      console.log("[v0] ✅ Lead também atualizado no Supabase")
+      await leadOperations.update(id, withTs)
     } catch (error) {
       console.error("[v0] Erro ao atualizar lead:", error)
-
-      console.log("[v0] Revertendo estado devido ao erro...")
-      await loadLeads()
-      alert("Erro ao atualizar lead")
     }
   }
 
