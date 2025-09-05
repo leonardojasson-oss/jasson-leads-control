@@ -302,9 +302,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         console.log("✅ Canal encontrado:", updates.canal)
       }
 
-      updates.origemLead = "leadbroker"
       updates.status = "BACKLOG"
-      console.log("✅ Origem do Lead definida como: LeadBroker")
       console.log("✅ STATUS inicial definido como: BACKLOG")
 
       const cnpjMatch = data.match(/CNPJ:\s*([^\n]+)/i)
@@ -405,6 +403,10 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
       if (Object.keys(updates).length > 0) {
         setFormData((prev) => {
           const newData = { ...prev, ...updates }
+          if (prev.origemLead && prev.origemLead !== "") {
+            newData.origemLead = prev.origemLead
+            console.log("✅ Origem do lead preservada:", prev.origemLead)
+          }
           console.log("✅ Formulário atualizado:", newData)
           return newData
         })
@@ -600,11 +602,12 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="leadbroker">LeadBroker</SelectItem>
-                    <SelectItem value="organico">Orgânico</SelectItem>
                     <SelectItem value="indicacao">Indicação</SelectItem>
-                    <SelectItem value="facebook">Facebook</SelectItem>
-                    <SelectItem value="google">Google</SelectItem>
-                    <SelectItem value="linkedin">LinkedIn</SelectItem>
+                    <SelectItem value="blackbox">Blackbox</SelectItem>
+                    <SelectItem value="recomendacao">Recomendação</SelectItem>
+                    <SelectItem value="outbound">Outbound</SelectItem>
+                    <SelectItem value="evento">Evento</SelectItem>
+                    <SelectItem value="networking">Networking</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
