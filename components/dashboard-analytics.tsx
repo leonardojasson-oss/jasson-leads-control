@@ -19,6 +19,7 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
   const [dateFilterColumn, setDateFilterColumn] = useState<string>("")
   const [dateFilterStart, setDateFilterStart] = useState<string>("")
   const [dateFilterEnd, setDateFilterEnd] = useState<string>("")
+  const [origemLeadFilter, setOrigemLeadFilter] = useState<string>("todos")
 
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -29,6 +30,17 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
     { value: "data_hora_compra", label: "DATA DA COMPRA" },
     { value: "data_marcacao", label: "DATA DA MARCAÇÃO" },
     { value: "data_assinatura", label: "DATA DE ASSINATURA" },
+  ]
+
+  const origemLeadOptions = [
+    { value: "todos", label: "Todos (Geral)" },
+    { value: "LeadBroker", label: "LeadBroker" },
+    { value: "Blackbox", label: "Blackbox" },
+    { value: "Outbound", label: "Outbound" },
+    { value: "Indicação", label: "Indicação" },
+    { value: "Networking", label: "Networking" },
+    { value: "Recomendação", label: "Recomendação" },
+    { value: "Evento", label: "Evento" },
   ]
 
   function pad(n: number) {
@@ -132,6 +144,14 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
         const endDate = new Date(dateFilterEnd + "T23:59:59.999")
 
         return leadDate >= startDate && leadDate <= endDate
+      })
+    }
+
+    if (origemLeadFilter && origemLeadFilter !== "todos") {
+      filteredLeads = filteredLeads.filter((lead) => {
+        const tipoLead = lead.tipo_lead?.toLowerCase()?.trim()
+        const filterValue = origemLeadFilter.toLowerCase()
+        return tipoLead === filterValue
       })
     }
 
@@ -529,6 +549,11 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
               </div>
               <p className="text-sm text-white/80">
                 Análise de Performance e Funis de Conversão • {getDisplayPeriod()}
+                {origemLeadFilter !== "todos" && (
+                  <span className="ml-2 bg-white/20 px-2 py-1 rounded text-xs">
+                    Origem: {origemLeadOptions.find((opt) => opt.value === origemLeadFilter)?.label}
+                  </span>
+                )}
               </p>
             </div>
 
@@ -617,6 +642,22 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
       <div className="bg-gray-50 border-b px-4 py-3">
         <div className="flex items-center space-x-4 flex-wrap gap-2">
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-600 whitespace-nowrap">🎯 Origem do Lead:</label>
+            <Select value={origemLeadFilter} onValueChange={setOrigemLeadFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Selecione uma origem" />
+              </SelectTrigger>
+              <SelectContent>
+                {origemLeadOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="flex items-center space-x-2">
             <label className="text-sm text-gray-600 whitespace-nowrap">📅 Filtrar por período:</label>
           </div>
