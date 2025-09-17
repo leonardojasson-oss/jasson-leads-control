@@ -347,6 +347,11 @@ export function MetasControl({ leads }: MetasControlProps) {
       })
     }
 
+    filteredLeads = filteredLeads.filter((lead) => {
+      const origem = lead.tipo_lead || lead.origem_lead || lead.origemLead || ""
+      return origem.toLowerCase() === "leadbroker"
+    })
+
     return filteredLeads
   }
 

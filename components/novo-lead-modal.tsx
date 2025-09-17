@@ -776,6 +776,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectItem value="antonio">Antônio</SelectItem>
                     <SelectItem value="gabrielli">Gabrielli</SelectItem>
                     <SelectItem value="vanessa">Vanessa</SelectItem>
+                    <SelectItem value="guilherme">Guilherme</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -790,6 +791,8 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectItem value="francisco">Francisco</SelectItem>
                     <SelectItem value="giselle">Giselle</SelectItem>
                     <SelectItem value="leonardo">Leonardo</SelectItem>
+                    <SelectItem value="guilherme">Guilherme</SelectItem>
+                    <SelectItem value="marcelo">Marcelo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -807,6 +810,9 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectItem value="giselle">Giselle</SelectItem>
                     <SelectItem value="leonardo">Leonardo</SelectItem>
                     <SelectItem value="vanessa">Vanessa</SelectItem>
+                    <SelectItem value="guilherme">Guilherme</SelectItem>
+                    <SelectItem value="marcelo">Marcelo</SelectItem>
+                    <SelectItem value="allan">Allan</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

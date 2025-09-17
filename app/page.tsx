@@ -3,18 +3,6 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import {
-  RefreshCw,
-  Plus,
-  Info,
-  DollarSign,
-  Users,
-  BarChart3,
-  CheckCircle,
-  Database,
-  Target,
-  Calendar,
-} from "lucide-react"
 import { LeadsList } from "@/components/leads-list"
 import { SalesTracking } from "@/components/sales-tracking"
 import { CommissionControl } from "@/components/commission-control"
@@ -26,6 +14,17 @@ import { LeadsSpreadsheet } from "@/components/leads-spreadsheet"
 import { useRealtimeLeadsSync } from "@/hooks/useRealtimeLeadsSync"
 
 export type { Lead }
+
+const RefreshIcon = () => <span className="inline-block">🔄</span>
+const PlusIcon = () => <span className="inline-block">➕</span>
+const InfoIcon = () => <span className="inline-block">ℹ️</span>
+const DollarIcon = () => <span className="inline-block">💰</span>
+const UsersIcon = () => <span className="inline-block">👥</span>
+const ChartIcon = () => <span className="inline-block">📊</span>
+const CheckIcon = () => <span className="inline-block">✅</span>
+const DatabaseIcon = () => <span className="inline-block">🗄️</span>
+const TargetIcon = () => <span className="inline-block">🎯</span>
+const CalendarIcon = () => <span className="inline-block">📅</span>
 
 interface TierConfig {
   meta: number
@@ -378,42 +377,47 @@ export default function LeadsControl() {
       })
     }
 
-    // Valor Compra
-    const valorCompra = leadsToAnalyze.reduce((sum, lead) => {
+    // Para FEE MRR e FEE ONE-TIME: TODOS os leads com data de assinatura no período
+    const leadsParaReceita = leadsToAnalyze.filter((lead) => lead.data_assinatura)
+
+    // Para Qtd. Leads e Custo por Lead: apenas leads comprados no mês atual com origem "LeadBroker"
+    const leadsLeadBroker = leadsToAnalyze.filter((lead) => {
+      const origem = (lead.tipo_lead || lead.origem_lead || lead.origemLead || "").toLowerCase()
+      return origem === "leadbroker" || origem === "lead broker"
+    })
+
+    // Valor Compra - baseado em leads LeadBroker
+    const valorCompra = leadsLeadBroker.reduce((sum, lead) => {
       const valor = Number.parseFloat(String(lead.valor_pago_lead || "0"))
       return sum + (isNaN(valor) ? 0 : valor)
     }, 0)
 
-    const feeMRR = leadsToAnalyze
-      .filter((lead) => lead.data_assinatura)
-      .reduce((sum, lead) => {
-        const valor = Number.parseFloat(String(lead.fee_mrr || "0"))
-        return sum + (isNaN(valor) ? 0 : valor)
-      }, 0)
+    // FEE MRR - TODO valor de venda realizado no mês (independente da origem)
+    const feeMRR = leadsParaReceita.reduce((sum, lead) => {
+      const valor = Number.parseFloat(String(lead.fee_mrr || "0"))
+      return sum + (isNaN(valor) ? 0 : valor)
+    }, 0)
 
-    // ROAS
-    const feeOneTime = leadsToAnalyze
-      .filter((lead) => lead.data_assinatura)
-      .reduce((sum, lead) => {
-        const valor = Number.parseFloat(String(lead.escopo_fechado || "0"))
-        return sum + (isNaN(valor) ? 0 : valor)
-      }, 0)
+    // FEE ONE-TIME - TODO valor de venda realizado no mês (independente da origem)
+    const feeOneTime = leadsParaReceita.reduce((sum, lead) => {
+      const valor = Number.parseFloat(String(lead.escopo_fechado || "0"))
+      return sum + (isNaN(valor) ? 0 : valor)
+    }, 0)
 
     const totalReceita = feeMRR + feeOneTime
     const roas = valorCompra > 0 ? totalReceita / valorCompra : 0
 
-    // Quantidade de Leads
-    const qtdLeads = leadsToAnalyze.length
+    // Quantidade de Leads - apenas LeadBroker
+    const qtdLeads = leadsLeadBroker.length
 
-    // Ticket Médio
-    const leadsComAssinatura = leadsToAnalyze.filter((lead) => lead.data_assinatura).length
-    const ticketMedio = leadsComAssinatura > 0 ? totalReceita / leadsComAssinatura : 0
+    // Ticket Médio - baseado em TODAS as vendas do período
+    const ticketMedio = leadsParaReceita.length > 0 ? totalReceita / leadsParaReceita.length : 0
 
-    // Custo por Lead
+    // Custo por Lead - baseado apenas em leads LeadBroker
     const custoPorLead = qtdLeads > 0 ? valorCompra / qtdLeads : 0
 
-    // Quantidade de Vendas
-    const qtdVendas = leadsComAssinatura
+    // Quantidade de Vendas - TODAS as vendas do período
+    const qtdVendas = leadsParaReceita.length
 
     return {
       valorCompra,
@@ -625,21 +629,21 @@ export default function LeadsControl() {
       case "loading":
         return (
           <div className="flex items-center space-x-2 text-gray-500">
-            <RefreshCw className="w-4 h-4 animate-spin" />
+            <RefreshIcon />
             <span className="text-sm">Carregando...</span>
           </div>
         )
       case "connected":
         return (
           <div className="flex items-center space-x-2 text-green-600">
-            <Database className="w-4 h-4" />
+            <DatabaseIcon />
             <span className="text-sm font-medium">Supabase Conectado</span>
           </div>
         )
       case "local":
         return (
           <div className="flex items-center space-x-2 text-blue-600">
-            <Info className="w-4 h-4" />
+            <InfoIcon />
             <span className="text-sm font-medium">Modo Local</span>
           </div>
         )
@@ -651,7 +655,9 @@ export default function LeadsControl() {
       return (
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
-            <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-gray-400" />
+            <div className="text-2xl mb-4">
+              <RefreshIcon />
+            </div>
             <p className="text-gray-500">Carregando leads...</p>
           </div>
         </div>
@@ -718,14 +724,14 @@ export default function LeadsControl() {
               onClick={handleRefresh}
               disabled={loading}
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+              <RefreshIcon />
               <span>Atualizar</span>
             </Button>
             <Button
               className="bg-red-600 hover:bg-red-700 flex items-center space-x-2"
               onClick={() => setIsNovoLeadModalOpen(true)}
             >
-              <Plus className="w-4 h-4" />
+              <PlusIcon />
               <span>Novo Lead</span>
             </Button>
           </div>
@@ -737,7 +743,7 @@ export default function LeadsControl() {
         <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <Calendar className="w-5 h-5 text-orange-500" />
+              <CalendarIcon />
               <span className="text-sm font-medium text-gray-700">Filtro por Data</span>
             </div>
 
@@ -795,7 +801,7 @@ export default function LeadsControl() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <DollarSign className="w-4 h-4 mr-1" />
+                    <DollarIcon />
                     Valor Compra
                   </p>
                   <p className="text-2xl font-bold text-gray-900">
@@ -812,7 +818,7 @@ export default function LeadsControl() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <DollarSign className="w-4 h-4 mr-1" />
+                    <DollarIcon />
                     FEE MRR
                   </p>
                   <p className="text-2xl font-bold text-gray-900">
@@ -829,7 +835,7 @@ export default function LeadsControl() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <DollarSign className="w-4 h-4 mr-1" />
+                    <DollarIcon />
                     FEE ONE-TIME
                   </p>
                   <p className="text-2xl font-bold text-gray-900">
@@ -846,7 +852,7 @@ export default function LeadsControl() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <BarChart3 className="w-4 h-4 mr-1" />
+                    <ChartIcon />
                     ROAS
                   </p>
                   <p className="text-2xl font-bold text-gray-900">{headerMetrics.roas.toFixed(2)}</p>
@@ -863,7 +869,7 @@ export default function LeadsControl() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <Users className="w-4 h-4 mr-1" />
+                    <UsersIcon />
                     Qtd. Leads
                   </p>
                   <p className="text-2xl font-bold text-gray-900">{headerMetrics.qtdLeads}</p>
@@ -878,7 +884,7 @@ export default function LeadsControl() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <Target className="w-4 h-4 mr-1" />
+                    <TargetIcon />
                     Ticket Médio
                   </p>
                   <p className="text-2xl font-bold text-gray-900">
@@ -895,7 +901,7 @@ export default function LeadsControl() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <Info className="w-4 h-4 mr-1" />
+                    <InfoIcon />
                     Custo por Lead
                   </p>
                   <p className="text-2xl font-bold text-gray-900">
@@ -912,7 +918,7 @@ export default function LeadsControl() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-1" />
+                    <CheckIcon />
                     Qtd. Vendas
                   </p>
                   <p className="text-2xl font-bold text-gray-900">{headerMetrics.qtdVendas}</p>
