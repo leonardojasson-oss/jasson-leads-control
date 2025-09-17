@@ -199,6 +199,16 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     }
   }, [formData.email])
 
+  // Added useEffect for auto-filling arrematador when origemLead is Blackbox
+  useEffect(() => {
+    if (formData.origemLead === "blackbox") {
+      setFormData((prev) => ({
+        ...prev,
+        arrematador: "matriz",
+      }))
+    }
+  }, [formData.origemLead])
+
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({
       ...prev,
@@ -813,6 +823,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectItem value="guilherme">Guilherme</SelectItem>
                     <SelectItem value="marcelo">Marcelo</SelectItem>
                     <SelectItem value="allan">Allan</SelectItem>
+                    <SelectItem value="matriz">Matriz</SelectItem> {/* Added option Matriz */}
                   </SelectContent>
                 </Select>
               </div>

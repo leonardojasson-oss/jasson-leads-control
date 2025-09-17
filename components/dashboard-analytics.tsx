@@ -115,46 +115,43 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
   }
 
   const getFilteredLeads = () => {
+    console.log("[v0] getFilteredLeads - leads totais:", leads?.length)
+    console.log("[v0] getFilteredLeads - startDate:", startDate, "endDate:", endDate)
+    console.log("[v0] getFilteredLeads - dateFilterColumn:", dateFilterColumn)
+    console.log("[v0] getFilteredLeads - origemLeadFilter:", origemLeadFilter)
+
     if (!leads || leads.length === 0) return []
 
     let filteredLeads = leads
 
     if (startDate && endDate) {
       filteredLeads = leads.filter((lead) => {
-        if (!lead.data_hora_compra) return false
-        const leadDate = new Date(lead.data_hora_compra)
-
-        const start = new Date(startDate)
-        start.setHours(0, 0, 0, 0)
-
-        const end = new Date(endDate)
-        end.setHours(23, 59, 59, 999)
-
-        return leadDate >= start && leadDate <= end
+        const leadDate = lead.data_hora_compra
+        if (!leadDate) return false
+        const date = new Date(leadDate).toISOString().split("T")[0]
+        const isInRange = date >= startDate && date <= endDate
+        return isInRange
       })
-    }
-
-    if (dateFilterColumn && dateFilterStart && dateFilterEnd) {
-      filteredLeads = filteredLeads.filter((lead) => {
-        const leadDateValue = (lead as any)[dateFilterColumn]
-        if (!leadDateValue) return false
-
-        const leadDate = new Date(leadDateValue)
-        const startDate = new Date(dateFilterStart + "T00:00:00")
-        const endDate = new Date(dateFilterEnd + "T23:59:59.999")
-
-        return leadDate >= startDate && leadDate <= endDate
-      })
+      console.log("[v0] getFilteredLeads - após filtro de data:", filteredLeads.length)
     }
 
     if (origemLeadFilter && origemLeadFilter !== "todos") {
+      const beforeOrigemFilter = filteredLeads.length
       filteredLeads = filteredLeads.filter((lead) => {
-        const tipoLead = lead.tipo_lead?.toLowerCase()?.trim()
+        const origem = (lead.tipo_lead || lead.origem_lead || lead.origemLead || "").toLowerCase()
         const filterValue = origemLeadFilter.toLowerCase()
-        return tipoLead === filterValue
+
+        // Para LeadBroker, aceitar tanto "leadbroker" quanto "lead broker"
+        if (filterValue === "leadbroker") {
+          return origem === "leadbroker" || origem === "lead broker"
+        }
+
+        return origem === filterValue
       })
+      console.log("[v0] getFilteredLeads - após filtro de origem:", filteredLeads.length, "antes:", beforeOrigemFilter)
     }
 
+    console.log("[v0] getFilteredLeads - resultado final:", filteredLeads.length)
     return filteredLeads
   }
 

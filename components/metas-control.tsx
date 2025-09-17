@@ -63,7 +63,16 @@ interface ClosersMetasConfig {
   [key: string]: CloserMetasConfig
 }
 
-export function MetasControl({ leads }: MetasControlProps) {
+interface NovasMetasConfig {
+  feeMRR: number
+  feeOneTime: number
+  leads: number
+  rm: number
+  rr: number
+  logos: number
+}
+
+export default function MetasControl({ leads }: MetasControlProps) {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
@@ -73,6 +82,16 @@ export function MetasControl({ leads }: MetasControlProps) {
   const [sdrMetasConfig, setSDRMetasConfig] = useState<SDRsMetasConfig>({})
   const [closerMetasConfig, setCloserMetasConfig] = useState<ClosersMetasConfig>({})
   const [isLoading, setIsLoading] = useState(true)
+
+  const [novasMetasConfig, setNovasMetasConfig] = useState<NovasMetasConfig>({
+    feeMRR: 0,
+    feeOneTime: 0,
+    leads: 0,
+    rm: 0,
+    rr: 0,
+    logos: 0,
+  })
+  const [isNovasMetasConfigModalOpen, setIsNovasMetasConfigModalOpen] = useState(false)
 
   // Configuração padrão das metas
   const defaultMetasConfig: MetasConfig = {
@@ -127,6 +146,15 @@ export function MetasControl({ leads }: MetasControlProps) {
     },
   }
 
+  const defaultNovasMetasConfig: NovasMetasConfig = {
+    feeMRR: 50000,
+    feeOneTime: 150000,
+    leads: 100,
+    rm: 150,
+    rr: 120,
+    logos: 25,
+  }
+
   // Carregar configurações salvas ou usar padrão
   useEffect(() => {
     const loadConfig = () => {
@@ -173,11 +201,20 @@ export function MetasControl({ leads }: MetasControlProps) {
         } else {
           setCloserMetasConfig(defaultCloserMetasConfig)
         }
+
+        const savedNovasMetasConfig = localStorage.getItem("jasson-novas-metas-config")
+        if (savedNovasMetasConfig) {
+          const parsedConfig = JSON.parse(savedNovasMetasConfig)
+          setNovasMetasConfig({ ...defaultNovasMetasConfig, ...parsedConfig })
+        } else {
+          setNovasMetasConfig(defaultNovasMetasConfig)
+        }
       } catch (error) {
         console.error("Erro ao carregar configurações:", error)
         setMetasConfig(defaultMetasConfig)
         setSDRMetasConfig(defaultSDRMetasConfig)
         setCloserMetasConfig(defaultCloserMetasConfig)
+        setNovasMetasConfig(defaultNovasMetasConfig)
       } finally {
         setIsLoading(false)
       }
@@ -214,6 +251,16 @@ export function MetasControl({ leads }: MetasControlProps) {
       console.log("✅ Configurações de metas dos Closers salvas:", newConfig)
     } catch (error) {
       console.error("Erro ao salvar configurações dos Closers:", error)
+    }
+  }
+
+  const saveNovasMetasConfig = (newConfig: NovasMetasConfig) => {
+    try {
+      setNovasMetasConfig(newConfig)
+      localStorage.setItem("jasson-novas-metas-config", JSON.stringify(newConfig))
+      console.log("✅ Configurações das novas metas salvas:", newConfig)
+    } catch (error) {
+      console.error("Erro ao salvar configurações das novas metas:", error)
     }
   }
 
@@ -347,10 +394,10 @@ export function MetasControl({ leads }: MetasControlProps) {
       })
     }
 
-    filteredLeads = filteredLeads.filter((lead) => {
-      const origem = lead.tipo_lead || lead.origem_lead || lead.origemLead || ""
-      return origem.toLowerCase() === "leadbroker"
-    })
+    // filteredLeads = filteredLeads.filter((lead) => {
+    //   const origem = lead.tipo_lead || lead.origem_lead || lead.origemLead || ""
+    //   return origem.toLowerCase() === "leadbroker"
+    // })
 
     return filteredLeads
   }
@@ -479,6 +526,130 @@ export function MetasControl({ leads }: MetasControlProps) {
     })
 
     return closerData
+  }
+
+  const calculateNovasMetasData = () => {
+    const allLeads = leads // Todos os leads sem filtro de data para algumas métricas
+    const filteredLeads = getFilteredLeads() // Leads filtrados por data para outras métricas
+
+    console.log("[v0] METAS DEBUG - Total de leads:", leads?.length || 0)
+    console.log("[v0] METAS DEBUG - Leads filtrados por data:", filteredLeads.length)
+    console.log(
+      "[v0] METAS DEBUG - Primeiros 3 leads filtrados:",
+      filteredLeads.slice(0, 3).map((l) => ({
+        id: l.id,
+        tipo_lead: l.tipo_lead,
+        data_hora_compra: l.data_hora_compra,
+      })),
+    )
+
+    // FEE MRR - independente de quando o lead foi comprado, se data de assinatura foi no mês
+    const hoje = new Date()
+    const mesAtual = hoje.getMonth()
+    const anoAtual = hoje.getFullYear()
+
+    const realizadoFeeMRR = allLeads
+      .filter((lead) => {
+        if (!lead.data_assinatura) return false
+        const dataAssinatura = new Date(lead.data_assinatura)
+        return dataAssinatura.getMonth() === mesAtual && dataAssinatura.getFullYear() === anoAtual
+      })
+      .reduce((sum, lead) => sum + (Number.parseFloat(String(lead.fee_mrr || "0")) || 0), 0)
+
+    // FEE ONE-TIME - independente de quando o lead foi comprado, se data de assinatura foi no mês
+    const realizadoFeeOneTime = allLeads
+      .filter((lead) => {
+        if (!lead.data_assinatura) return false
+        const dataAssinatura = new Date(lead.data_assinatura)
+        return dataAssinatura.getMonth() === mesAtual && dataAssinatura.getFullYear() === anoAtual
+      })
+      .reduce((sum, lead) => sum + (Number.parseFloat(String(lead.escopo_fechado || "0")) || 0), 0)
+
+    // Leads - todo lead com origem LeadBroker OU Blackbox que foi comprado dentro do mês
+    const realizadoLeads = filteredLeads.filter((lead) => {
+      const origem = lead.tipo_lead?.toLowerCase()?.trim()
+      const isValid = origem === "leadbroker" || origem === "lead broker" || origem === "blackbox"
+      return isValid
+    }).length
+
+    console.log("[v0] METAS DEBUG - Leads LeadBroker/Blackbox encontrados:", realizadoLeads)
+    console.log("[v0] METAS DEBUG - Tipos de lead únicos:", [...new Set(filteredLeads.map((l) => l.tipo_lead))])
+
+    // RM - toda reunião marcada de origem LeadBroker ou Blackbox que foi marcada dentro do mês
+    const realizadoRM = filteredLeads.filter((lead) => {
+      const origem = lead.tipo_lead?.toLowerCase()?.trim()
+      const isOrigemValida = origem === "leadbroker" || origem === "lead broker" || origem === "blackbox"
+      return isOrigemValida && lead.reuniao_agendada === true
+    }).length
+
+    // RR - toda reunião realizada de origem LeadBroker ou Blackbox que foi realizada dentro do mês
+    const realizadoRR = filteredLeads.filter((lead) => {
+      const origem = lead.tipo_lead?.toLowerCase()?.trim()
+      const isOrigemValida = origem === "leadbroker" || origem === "lead broker" || origem === "blackbox"
+      return isOrigemValida && lead.reuniao_realizada === true
+    }).length
+
+    // Logos - número de vendas, toda venda realizada dentro do mês
+    const realizadoLogos = allLeads.filter((lead) => {
+      if (!lead.data_assinatura) return false
+      const dataAssinatura = new Date(lead.data_assinatura)
+      return dataAssinatura.getMonth() === mesAtual && dataAssinatura.getFullYear() === anoAtual
+    }).length
+
+    // Calcular ideal por dia
+    const hoje2 = new Date()
+    const diaAtual = hoje2.getDate()
+    const diasDoMes = new Date(hoje2.getFullYear(), hoje2.getMonth() + 1, 0).getDate()
+
+    const calcularIdealDia = (metaMensal: number) => {
+      if (metaMensal === 0 || diasDoMes === 0) return 0
+      return Math.round((metaMensal / diasDoMes) * diaAtual)
+    }
+
+    return {
+      feeMRR: {
+        meta: novasMetasConfig.feeMRR,
+        realizado: realizadoFeeMRR,
+        idealDia: calcularIdealDia(novasMetasConfig.feeMRR),
+        falta: novasMetasConfig.feeMRR - realizadoFeeMRR,
+        percentual: novasMetasConfig.feeMRR > 0 ? (realizadoFeeMRR / novasMetasConfig.feeMRR) * 100 : 0,
+      },
+      feeOneTime: {
+        meta: novasMetasConfig.feeOneTime,
+        realizado: realizadoFeeOneTime,
+        idealDia: calcularIdealDia(novasMetasConfig.feeOneTime),
+        falta: novasMetasConfig.feeOneTime - realizadoFeeOneTime,
+        percentual: novasMetasConfig.feeOneTime > 0 ? (realizadoFeeOneTime / novasMetasConfig.feeOneTime) * 100 : 0,
+      },
+      leads: {
+        meta: novasMetasConfig.leads,
+        realizado: realizadoLeads,
+        idealDia: calcularIdealDia(novasMetasConfig.leads),
+        falta: novasMetasConfig.leads - realizadoLeads,
+        percentual: novasMetasConfig.leads > 0 ? (realizadoLeads / novasMetasConfig.leads) * 100 : 0,
+      },
+      rm: {
+        meta: novasMetasConfig.rm,
+        realizado: realizadoRM,
+        idealDia: calcularIdealDia(novasMetasConfig.rm),
+        falta: novasMetasConfig.rm - realizadoRM,
+        percentual: novasMetasConfig.rm > 0 ? (realizadoRM / novasMetasConfig.rm) * 100 : 0,
+      },
+      rr: {
+        meta: novasMetasConfig.rr,
+        realizado: realizadoRR,
+        idealDia: calcularIdealDia(novasMetasConfig.rr),
+        falta: novasMetasConfig.rr - realizadoRR,
+        percentual: novasMetasConfig.rr > 0 ? (realizadoRR / novasMetasConfig.rr) * 100 : 0,
+      },
+      logos: {
+        meta: novasMetasConfig.logos,
+        realizado: realizadoLogos,
+        idealDia: calcularIdealDia(novasMetasConfig.logos),
+        falta: novasMetasConfig.logos - realizadoLogos,
+        percentual: novasMetasConfig.logos > 0 ? (realizadoLogos / novasMetasConfig.logos) * 100 : 0,
+      },
+    }
   }
 
   // Ordem dos tiers
@@ -929,6 +1100,146 @@ export function MetasControl({ leads }: MetasControlProps) {
     )
   }
 
+  const NovasMetasConfigModal = () => {
+    const [tempConfig, setTempConfig] = useState<NovasMetasConfig>(novasMetasConfig)
+
+    const handleSave = () => {
+      saveNovasMetasConfig(tempConfig)
+      setIsNovasMetasConfigModalOpen(false)
+    }
+
+    const updateConfig = (field: keyof NovasMetasConfig, value: number) => {
+      setTempConfig((prev) => ({
+        ...prev,
+        [field]: value,
+      }))
+    }
+
+    return (
+      <Dialog open={isNovasMetasConfigModalOpen} onOpenChange={setIsNovasMetasConfigModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Settings className="w-5 h-5 text-green-600" />
+              <span>Configurar Metas Mensais</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="text-sm text-green-800">
+                <strong>💡 Dica:</strong> Configure as metas mensais para FEE MRR, FEE ONE-TIME, Leads, RM, RR e Logos.
+                O sistema calculará automaticamente o ideal por dia e o progresso.
+              </p>
+            </div>
+
+            <div className="grid gap-4">
+              <Card className="border-l-4 border-l-green-500">
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="meta-fee-mrr" className="text-sm font-medium">
+                        Meta FEE MRR (R$)
+                      </Label>
+                      <Input
+                        id="meta-fee-mrr"
+                        type="number"
+                        value={tempConfig.feeMRR}
+                        onChange={(e) => updateConfig("feeMRR", Number(e.target.value))}
+                        className="mt-1"
+                        min="0"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="meta-fee-onetime" className="text-sm font-medium">
+                        Meta FEE ONE-TIME (R$)
+                      </Label>
+                      <Input
+                        id="meta-fee-onetime"
+                        type="number"
+                        value={tempConfig.feeOneTime}
+                        onChange={(e) => updateConfig("feeOneTime", Number(e.target.value))}
+                        className="mt-1"
+                        min="0"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="meta-leads" className="text-sm font-medium">
+                        Meta Leads
+                      </Label>
+                      <Input
+                        id="meta-leads"
+                        type="number"
+                        value={tempConfig.leads}
+                        onChange={(e) => updateConfig("leads", Number(e.target.value))}
+                        className="mt-1"
+                        min="0"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="meta-rm" className="text-sm font-medium">
+                        Meta RM (Reuniões Marcadas)
+                      </Label>
+                      <Input
+                        id="meta-rm"
+                        type="number"
+                        value={tempConfig.rm}
+                        onChange={(e) => updateConfig("rm", Number(e.target.value))}
+                        className="mt-1"
+                        min="0"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="meta-rr" className="text-sm font-medium">
+                        Meta RR (Reuniões Realizadas)
+                      </Label>
+                      <Input
+                        id="meta-rr"
+                        type="number"
+                        value={tempConfig.rr}
+                        onChange={(e) => updateConfig("rr", Number(e.target.value))}
+                        className="mt-1"
+                        min="0"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="meta-logos" className="text-sm font-medium">
+                        Meta Logos (Vendas)
+                      </Label>
+                      <Input
+                        id="meta-logos"
+                        type="number"
+                        value={tempConfig.logos}
+                        onChange={(e) => updateConfig("logos", Number(e.target.value))}
+                        className="mt-1"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4 border-t">
+              <Button variant="outline" onClick={() => setIsNovasMetasConfigModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700">
+                <Save className="w-4 h-4 mr-2" />
+                Salvar Configurações
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
   // Loading state
   if (isLoading) {
     return (
@@ -940,6 +1251,8 @@ export function MetasControl({ leads }: MetasControlProps) {
       </div>
     )
   }
+
+  const novasMetasData = calculateNovasMetasData()
 
   return (
     <div className="space-y-4">
@@ -968,6 +1281,14 @@ export function MetasControl({ leads }: MetasControlProps) {
                 <Settings className="w-3 h-3 mr-1" />
                 Config
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsNovasMetasConfigModalOpen(true)}
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm text-xs h-7 px-2"
+              >
+                <Settings className="w-3 h-3 mr-1" />
+                Metas Mensais
+              </Button>
               <div className="flex items-center space-x-1">
                 <Input
                   type="date"
@@ -987,6 +1308,384 @@ export function MetasControl({ leads }: MetasControlProps) {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+              <Target className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Metas Mensais</h2>
+              <p className="text-sm text-gray-500">Controle de metas: FEE MRR, FEE ONE-TIME, Leads, RM, RR e Logos</p>
+            </div>
+          </div>
+          <Button onClick={() => setIsNovasMetasConfigModalOpen(true)} className="bg-green-600 hover:bg-green-700">
+            <Settings className="w-4 h-4 mr-2" />
+            Configurar Metas
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* FEE MRR */}
+          <Card
+            className={`border-l-4 ${getStatusBadge(novasMetasData.feeMRR.percentual).color.replace("bg-", "border-l-")}`}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <span className="text-lg">💰</span>
+                  <h3 className="font-semibold text-gray-900">FEE MRR</h3>
+                </div>
+                <Badge className={getStatusBadge(novasMetasData.feeMRR.percentual).color}>
+                  {formatPercentage(novasMetasData.feeMRR.percentual)}
+                </Badge>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Meta:</span>
+                  <span className="font-medium">{formatCurrency(novasMetasData.feeMRR.meta)} (100%)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Realizado:</span>
+                  <span className="font-medium">
+                    {formatCurrency(novasMetasData.feeMRR.realizado)} (
+                    {formatPercentage(
+                      novasMetasData.feeMRR.meta > 0
+                        ? (novasMetasData.feeMRR.realizado / novasMetasData.feeMRR.meta) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Ideal Dia:</span>
+                  <span className="font-medium">
+                    {formatCurrency(novasMetasData.feeMRR.idealDia)} (
+                    {formatPercentage(
+                      novasMetasData.feeMRR.idealDia > 0
+                        ? (novasMetasData.feeMRR.realizado / novasMetasData.feeMRR.idealDia) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Falta:</span>
+                  <span
+                    className={`font-medium ${novasMetasData.feeMRR.falta <= 0 ? "text-green-600" : "text-red-600"}`}
+                  >
+                    {formatCurrency(Math.abs(novasMetasData.feeMRR.falta))} (
+                    {formatPercentage(
+                      novasMetasData.feeMRR.meta > 0
+                        ? (Math.abs(novasMetasData.feeMRR.falta) / novasMetasData.feeMRR.meta) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* FEE ONE-TIME */}
+          <Card
+            className={`border-l-4 ${getStatusBadge(novasMetasData.feeOneTime.percentual).color.replace("bg-", "border-l-")}`}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <span className="text-lg">💎</span>
+                  <h3 className="font-semibold text-gray-900">FEE ONE-TIME</h3>
+                </div>
+                <Badge className={getStatusBadge(novasMetasData.feeOneTime.percentual).color}>
+                  {formatPercentage(novasMetasData.feeOneTime.percentual)}
+                </Badge>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Meta:</span>
+                  <span className="font-medium">{formatCurrency(novasMetasData.feeOneTime.meta)} (100%)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Realizado:</span>
+                  <span className="font-medium">
+                    {formatCurrency(novasMetasData.feeOneTime.realizado)} (
+                    {formatPercentage(
+                      novasMetasData.feeOneTime.meta > 0
+                        ? (novasMetasData.feeOneTime.realizado / novasMetasData.feeOneTime.meta) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Ideal Dia:</span>
+                  <span className="font-medium">
+                    {formatCurrency(novasMetasData.feeOneTime.idealDia)} (
+                    {formatPercentage(
+                      novasMetasData.feeOneTime.idealDia > 0
+                        ? (novasMetasData.feeOneTime.realizado / novasMetasData.feeOneTime.idealDia) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Falta:</span>
+                  <span
+                    className={`font-medium ${novasMetasData.feeOneTime.falta <= 0 ? "text-green-600" : "text-red-600"}`}
+                  >
+                    {formatCurrency(Math.abs(novasMetasData.feeOneTime.falta))} (
+                    {formatPercentage(
+                      novasMetasData.feeOneTime.meta > 0
+                        ? (Math.abs(novasMetasData.feeOneTime.falta) / novasMetasData.feeOneTime.meta) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Leads */}
+          <Card
+            className={`border-l-4 ${getStatusBadge(novasMetasData.leads.percentual).color.replace("bg-", "border-l-")}`}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <span className="text-lg">👥</span>
+                  <h3 className="font-semibold text-gray-900">Leads</h3>
+                </div>
+                <Badge className={getStatusBadge(novasMetasData.leads.percentual).color}>
+                  {formatPercentage(novasMetasData.leads.percentual)}
+                </Badge>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Meta:</span>
+                  <span className="font-medium">{novasMetasData.leads.meta} (100%)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Realizado:</span>
+                  <span className="font-medium">
+                    {novasMetasData.leads.realizado} (
+                    {formatPercentage(
+                      novasMetasData.leads.meta > 0
+                        ? (novasMetasData.leads.realizado / novasMetasData.leads.meta) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Ideal Dia:</span>
+                  <span className="font-medium">
+                    {novasMetasData.leads.idealDia} (
+                    {formatPercentage(
+                      novasMetasData.leads.idealDia > 0
+                        ? (novasMetasData.leads.realizado / novasMetasData.leads.idealDia) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Falta:</span>
+                  <span
+                    className={`font-medium ${novasMetasData.leads.falta <= 0 ? "text-green-600" : "text-red-600"}`}
+                  >
+                    {Math.abs(novasMetasData.leads.falta)} (
+                    {formatPercentage(
+                      novasMetasData.leads.meta > 0
+                        ? (Math.abs(novasMetasData.leads.falta) / novasMetasData.leads.meta) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* RM */}
+          <Card
+            className={`border-l-4 ${getStatusBadge(novasMetasData.rm.percentual).color.replace("bg-", "border-l-")}`}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <span className="text-lg">📅</span>
+                  <h3 className="font-semibold text-gray-900">RM</h3>
+                </div>
+                <Badge className={getStatusBadge(novasMetasData.rm.percentual).color}>
+                  {formatPercentage(novasMetasData.rm.percentual)}
+                </Badge>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Meta:</span>
+                  <span className="font-medium">{novasMetasData.rm.meta} (100%)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Realizado:</span>
+                  <span className="font-medium">
+                    {novasMetasData.rm.realizado} (
+                    {formatPercentage(
+                      novasMetasData.rm.meta > 0 ? (novasMetasData.rm.realizado / novasMetasData.rm.meta) * 100 : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Ideal Dia:</span>
+                  <span className="font-medium">
+                    {novasMetasData.rm.idealDia} (
+                    {formatPercentage(
+                      novasMetasData.rm.idealDia > 0
+                        ? (novasMetasData.rm.realizado / novasMetasData.rm.idealDia) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Falta:</span>
+                  <span className={`font-medium ${novasMetasData.rm.falta <= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {Math.abs(novasMetasData.rm.falta)} (
+                    {formatPercentage(
+                      novasMetasData.rm.meta > 0
+                        ? (Math.abs(novasMetasData.rm.falta) / novasMetasData.rm.meta) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* RR */}
+          <Card
+            className={`border-l-4 ${getStatusBadge(novasMetasData.rr.percentual).color.replace("bg-", "border-l-")}`}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <span className="text-lg">✅</span>
+                  <h3 className="font-semibold text-gray-900">RR</h3>
+                </div>
+                <Badge className={getStatusBadge(novasMetasData.rr.percentual).color}>
+                  {formatPercentage(novasMetasData.rr.percentual)}
+                </Badge>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Meta:</span>
+                  <span className="font-medium">{novasMetasData.rr.meta} (100%)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Realizado:</span>
+                  <span className="font-medium">
+                    {novasMetasData.rr.realizado} (
+                    {formatPercentage(
+                      novasMetasData.rr.meta > 0 ? (novasMetasData.rr.realizado / novasMetasData.rr.meta) * 100 : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Ideal Dia:</span>
+                  <span className="font-medium">
+                    {novasMetasData.rr.idealDia} (
+                    {formatPercentage(
+                      novasMetasData.rr.idealDia > 0
+                        ? (novasMetasData.rr.realizado / novasMetasData.rr.idealDia) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Falta:</span>
+                  <span className={`font-medium ${novasMetasData.rr.falta <= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {Math.abs(novasMetasData.rr.falta)} (
+                    {formatPercentage(
+                      novasMetasData.rr.meta > 0
+                        ? (Math.abs(novasMetasData.rr.falta) / novasMetasData.rr.meta) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Logos */}
+          <Card
+            className={`border-l-4 ${getStatusBadge(novasMetasData.logos.percentual).color.replace("bg-", "border-l-")}`}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <span className="text-lg">🏆</span>
+                  <h3 className="font-semibold text-gray-900">Logos</h3>
+                </div>
+                <Badge className={getStatusBadge(novasMetasData.logos.percentual).color}>
+                  {formatPercentage(novasMetasData.logos.percentual)}
+                </Badge>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Meta:</span>
+                  <span className="font-medium">{novasMetasData.logos.meta} (100%)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Realizado:</span>
+                  <span className="font-medium">
+                    {novasMetasData.logos.realizado} (
+                    {formatPercentage(
+                      novasMetasData.logos.meta > 0
+                        ? (novasMetasData.logos.realizado / novasMetasData.logos.meta) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Ideal Dia:</span>
+                  <span className="font-medium">
+                    {novasMetasData.logos.idealDia} (
+                    {formatPercentage(
+                      novasMetasData.logos.idealDia > 0
+                        ? (novasMetasData.logos.realizado / novasMetasData.logos.idealDia) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Falta:</span>
+                  <span
+                    className={`font-medium ${novasMetasData.logos.falta <= 0 ? "text-green-600" : "text-red-600"}`}
+                  >
+                    {Math.abs(novasMetasData.logos.falta)} (
+                    {formatPercentage(
+                      novasMetasData.logos.meta > 0
+                        ? (Math.abs(novasMetasData.logos.falta) / novasMetasData.logos.meta) * 100
+                        : 0,
+                    )}
+                    )
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
@@ -1443,9 +2142,11 @@ export function MetasControl({ leads }: MetasControlProps) {
         </CardContent>
       </Card>
 
+      {/* Modals */}
       <ConfigModal />
       <SDRConfigModal />
       <CloserConfigModal />
+      <NovasMetasConfigModal />
     </div>
   )
 }
