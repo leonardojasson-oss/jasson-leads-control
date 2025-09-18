@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Filter, Eye, EyeOff } from "lucide-react"
+import { Filter, X, Settings } from "lucide-react"
 import type { Lead } from "@/lib/supabase-operations"
 
 interface ProspeccaoAtivaProps {
@@ -25,6 +25,9 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
   const [openFilterDropdown, setOpenFilterDropdown] = useState<string | null>(null)
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({})
   const [showColumnSelector, setShowColumnSelector] = useState(false)
+  const [activePreset, setActivePreset] = useState("todas")
+  const [configuringPreset, setConfiguringPreset] = useState<string | null>(null)
+  const [presetConfigurations, setPresetConfigurations] = useState<Record<string, string[]>>({})
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const columns = [
@@ -122,17 +125,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
       label: "PRODUTO",
       width: "150px",
       type: "select",
-      options: [
-        "E.C",
-        "E.E",
-        "Assessoria",
-        "E.E + E.C",
-        "Assessoria + E.C",
-        "Assessoria + E.E",
-        "MIV",
-        "Site",
-        "Social Media",
-      ],
+      options: ["E.C", "E.E", "Assessoria", "E.E + E.C", "Assessoria + E.E", "MIV", "Site", "Social Media"],
     },
     { key: "data_assinatura", label: "DATA DE ASSINATURA", width: "150px", type: "date" },
     {
@@ -155,6 +148,124 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
       ],
     },
   ]
+
+  const defaultPresets = {
+    todas: {
+      name: "Todas Colunas",
+      icon: "📋",
+      columns: columns.map((col) => col.key),
+    },
+    sdr: {
+      name: "Funil SDR",
+      icon: "📞",
+      columns: [
+        "nome_empresa",
+        "status",
+        "observacoes_sdr",
+        "data_ultimo_contato",
+        "sdr",
+        "tipo_lead",
+        "conseguiu_contato",
+        "data_marcacao",
+        "nicho",
+        "cidade",
+        "regiao",
+        "cargo_contato",
+        "email",
+      ],
+    },
+    completo: {
+      name: "Funil Completo",
+      icon: "🎯",
+      columns: [
+        "nome_empresa",
+        "status",
+        "observacoes_sdr",
+        "link_bant",
+        "data_ultimo_contato",
+        "sdr",
+        "tipo_lead",
+        "conseguiu_contato",
+        "reuniao_agendada",
+        "reuniao_realizada",
+        "data_marcacao",
+        "data_reuniao",
+        "faturamento",
+        "nicho",
+        "cidade",
+        "regiao",
+        "cargo_contato",
+        "email",
+        "anuncios",
+        "closer",
+        "observacoes_closer",
+        "temperatura",
+      ],
+    },
+    closer: {
+      name: "Funil Closer",
+      icon: "💰",
+      columns: [
+        "nome_empresa",
+        "status",
+        "closer",
+        "observacoes_closer",
+        "temperatura",
+        "fee_mrr",
+        "escopo_fechado",
+        "produto",
+        "data_assinatura",
+        "motivo_perda_pv",
+        "faturamento",
+        "nicho",
+        "cidade",
+        "regiao",
+      ],
+    },
+  }
+
+  useEffect(() => {
+    const savedConfigurations = localStorage.getItem("prospeccao-ativa-presets")
+    if (savedConfigurations) {
+      setPresetConfigurations(JSON.parse(savedConfigurations))
+    } else {
+      // Se não há configurações salvas, usar as padrão
+      const defaultConfigs: Record<string, string[]> = {}
+      Object.entries(defaultPresets).forEach(([key, preset]) => {
+        defaultConfigs[key] = preset.columns
+      })
+      setPresetConfigurations(defaultConfigs)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (Object.keys(presetConfigurations).length > 0) {
+      localStorage.setItem("prospeccao-ativa-presets", JSON.stringify(presetConfigurations))
+    }
+  }, [presetConfigurations])
+
+  const applyPreset = (presetKey: string) => {
+    const presetColumns =
+      presetConfigurations[presetKey] || defaultPresets[presetKey as keyof typeof defaultPresets]?.columns || []
+    const newVisibility: Record<string, boolean> = {}
+    columns.forEach((col) => {
+      newVisibility[col.key] = presetColumns.includes(col.key)
+    })
+    setVisibleColumns(newVisibility)
+    setActivePreset(presetKey)
+  }
+
+  const savePresetConfiguration = (presetKey: string, selectedColumns: string[]) => {
+    setPresetConfigurations((prev) => ({
+      ...prev,
+      [presetKey]: selectedColumns,
+    }))
+    setConfiguringPreset(null)
+  }
+
+  const openPresetConfiguration = (presetKey: string) => {
+    setConfiguringPreset(presetKey)
+  }
 
   useEffect(() => {
     const initialVisibility: Record<string, boolean> = {}
@@ -727,43 +838,105 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
                   onClick={() => setShowColumnSelector(!showColumnSelector)}
                   className="flex items-center space-x-2"
                 >
-                  {showColumnSelector ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  <span>
-                    Colunas ({visibleColumnsArray.length}/{columns.length})
-                  </span>
+                  <Settings className="h-4 w-4" />
+                  <span>Colunas</span>
                 </Button>
 
                 {showColumnSelector && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowColumnSelector(false)} />
-                    <div className="absolute top-full left-0 mt-2 w-80 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-96 overflow-y-auto">
-                      <div className="p-3 border-b bg-gray-50">
-                        <h3 className="font-medium text-sm">Selecionar Colunas</h3>
+                    <div className="absolute top-full left-0 mt-2 w-[800px] bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-[600px] overflow-hidden">
+                      <div className="flex items-center justify-between p-4 border-b bg-gray-50">
+                        <h3 className="text-lg font-semibold text-gray-900">Colunas</h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowColumnSelector(false)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <div className="p-2">
-                        {columns.map((column) => (
-                          <div key={column.key} className="flex items-center space-x-2 py-1">
-                            <Checkbox
-                              id={`column-${column.key}`}
-                              checked={visibleColumns[column.key] || false}
-                              onCheckedChange={(checked) => {
-                                setVisibleColumns((prev) => ({
-                                  ...prev,
-                                  [column.key]: checked as boolean,
-                                }))
-                              }}
-                              disabled={column.essential}
-                            />
-                            <label
-                              htmlFor={`column-${column.key}`}
-                              className={`text-sm cursor-pointer flex-1 ${
-                                column.essential ? "font-medium text-gray-900" : "text-gray-700"
-                              }`}
-                            >
-                              {column.label} {column.essential && "(Essencial)"}
-                            </label>
+
+                      <div className="p-4">
+                        <div className="mb-4">
+                          <div className="flex items-center space-x-2 mb-3">
+                            <span className="text-red-600">🎯</span>
+                            <h4 className="font-medium text-gray-900">Presets de Visualização</h4>
                           </div>
-                        ))}
+
+                          <div className="grid grid-cols-2 gap-3">
+                            {Object.entries(defaultPresets).map(([key, preset]) => (
+                              <div key={key} className="flex items-center space-x-2">
+                                <Button
+                                  variant={activePreset === key ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => applyPreset(key)}
+                                  className={`flex items-center justify-start space-x-2 h-10 flex-1 ${
+                                    activePreset === key
+                                      ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                                      : "bg-white hover:bg-gray-50 text-gray-700 border-gray-300"
+                                  }`}
+                                >
+                                  <span>{preset.icon}</span>
+                                  <span className="font-medium">{preset.name}</span>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openPresetConfiguration(key)}
+                                  className="h-10 w-10 p-0 hover:bg-gray-100"
+                                  title={`Configurar ${preset.name}`}
+                                >
+                                  <Settings className="h-4 w-4 text-gray-500" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="border-t pt-4">
+                          <div className="grid grid-cols-3 gap-4 max-h-80 overflow-y-auto">
+                            {columns.map((column) => (
+                              <div key={column.key} className="flex items-center space-x-2 py-1">
+                                <Checkbox
+                                  id={`column-${column.key}`}
+                                  checked={visibleColumns[column.key] || false}
+                                  onCheckedChange={(checked) => {
+                                    setVisibleColumns((prev) => ({
+                                      ...prev,
+                                      [column.key]: checked as boolean,
+                                    }))
+                                    setActivePreset("custom")
+                                  }}
+                                />
+                                <label
+                                  htmlFor={`column-${column.key}`}
+                                  className="text-sm cursor-pointer flex-1 text-gray-700 font-medium"
+                                >
+                                  {column.label}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="border-t pt-4 mt-4">
+                          <div className="flex justify-center space-x-3">
+                            {Object.entries(defaultPresets).map(([key, preset]) => (
+                              <Button
+                                key={key}
+                                variant="outline"
+                                size="sm"
+                                onClick={() => applyPreset(key)}
+                                className="flex items-center space-x-2 bg-white hover:bg-gray-50 border-gray-300"
+                              >
+                                <span>{preset.icon}</span>
+                                <span>{preset.name}</span>
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </>
@@ -783,6 +956,81 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
           </div>
         </div>
       </div>
+
+      {configuringPreset && (
+        <Dialog open={!!configuringPreset} onOpenChange={() => setConfiguringPreset(null)}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                Configurar {defaultPresets[configuringPreset as keyof typeof defaultPresets]?.name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="p-4">
+              <p className="text-sm text-gray-600 mb-4">
+                Selecione as colunas que devem aparecer quando este preset for aplicado:
+              </p>
+              <div className="grid grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+                {columns.map((column) => {
+                  const currentPresetColumns =
+                    presetConfigurations[configuringPreset] ||
+                    defaultPresets[configuringPreset as keyof typeof defaultPresets]?.columns ||
+                    []
+
+                  return (
+                    <div key={column.key} className="flex items-center space-x-2 py-1">
+                      <Checkbox
+                        id={`preset-${configuringPreset}-${column.key}`}
+                        checked={currentPresetColumns.includes(column.key)}
+                        onCheckedChange={(checked) => {
+                          const currentColumns =
+                            presetConfigurations[configuringPreset] ||
+                            defaultPresets[configuringPreset as keyof typeof defaultPresets]?.columns ||
+                            []
+
+                          let newColumns: string[]
+                          if (checked) {
+                            newColumns = [...currentColumns, column.key]
+                          } else {
+                            newColumns = currentColumns.filter((col) => col !== column.key)
+                          }
+
+                          setPresetConfigurations((prev) => ({
+                            ...prev,
+                            [configuringPreset]: newColumns,
+                          }))
+                        }}
+                      />
+                      <label
+                        htmlFor={`preset-${configuringPreset}-${column.key}`}
+                        className="text-sm cursor-pointer flex-1 text-gray-700 font-medium"
+                      >
+                        {column.label}
+                      </label>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2 mt-6">
+              <Button variant="outline" onClick={() => setConfiguringPreset(null)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  const currentColumns =
+                    presetConfigurations[configuringPreset] ||
+                    defaultPresets[configuringPreset as keyof typeof defaultPresets]?.columns ||
+                    []
+                  savePresetConfiguration(configuringPreset, currentColumns)
+                }}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Salvar Configuração
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <div ref={scrollContainerRef} className="overflow-x-auto max-h-[600px] overflow-y-auto">
         <table className="w-full border-collapse">
