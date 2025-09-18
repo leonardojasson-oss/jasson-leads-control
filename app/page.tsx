@@ -9,6 +9,7 @@ import { CommissionControl } from "@/components/commission-control"
 import { DashboardAnalytics } from "@/components/dashboard-analytics"
 import MetasControl from "@/components/metas-control"
 import { NovoLeadModal } from "@/components/novo-lead-modal"
+import { ProspeccaoAtiva } from "@/components/prospeccao-ativa" // Importação da nova aba Prospecção Ativa
 import { leadOperations, type Lead, isSupabaseConfigured, testSupabaseConnection } from "@/lib/supabase-operations"
 import { LeadsSpreadsheet } from "@/components/leads-spreadsheet"
 import { useRealtimeLeadsSync } from "@/hooks/useRealtimeLeadsSync"
@@ -87,7 +88,8 @@ export default function LeadsControl() {
 
   const tabs = [
     { id: "lista", label: "Lista de Leads", active: activeTab === "lista" },
-    { id: "planilha", label: "📊 Controle Inbound", active: activeTab === "planilha" }, // alterado de "📊 Planilha" para "📊 Controle Inbound"
+    { id: "planilha", label: "📊 Controle Inbound", active: activeTab === "planilha" },
+    { id: "prospeccao", label: "🎯 Prospecção Ativa", active: activeTab === "prospeccao" }, // Nova aba Prospecção Ativa
     { id: "metas", label: "🎯 Controle de Metas", active: activeTab === "metas" },
     { id: "vendas", label: "Acompanhamento de Vendas", active: activeTab === "vendas" },
     { id: "comissoes", label: "Controle de Comissões", active: activeTab === "comissoes" },
@@ -676,6 +678,8 @@ export default function LeadsControl() {
         )
       case "planilha":
         return <LeadsSpreadsheet leads={leads} onUpdateLead={handleUpdateLead} onRefresh={handleRefresh} />
+      case "prospeccao": // Adicionado case para Prospecção Ativa
+        return <ProspeccaoAtiva leads={[]} onUpdateLead={handleUpdateLead} onRefresh={handleRefresh} />
       case "metas":
         return <MetasControl leads={filteredLeads} />
       case "vendas":
