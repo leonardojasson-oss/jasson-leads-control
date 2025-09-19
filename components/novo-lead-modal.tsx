@@ -815,12 +815,10 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                   <SelectContent>
                     <SelectItem value="alan">Alan</SelectItem>
                     <SelectItem value="antonio">Antônio</SelectItem>
-                    <SelectItem value="francisco">Francisco</SelectItem>
                     <SelectItem value="gabrielli">Gabrielli</SelectItem>
                     <SelectItem value="giselle">Giselle</SelectItem>
-                    <SelectItem value="leonardo">Leonardo</SelectItem>
-                    <SelectItem value="vanessa">Vanessa</SelectItem>
                     <SelectItem value="guilherme">Guilherme</SelectItem>
+                    <SelectItem value="leonardo">Leonardo</SelectItem>
                     <SelectItem value="marcelo">Marcelo</SelectItem>
                     <SelectItem value="allan">Allan</SelectItem>
                     <SelectItem value="matriz">Matriz</SelectItem> {/* Added option Matriz */}

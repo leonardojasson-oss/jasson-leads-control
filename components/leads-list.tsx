@@ -377,10 +377,12 @@ export function LeadsList({ leads, onEditLead, onDeleteLead, onUpdateLead }: Lea
                     {renderEditableCell(lead, "arrematador", lead.arrematador, "select", [
                       "alan",
                       "antonio",
-                      "francisco",
                       "gabrielli",
                       "giselle",
+                      "guilherme",
                       "leonardo",
+                      "marcelo",
+                      "matriz",
                       "vanessa",
                     ])}
                   </td>

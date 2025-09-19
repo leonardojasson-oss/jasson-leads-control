@@ -701,10 +701,12 @@ export default function MetasControl({ leads }: MetasControlProps) {
     const arrematadores = [
       { key: "alan", name: "Alan", color: "from-blue-500 to-blue-600", icon: "🎯" },
       { key: "antonio", name: "Antônio", color: "from-green-500 to-green-600", icon: "📈" },
-      { key: "francisco", name: "Francisco", color: "from-purple-500 to-purple-600", icon: "🚀" },
       { key: "gabrielli", name: "Gabrielli", color: "from-red-500 to-red-600", icon: "⭐" },
       { key: "giselle", name: "Giselle", color: "from-pink-500 to-pink-600", icon: "💎" },
+      { key: "guilherme", name: "Guilherme", color: "from-indigo-500 to-indigo-600", icon: "🎪" },
       { key: "leonardo", name: "Leonardo", color: "from-orange-500 to-orange-600", icon: "👑" },
+      { key: "marcelo", name: "Marcelo", color: "from-teal-500 to-teal-600", icon: "🚀" },
+      { key: "matriz", name: "Matriz", color: "from-slate-500 to-slate-600", icon: "🏢" },
       { key: "vanessa", name: "Vanessa", color: "from-violet-500 to-violet-600", icon: "🏆" },
     ]
 
@@ -1864,10 +1866,12 @@ export default function MetasControl({ leads }: MetasControlProps) {
                     const arrematadores = [
                       { key: "alan", name: "Alan", color: "from-blue-500 to-blue-600", icon: "🎯" },
                       { key: "antonio", name: "Antônio", color: "from-green-500 to-green-600", icon: "📈" },
-                      { key: "francisco", name: "Francisco", color: "from-purple-500 to-purple-600", icon: "🚀" },
                       { key: "gabrielli", name: "Gabrielli", color: "from-red-500 to-red-600", icon: "⭐" },
                       { key: "giselle", name: "Giselle", color: "from-pink-500 to-pink-600", icon: "💎" },
+                      { key: "guilherme", name: "Guilherme", color: "from-indigo-500 to-indigo-600", icon: "🎪" },
                       { key: "leonardo", name: "Leonardo", color: "from-orange-500 to-orange-600", icon: "👑" },
+                      { key: "marcelo", name: "Marcelo", color: "from-teal-500 to-teal-600", icon: "🚀" },
+                      { key: "matriz", name: "Matriz", color: "from-slate-500 to-slate-600", icon: "🏢" },
                       { key: "vanessa", name: "Vanessa", color: "from-violet-500 to-violet-600", icon: "🏆" },
                     ]
 
