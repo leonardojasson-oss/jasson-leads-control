@@ -585,6 +585,28 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
   const handleNovoLead = async () => {
     if (!onAddLead) return
 
+    const camposObrigatorios = [
+      { campo: "lead", nome: "LEAD" },
+      { campo: "status", nome: "STATUS" },
+      { campo: "sdr", nome: "SDR" },
+      { campo: "origem", nome: "ORIGEM" },
+      { campo: "data_marcacao", nome: "DATA DA MARCAÇÃO" },
+      { campo: "data_reuniao", nome: "DATA DA REUNIÃO" },
+      { campo: "segmento", nome: "SEGMENTO" },
+      { campo: "cidade", nome: "CIDADE" },
+      { campo: "regiao", nome: "REGIÃO" },
+      { campo: "cargo", nome: "CARGO" },
+      { campo: "email", nome: "E-MAIL" },
+      { campo: "anuncios", nome: "ANÚNCIOS" },
+    ]
+
+    const camposVazios = camposObrigatorios.filter((item) => !novoLeadData[item.campo as keyof typeof novoLeadData])
+
+    if (camposVazios.length > 0) {
+      alert(`Os seguintes campos são obrigatórios: ${camposVazios.map((item) => item.nome).join(", ")}`)
+      return
+    }
+
     try {
       await onAddLead({
         nome_empresa: novoLeadData.lead,
@@ -654,15 +676,17 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
                     value={novoLeadData.lead}
                     onChange={(e) => setNovoLeadData({ ...novoLeadData, lead: e.target.value })}
                     placeholder="Nome da empresa"
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="status">STATUS</Label>
+                  <Label htmlFor="status">STATUS *</Label>
                   <select
                     id="status"
                     value={novoLeadData.status}
                     onChange={(e) => setNovoLeadData({ ...novoLeadData, status: e.target.value })}
                     className="w-full p-2 border border-gray-300 rounded"
+                    required
                   >
                     <option value="">Selecione...</option>
                     {columns
@@ -684,12 +708,13 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
                   />
                 </div>
                 <div>
-                  <Label htmlFor="sdr">SDR</Label>
+                  <Label htmlFor="sdr">SDR *</Label>
                   <select
                     id="sdr"
                     value={novoLeadData.sdr}
                     onChange={(e) => setNovoLeadData({ ...novoLeadData, sdr: e.target.value })}
                     className="w-full p-2 border border-gray-300 rounded"
+                    required
                   >
                     <option value="">Selecione...</option>
                     {columns
@@ -702,12 +727,13 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
                   </select>
                 </div>
                 <div>
-                  <Label htmlFor="origem">ORIGEM</Label>
+                  <Label htmlFor="origem">ORIGEM *</Label>
                   <select
                     id="origem"
                     value={novoLeadData.origem}
                     onChange={(e) => setNovoLeadData({ ...novoLeadData, origem: e.target.value })}
                     className="w-full p-2 border border-gray-300 rounded"
+                    required
                   >
                     <option value="">Selecione...</option>
                     {columns
@@ -720,76 +746,84 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
                   </select>
                 </div>
                 <div>
-                  <Label htmlFor="data_marcacao">DATA DA MARCAÇÃO</Label>
+                  <Label htmlFor="data_marcacao">DATA DA MARCAÇÃO *</Label>
                   <Input
                     id="data_marcacao"
                     type="date"
                     value={novoLeadData.data_marcacao}
                     onChange={(e) => setNovoLeadData({ ...novoLeadData, data_marcacao: e.target.value })}
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="data_reuniao">DATA DA REUNIÃO</Label>
+                  <Label htmlFor="data_reuniao">DATA DA REUNIÃO *</Label>
                   <Input
                     id="data_reuniao"
                     type="date"
                     value={novoLeadData.data_reuniao}
                     onChange={(e) => setNovoLeadData({ ...novoLeadData, data_reuniao: e.target.value })}
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="segmento">SEGMENTO</Label>
+                  <Label htmlFor="segmento">SEGMENTO *</Label>
                   <Input
                     id="segmento"
                     value={novoLeadData.segmento}
                     onChange={(e) => setNovoLeadData({ ...novoLeadData, segmento: e.target.value })}
                     placeholder="Segmento da empresa"
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="cidade">CIDADE</Label>
+                  <Label htmlFor="cidade">CIDADE *</Label>
                   <Input
                     id="cidade"
                     value={novoLeadData.cidade}
                     onChange={(e) => setNovoLeadData({ ...novoLeadData, cidade: e.target.value })}
                     placeholder="Cidade"
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="regiao">REGIÃO</Label>
+                  <Label htmlFor="regiao">REGIÃO *</Label>
                   <Input
                     id="regiao"
                     value={novoLeadData.regiao}
                     onChange={(e) => setNovoLeadData({ ...novoLeadData, regiao: e.target.value })}
                     placeholder="Região"
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="cargo">CARGO</Label>
+                  <Label htmlFor="cargo">CARGO *</Label>
                   <Input
                     id="cargo"
                     value={novoLeadData.cargo}
                     onChange={(e) => setNovoLeadData({ ...novoLeadData, cargo: e.target.value })}
                     placeholder="Cargo do contato"
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="email">EMAIL</Label>
+                  <Label htmlFor="email">E-MAIL *</Label>
                   <Input
                     id="email"
                     type="email"
                     value={novoLeadData.email}
                     onChange={(e) => setNovoLeadData({ ...novoLeadData, email: e.target.value })}
                     placeholder="email@empresa.com"
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="anuncios">ANÚNCIOS</Label>
+                  <Label htmlFor="anuncios">ANÚNCIOS *</Label>
                   <Input
                     id="anuncios"
                     value={novoLeadData.anuncios}
                     onChange={(e) => setNovoLeadData({ ...novoLeadData, anuncios: e.target.value })}
                     placeholder="Informações sobre anúncios"
+                    required
                   />
                 </div>
                 <div>
