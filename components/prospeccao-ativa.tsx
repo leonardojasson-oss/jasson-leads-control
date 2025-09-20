@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Filter, X, Settings } from "lucide-react"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import type { Lead } from "@/lib/supabase-operations"
 
 interface ProspeccaoAtivaProps {
@@ -229,13 +230,21 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
     if (savedConfigurations) {
       setPresetConfigurations(JSON.parse(savedConfigurations))
     } else {
-      // Se não há configurações salvas, usar as padrão
       const defaultConfigs: Record<string, string[]> = {}
       Object.entries(defaultPresets).forEach(([key, preset]) => {
-        defaultConfigs[key] = preset.columns
+        // Para o preset "todas", sempre usar todas as colunas disponíveis
+        if (key === "todas") {
+          defaultConfigs[key] = columns.map((col) => col.key)
+        } else {
+          defaultConfigs[key] = preset.columns
+        }
       })
       setPresetConfigurations(defaultConfigs)
     }
+
+    setTimeout(() => {
+      applyPreset("todas")
+    }, 0)
   }, [])
 
   useEffect(() => {
@@ -447,8 +456,6 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
     observacoes: "",
     sdr: "",
     origem: "",
-    data_marcacao: "",
-    data_reuniao: "",
     segmento: "",
     cidade: "",
     regiao: "",
@@ -590,8 +597,6 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
       { campo: "status", nome: "STATUS" },
       { campo: "sdr", nome: "SDR" },
       { campo: "origem", nome: "ORIGEM" },
-      { campo: "data_marcacao", nome: "DATA DA MARCAÇÃO" },
-      { campo: "data_reuniao", nome: "DATA DA REUNIÃO" },
       { campo: "segmento", nome: "SEGMENTO" },
       { campo: "cidade", nome: "CIDADE" },
       { campo: "regiao", nome: "REGIÃO" },
@@ -614,8 +619,6 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
         observacoes_sdr: novoLeadData.observacoes,
         sdr: novoLeadData.sdr,
         tipo_lead: novoLeadData.origem,
-        data_marcacao: novoLeadData.data_marcacao,
-        data_reuniao: novoLeadData.data_reuniao,
         nicho: novoLeadData.segmento,
         cidade: novoLeadData.cidade,
         regiao: novoLeadData.regiao,
@@ -633,8 +636,6 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
         observacoes: "",
         sdr: "",
         origem: "",
-        data_marcacao: "",
-        data_reuniao: "",
         segmento: "",
         cidade: "",
         regiao: "",
@@ -728,42 +729,25 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
                 </div>
                 <div>
                   <Label htmlFor="origem">ORIGEM *</Label>
-                  <select
-                    id="origem"
+                  <Select
                     value={novoLeadData.origem}
-                    onChange={(e) => setNovoLeadData({ ...novoLeadData, origem: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded"
+                    onValueChange={(value) => setNovoLeadData({ ...novoLeadData, origem: value })}
                     required
                   >
-                    <option value="">Selecione...</option>
-                    {columns
-                      .find((col) => col.key === "tipo_lead")
-                      ?.options?.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="data_marcacao">DATA DA MARCAÇÃO *</Label>
-                  <Input
-                    id="data_marcacao"
-                    type="date"
-                    value={novoLeadData.data_marcacao}
-                    onChange={(e) => setNovoLeadData({ ...novoLeadData, data_marcacao: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="data_reuniao">DATA DA REUNIÃO *</Label>
-                  <Input
-                    id="data_reuniao"
-                    type="date"
-                    value={novoLeadData.data_reuniao}
-                    onChange={(e) => setNovoLeadData({ ...novoLeadData, data_reuniao: e.target.value })}
-                    required
-                  />
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a origem" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Facebook">Facebook</SelectItem>
+                      <SelectItem value="Instagram">Instagram</SelectItem>
+                      <SelectItem value="Google">Google</SelectItem>
+                      <SelectItem value="LinkedIn">LinkedIn</SelectItem>
+                      <SelectItem value="Indicação">Indicação</SelectItem>
+                      <SelectItem value="Site">Site</SelectItem>
+                      <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                      <SelectItem value="Outros">Outros</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="segmento">SEGMENTO *</Label>
