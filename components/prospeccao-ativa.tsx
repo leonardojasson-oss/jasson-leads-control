@@ -452,6 +452,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
   const [isNovoLeadOpen, setIsNovoLeadOpen] = useState(false)
   const [novoLeadData, setNovoLeadData] = useState({
     lead: "",
+    nome: "",
     status: "",
     observacoes: "",
     sdr: "",
@@ -594,6 +595,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
 
     const camposObrigatorios = [
       { campo: "lead", nome: "LEAD" },
+      { campo: "nome", nome: "NOME" },
       { campo: "status", nome: "STATUS" },
       { campo: "sdr", nome: "SDR" },
       { campo: "origem", nome: "ORIGEM" },
@@ -615,6 +617,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
     try {
       await onAddLead({
         nome_empresa: novoLeadData.lead,
+        nome_contato: novoLeadData.nome,
         status: novoLeadData.status,
         observacoes_sdr: novoLeadData.observacoes,
         sdr: novoLeadData.sdr,
@@ -632,6 +635,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
       setIsNovoLeadOpen(false)
       setNovoLeadData({
         lead: "",
+        nome: "",
         status: "",
         observacoes: "",
         sdr: "",
@@ -681,23 +685,14 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
                   />
                 </div>
                 <div>
-                  <Label htmlFor="status">STATUS *</Label>
-                  <select
-                    id="status"
-                    value={novoLeadData.status}
-                    onChange={(e) => setNovoLeadData({ ...novoLeadData, status: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded"
+                  <Label htmlFor="nome">NOME *</Label>
+                  <Input
+                    id="nome"
+                    value={novoLeadData.nome}
+                    onChange={(e) => setNovoLeadData({ ...novoLeadData, nome: e.target.value })}
+                    placeholder="Nome do contato"
                     required
-                  >
-                    <option value="">Selecione...</option>
-                    {columns
-                      .find((col) => col.key === "status")
-                      ?.options?.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                  </select>
+                  />
                 </div>
                 <div className="col-span-2">
                   <Label htmlFor="observacoes">OBSERVAÇÕES</Label>
