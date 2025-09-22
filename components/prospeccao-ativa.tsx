@@ -69,7 +69,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
       width: "120px",
       type: "select",
       essential: true,
-      options: ["leadbroker", "indicacao", "blackbox", "recomendacao", "outbound", "evento", "networking"],
+      options: ["Outbound", "Indicação", "Recomendação", "Evento", "Networking"],
     },
     { key: "conseguiu_contato", label: "CS", width: "60px", type: "tristate" },
     { key: "reuniao_agendada", label: "RM", width: "60px", type: "tristate" },
@@ -109,7 +109,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
       label: "CLOSER",
       width: "100px",
       type: "select",
-      options: ["Antonio", "Alan", "Giselle", "Guilherme", "Leonardo", "Marcelo"],
+      options: ["Antonio", "Alan", "Giselle", "Guilherme", "Leonardo", "Marcelo", "Matriz"],
     },
     { key: "observacoes_closer", label: "OBSERVAÇÕES CLOSER", width: "200px", type: "text" },
     {
@@ -738,14 +738,11 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
                       <SelectValue placeholder="Selecione a origem" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Facebook">Facebook</SelectItem>
-                      <SelectItem value="Instagram">Instagram</SelectItem>
-                      <SelectItem value="Google">Google</SelectItem>
-                      <SelectItem value="LinkedIn">LinkedIn</SelectItem>
+                      <SelectItem value="Outbound">Outbound</SelectItem>
                       <SelectItem value="Indicação">Indicação</SelectItem>
-                      <SelectItem value="Site">Site</SelectItem>
-                      <SelectItem value="WhatsApp">WhatsApp</SelectItem>
-                      <SelectItem value="Outros">Outros</SelectItem>
+                      <SelectItem value="Recomendação">Recomendação</SelectItem>
+                      <SelectItem value="Evento">Evento</SelectItem>
+                      <SelectItem value="Networking">Networking</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

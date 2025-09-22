@@ -149,7 +149,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       label: "CLOSER",
       width: "100px",
       type: "select",
-      options: ["alan", "francisco", "giselle", "leonardo", "guilherme", "marcelo"],
+      options: ["alan", "francisco", "giselle", "leonardo", "guilherme", "marcelo", "Matriz"],
     },
     { key: "observacoes_closer", label: "OBSERVAÇÕES CLOSER", width: "200px", type: "text" },
     {
@@ -1089,7 +1089,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         </div>
       </div>
 
-      <div className="p-4 border-b border-gray-200 bg-gray-25">
+      <div className="p-3 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <Calendar className="w-4 h-4 text-gray-600" />
@@ -1143,44 +1143,61 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         </div>
       </div>
 
-      <div ref={scrollContainerRef} className="overflow-x-auto max-h-[600px] overflow-y-auto">
-        <table className="w-full border-collapse">
-          <thead className="bg-red-600 text-white sticky top-0 z-10">
-            <tr>
-              {visibleColumnsArray.map((column) => (
-                <th
-                  key={column.key}
-                  className="px-2 py-3 text-xs font-bold uppercase border-r border-red-500 text-center relative"
-                  style={{ minWidth: column.width, width: column.width }}
-                >
-                  <div className="flex items-center justify-center space-x-1">
-                    <span className="flex-1">{column.label}</span>
-                    <ColumnFilter column={column} />
-                  </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-
-          <tbody>
-            {filteredLeads.map((lead, index) => (
-              <tr
-                key={lead.id}
-                className={`border-b border-gray-200 hover:bg-gray-50 ${index % 2 === 0 ? "bg-white" : "bg-gray-25"}`}
-              >
-                {visibleColumnsArray.map((column) => (
-                  <td
-                    key={`${lead.id}-${column.key}`}
-                    className="border-r border-gray-200 p-0"
-                    style={{ minWidth: column.width, width: column.width }}
-                  >
-                    {renderCell(lead, column)}
-                  </td>
-                ))}
+      <div className="overflow-hidden">
+        <div ref={scrollContainerRef} className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-red-600 text-white">
+                {visibleColumnsArray.map((column, index) => {
+                  const isLeadColumn = column.key === "nome_empresa"
+                  return (
+                    <th
+                      key={column.key}
+                      className={`px-2 py-2 text-xs font-medium text-left border-r border-red-500 ${
+                        isLeadColumn ? "sticky left-0 z-20 bg-red-600 shadow-lg" : ""
+                      }`}
+                      style={{
+                        width: column.width,
+                        minWidth: column.width,
+                        maxWidth: column.width,
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="truncate">{column.label}</span>
+                        <ColumnFilter column={column} />
+                      </div>
+                    </th>
+                  )
+                })}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredLeads.map((lead, leadIndex) => (
+                <tr key={lead.id} className={leadIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                  {visibleColumnsArray.map((column, columnIndex) => {
+                    const isLeadColumn = column.key === "nome_empresa"
+                    const rowBgColor = leadIndex % 2 === 0 ? "bg-white" : "bg-gray-50"
+                    return (
+                      <td
+                        key={`${lead.id}-${column.key}`}
+                        className={`border-r border-gray-200 ${
+                          isLeadColumn ? `sticky left-0 z-10 ${rowBgColor} shadow-lg` : ""
+                        }`}
+                        style={{
+                          width: column.width,
+                          minWidth: column.width,
+                          maxWidth: column.width,
+                        }}
+                      >
+                        {renderCell(lead, column)}
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="p-2 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">

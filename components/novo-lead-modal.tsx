@@ -803,6 +803,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectItem value="leonardo">Leonardo</SelectItem>
                     <SelectItem value="guilherme">Guilherme</SelectItem>
                     <SelectItem value="marcelo">Marcelo</SelectItem>
+                    <SelectItem value="matriz">Matriz</SelectItem> {/* Added option Matriz */}
                   </SelectContent>
                 </Select>
               </div>
