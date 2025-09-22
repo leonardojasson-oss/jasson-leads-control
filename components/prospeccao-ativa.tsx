@@ -591,12 +591,17 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
   }
 
   const handleNovoLead = async () => {
-    if (!onAddLead) return
+    console.log("[v0] Iniciando handleNovoLead")
+    console.log("[v0] novoLeadData:", novoLeadData)
+
+    if (!onAddLead) {
+      console.log("[v0] onAddLead não está disponível")
+      return
+    }
 
     const camposObrigatorios = [
       { campo: "lead", nome: "LEAD" },
       { campo: "nome", nome: "NOME" },
-      { campo: "status", nome: "STATUS" },
       { campo: "sdr", nome: "SDR" },
       { campo: "origem", nome: "ORIGEM" },
       { campo: "segmento", nome: "SEGMENTO" },
@@ -608,17 +613,21 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
     ]
 
     const camposVazios = camposObrigatorios.filter((item) => !novoLeadData[item.campo as keyof typeof novoLeadData])
+    console.log("[v0] Campos vazios:", camposVazios)
 
     if (camposVazios.length > 0) {
+      console.log("[v0] Validação falhou - campos obrigatórios vazios")
       alert(`Os seguintes campos são obrigatórios: ${camposVazios.map((item) => item.nome).join(", ")}`)
       return
     }
+
+    console.log("[v0] Validação passou, tentando salvar...")
 
     try {
       await onAddLead({
         nome_empresa: novoLeadData.lead,
         nome_contato: novoLeadData.nome,
-        status: novoLeadData.status,
+        status: "BACKLOG",
         observacoes_sdr: novoLeadData.observacoes,
         sdr: novoLeadData.sdr,
         tipo_lead: novoLeadData.origem,
@@ -632,6 +641,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
         canal: "prospeccao_ativa",
       })
 
+      console.log("[v0] Lead salvo com sucesso")
       setIsNovoLeadOpen(false)
       setNovoLeadData({
         lead: "",
@@ -650,7 +660,8 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
       })
       onRefresh()
     } catch (error) {
-      console.error("Erro ao adicionar lead:", error)
+      console.error("[v0] Erro ao adicionar lead:", error)
+      alert("Erro ao salvar o lead. Verifique o console para mais detalhes.")
     }
   }
 

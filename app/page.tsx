@@ -608,6 +608,29 @@ export default function LeadsControl() {
     }
   }
 
+  const handleAddLead = async (leadData: any) => {
+    console.log("🔄 === ADICIONANDO LEAD PROSPECÇÃO ATIVA ===")
+    console.log("📊 Dados recebidos:", leadData)
+
+    try {
+      setSaving(true)
+
+      // Criar novo lead
+      const newLead = await leadOperations.create(leadData)
+      console.log("✅ Lead criado com sucesso:", newLead.id)
+
+      // Recarregar lista
+      await loadLeads()
+
+      console.log("✅ Processo de adição concluído")
+    } catch (error) {
+      console.error("❌ Erro ao adicionar lead:", error)
+      throw error
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // Calcular KPIs
   const totalLeads = leads.length
   const totalInvestido = leads.reduce((sum, lead) => {
@@ -678,8 +701,19 @@ export default function LeadsControl() {
         )
       case "planilha":
         return <LeadsSpreadsheet leads={leads} onUpdateLead={handleUpdateLead} onRefresh={handleRefresh} />
-      case "prospeccao": // Adicionado case para Prospecção Ativa
-        return <ProspeccaoAtiva leads={[]} onUpdateLead={handleUpdateLead} onRefresh={handleRefresh} />
+      case "prospeccao": // Filtrando apenas leads com origem específica da Prospecção Ativa
+        const prospeccaoAtivaLeads = leads.filter((lead) => {
+          const origem = lead.origem || lead.tipo_lead || lead.origemLead || ""
+          return ["Outbound", "Indicação", "Recomendação", "Evento", "Networking"].includes(origem)
+        })
+        return (
+          <ProspeccaoAtiva
+            leads={prospeccaoAtivaLeads}
+            onUpdateLead={handleUpdateLead}
+            onRefresh={handleRefresh}
+            onAddLead={handleAddLead}
+          />
+        )
       case "metas":
         return <MetasControl leads={filteredLeads} />
       case "vendas":
