@@ -1144,44 +1144,29 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
       </div>
 
       <div className="overflow-hidden">
-        <div ref={scrollContainerRef} className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-red-600 text-white">
-                {visibleColumnsArray.map((column, index) => {
-                  const isLeadColumn = column.key === "nome_empresa"
-                  return (
-                    <th
-                      key={column.key}
-                      className={`px-2 py-2 text-xs font-medium text-left border-r border-red-500 ${
-                        isLeadColumn ? "sticky left-0 z-20 bg-red-600 shadow-lg" : ""
-                      }`}
-                      style={{
-                        width: column.width,
-                        minWidth: column.width,
-                        maxWidth: column.width,
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="truncate">{column.label}</span>
-                        <ColumnFilter column={column} />
-                      </div>
-                    </th>
-                  )
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredLeads.map((lead, leadIndex) => (
-                <tr key={lead.id} className={leadIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                  {visibleColumnsArray.map((column, columnIndex) => {
+        <div
+          ref={scrollContainerRef}
+          className="overflow-x-scroll"
+          style={{
+            scrollbarWidth: "thin",
+            scrollbarColor: "#9CA3AF #E5E7EB",
+            minHeight: "400px",
+            maxHeight: "70vh",
+            overflowY: "auto",
+            scrollbarGutter: "stable",
+          }}
+        >
+          <div style={{ minWidth: "100%", width: "max-content" }}>
+            <table className="w-full" style={{ minWidth: "max-content" }}>
+              <thead>
+                <tr className="bg-red-600 text-white">
+                  {visibleColumnsArray.map((column, index) => {
                     const isLeadColumn = column.key === "nome_empresa"
-                    const rowBgColor = leadIndex % 2 === 0 ? "bg-white" : "bg-gray-50"
                     return (
-                      <td
-                        key={`${lead.id}-${column.key}`}
-                        className={`border-r border-gray-200 ${
-                          isLeadColumn ? `sticky left-0 z-10 ${rowBgColor} shadow-lg` : ""
+                      <th
+                        key={column.key}
+                        className={`px-2 py-2 text-xs font-medium text-left border-r border-red-500 ${
+                          isLeadColumn ? "sticky left-0 z-20 bg-red-600 shadow-lg" : ""
                         }`}
                         style={{
                           width: column.width,
@@ -1189,14 +1174,42 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
                           maxWidth: column.width,
                         }}
                       >
-                        {renderCell(lead, column)}
-                      </td>
+                        <div className="flex items-center justify-between">
+                          <span className="truncate">{column.label}</span>
+                          <ColumnFilter column={column} />
+                        </div>
+                      </th>
                     )
                   })}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredLeads.map((lead, leadIndex) => (
+                  <tr key={lead.id} className={leadIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                    {visibleColumnsArray.map((column, columnIndex) => {
+                      const isLeadColumn = column.key === "nome_empresa"
+                      const rowBgColor = leadIndex % 2 === 0 ? "bg-white" : "bg-gray-50"
+                      return (
+                        <td
+                          key={`${lead.id}-${column.key}`}
+                          className={`border-r border-gray-200 ${
+                            isLeadColumn ? `sticky left-0 z-10 ${rowBgColor} shadow-lg` : ""
+                          }`}
+                          style={{
+                            width: column.width,
+                            minWidth: column.width,
+                            maxWidth: column.width,
+                          }}
+                        >
+                          {renderCell(lead, column)}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
