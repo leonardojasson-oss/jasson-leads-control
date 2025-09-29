@@ -264,8 +264,28 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
 
     let updates: Partial<Lead> = { [field]: value }
 
+    // Regra: Se CS = SIM → STATUS = "QUALIFICANDO"
+    if (field === "conseguiu_contato" && value === true) {
+      updates.status = "QUALIFICANDO"
+      console.log("[v0] CS marcado como ✅ - STATUS alterado para QUALIFICANDO:", leadId)
+    }
+    // Regra: Se RM = SIM → STATUS = "REUNIÃO AGENDADA"
+    else if (field === "reuniao_agendada" && value === true) {
+      updates.status = "REUNIÃO AGENDADA"
+      console.log("[v0] RM marcado como ✅ - STATUS alterado para REUNIÃO AGENDADA:", leadId)
+    }
+    // Regra: Se RR = SIM → STATUS = "REUNIÃO REALIZADA"
+    else if (field === "reuniao_realizada" && value === true) {
+      updates.status = "REUNIÃO REALIZADA"
+      console.log("[v0] RR marcado como ✅ - STATUS alterado para REUNIÃO REALIZADA:", leadId)
+    }
+    // Regra: Se RR = NÃO → STATUS = "NO-SHOW"
+    else if (field === "reuniao_realizada" && value === false) {
+      updates.status = "NO-SHOW"
+      console.log("[v0] RR marcado como ❌ - STATUS alterado para NO-SHOW:", leadId)
+    }
     // Regra: Se DATA DE ASSINATURA for preenchida → STATUS = "GANHO"
-    if (field === "data_assinatura" && value && value.trim() !== "") {
+    else if (field === "data_assinatura" && value && value.trim() !== "") {
       updates = {
         ...updates,
         data_reuniao: value,
@@ -276,21 +296,6 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         leadId,
         data_assinatura: value,
       })
-    }
-    // Regra: Se RM = ✅ → STATUS = "REUNIÃO AGENDADA"
-    else if (field === "reuniao_agendada" && value === true) {
-      updates.status = "REUNIÃO AGENDADA"
-      console.log("[v0] RM marcado como ✅ - STATUS alterado para REUNIÃO AGENDADA:", leadId)
-    }
-    // Regra: Se RR = ✅ → STATUS = "REUNIÃO REALIZADA"
-    else if (field === "reuniao_realizada" && value === true) {
-      updates.status = "REUNIÃO REALIZADA"
-      console.log("[v0] RR marcado como ✅ - STATUS alterado para REUNIÃO REALIZADA:", leadId)
-    }
-    // Regra: Se RR = ❌ → STATUS = "NO-SHOW"
-    else if (field === "reuniao_realizada" && value === false) {
-      updates.status = "NO-SHOW"
-      console.log("[v0] RR marcado como ❌ - STATUS alterado para NO-SHOW:", leadId)
     } else if (field === "motivo_perda" && value && value.trim() !== "") {
       updates.status = "PERDIDO"
       console.log("[v0] MOTIVO DE PERDA preenchido - STATUS alterado para PERDIDO:", {
