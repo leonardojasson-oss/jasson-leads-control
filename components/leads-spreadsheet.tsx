@@ -9,6 +9,7 @@ import { RefreshCw, Settings, Filter, Calendar } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { Lead } from "@/app/page"
+import { normalizePersonName } from "@/lib/normalizers"
 
 interface LeadsSpreadsheetProps {
   leads: Lead[]
@@ -263,6 +264,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     }
 
     let updates: Partial<Lead> = { [field]: value }
+
+    if (field === "closer" || field === "sdr" || field === "arrematador") {
+      updates[field] = normalizePersonName(value)
+      console.log(`[v0] Nome normalizado: "${value}" → "${updates[field]}"`)
+    }
 
     // Regra: Se CS = SIM → STATUS = "QUALIFICANDO"
     if (field === "conseguiu_contato" && value === true) {

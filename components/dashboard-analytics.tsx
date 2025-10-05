@@ -8,6 +8,7 @@ import { BarChart3, X } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import type { Lead } from "@/app/page"
+import { normalizePersonName } from "@/lib/normalizers"
 
 interface DashboardAnalyticsProps {
   leads: Lead[]
@@ -295,11 +296,13 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
     const closerForecast = forecastLeads.reduce(
       (acc, lead) => {
-        const closer = lead.closer?.toLowerCase()?.trim()
+        const closerRaw = lead.closer?.trim()
+        const closer = closerRaw ? normalizePersonName(closerRaw).toLowerCase() : ""
+
         if (closer && closer !== "") {
           if (!acc[closer]) {
             acc[closer] = {
-              name: closer.charAt(0).toUpperCase() + closer.slice(1),
+              name: normalizePersonName(closerRaw),
               quantidade: 0,
               potencialFeeMrr: 0,
               potencialFeeOneTime: 0,
@@ -337,7 +340,9 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
 
   const closerStats = filteredLeads.reduce(
     (acc, lead) => {
-      const closer = lead.closer?.toLowerCase()?.trim()
+      const closerRaw = lead.closer?.trim()
+      const closer = closerRaw ? normalizePersonName(closerRaw).toLowerCase() : ""
+
       if (closer && closer !== "") {
         if (!acc[closer]) {
           acc[closer] = []
@@ -350,13 +355,15 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
   )
 
   const closerFunnels = Object.entries(closerStats).map(([closer, closerLeads]) => ({
-    name: closer.charAt(0).toUpperCase() + closer.slice(1),
+    name: normalizePersonName(closer),
     funnel: calculateFunnel(closerLeads),
   }))
 
   const sdrStats = filteredLeads.reduce(
     (acc, lead) => {
-      const sdr = lead.sdr?.toLowerCase()?.trim()
+      const sdrRaw = lead.sdr?.trim()
+      const sdr = sdrRaw ? normalizePersonName(sdrRaw).toLowerCase() : ""
+
       if (sdr && sdr !== "") {
         if (!acc[sdr]) {
           acc[sdr] = []
@@ -369,7 +376,7 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
   )
 
   const sdrFunnels = Object.entries(sdrStats).map(([sdr, sdrLeads]) => ({
-    name: sdr.charAt(0).toUpperCase() + sdr.slice(1),
+    name: normalizePersonName(sdr),
     funnel: calculateFunnel(sdrLeads),
   }))
 
@@ -477,7 +484,7 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
                 </div>
               </div>
               <div className="bg-blue-50 p-2 rounded-lg">
-                <div className="text-xs text-gray-600 mb-1">FEE ONE TIME (Escopo)</div>
+                <div className="text-xs text-gray-600 mb-1">FEE ONE-TIME (Escopo)</div>
                 <div className="font-bold text-blue-600 text-base">
                   R$ {funnel.feeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                 </div>

@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Filter, X, Settings } from "lucide-react"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import type { Lead } from "@/lib/supabase-operations"
+import { normalizePersonName } from "@/lib/normalizers"
 
 interface ProspeccaoAtivaProps {
   leads: Lead[]
@@ -629,7 +630,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
         nome_contato: novoLeadData.nome,
         status: "BACKLOG",
         observacoes_sdr: novoLeadData.observacoes,
-        sdr: novoLeadData.sdr,
+        sdr: normalizePersonName(novoLeadData.sdr),
         tipo_lead: novoLeadData.origem,
         nicho: novoLeadData.segmento,
         cidade: novoLeadData.cidade,
@@ -637,7 +638,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
         cargo_contato: novoLeadData.cargo,
         email: novoLeadData.email,
         anuncios: novoLeadData.anuncios,
-        closer: novoLeadData.closer,
+        closer: normalizePersonName(novoLeadData.closer),
         canal: "prospeccao_ativa",
       })
 
