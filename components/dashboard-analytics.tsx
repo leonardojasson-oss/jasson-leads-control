@@ -9,6 +9,7 @@ import { useState, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import type { Lead } from "@/app/page"
 import { normalizePersonName } from "@/lib/normalizers"
+import { computeStepPercents } from "@/lib/funnel"
 
 interface DashboardAnalyticsProps {
   leads: Lead[]
@@ -177,31 +178,39 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
       return sum + (isNaN(escopo) ? 0 : escopo)
     }, 0)
 
+    const stepPercents = computeStepPercents({
+      leads: totalLeads,
+      contato,
+      agendada,
+      realizada,
+      vendas,
+    })
+
     return {
-      leads: { count: totalLeads, percentage: 100 },
+      leads: { count: totalLeads, percentage: stepPercents.leads },
       contato: {
         count: contato,
-        percentage: totalLeads > 0 ? (contato / totalLeads) * 100 : 0,
+        percentage: stepPercents.contato,
       },
       agendada: {
         count: agendada,
-        percentage: totalLeads > 0 ? (agendada / totalLeads) * 100 : 0,
+        percentage: stepPercents.agendada,
       },
       realizada: {
         count: realizada,
-        percentage: totalLeads > 0 ? (realizada / totalLeads) * 100 : 0,
+        percentage: stepPercents.realizada,
       },
       vendas: {
         count: vendas,
-        percentage: totalLeads > 0 ? (vendas / totalLeads) * 100 : 0,
+        percentage: stepPercents.vendas,
       },
       feeMrr,
       feeOneTime,
       conversions: {
-        leadToContato: totalLeads > 0 ? (contato / totalLeads) * 100 : 0,
-        contatoToAgendada: contato > 0 ? (agendada / contato) * 100 : 0,
-        agendadaToRealizada: agendada > 0 ? (realizada / agendada) * 100 : 0,
-        realizadaToVenda: realizada > 0 ? (vendas / realizada) * 100 : 0,
+        leadToContato: stepPercents.contato,
+        contatoToAgendada: stepPercents.agendada,
+        agendadaToRealizada: stepPercents.realizada,
+        realizadaToVenda: stepPercents.vendas,
       },
     }
   }
