@@ -700,7 +700,11 @@ export default function LeadsControl() {
           />
         )
       case "planilha":
-        return <LeadsSpreadsheet leads={leads} onUpdateLead={handleUpdateLead} onRefresh={handleRefresh} />
+        const inboundLeads = leads.filter((lead) => {
+          const origem = lead.origem || lead.tipo_lead || lead.origemLead || ""
+          return ["LeadBroker", "Blackbox"].some((o) => origem.toLowerCase().includes(o.toLowerCase()))
+        })
+        return <LeadsSpreadsheet leads={inboundLeads} onUpdateLead={handleUpdateLead} onRefresh={handleRefresh} />
       case "prospeccao": // Filtrando apenas leads com origem específica da Prospecção Ativa
         const prospeccaoAtivaLeads = leads.filter((lead) => {
           const origem = lead.origem || lead.tipo_lead || lead.origemLead || ""

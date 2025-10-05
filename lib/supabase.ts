@@ -143,13 +143,20 @@ export const leadOperations = {
     }
 
     try {
-      const { data, error } = await supabase.from("leads").select("*").order("created_at", { ascending: false })
+      const [inboundResult, prospeccaoResult] = await Promise.all([
+        supabase.from("leads_inbound").select("*").order("created_at", { ascending: false }),
+        supabase.from("leads_prospeccao_ativa").select("*").order("created_at", { ascending: false }),
+      ])
 
-      if (error) {
-        throw error
-      }
+      if (inboundResult.error) throw inboundResult.error
+      if (prospeccaoResult.error) throw prospeccaoResult.error
 
-      return data || []
+      const allLeads = [...(inboundResult.data || []), ...(prospeccaoResult.data || [])]
+      return allLeads.sort((a, b) => {
+        const dateA = new Date(a.created_at || 0).getTime()
+        const dateB = new Date(b.created_at || 0).getTime()
+        return dateB - dateA
+      })
     } catch (error) {
       console.error("Supabase error, using localStorage:", error)
       return localStorageOperations.getAll()
@@ -165,6 +172,10 @@ export const leadOperations = {
       // Try Supabase in background if configured
       if (isSupabaseConfigured && supabase) {
         try {
+          const origem = (lead as any).tipo_lead || (lead as any).origem || ""
+          const isProspeccaoAtiva = ["Outbound", "Indicação", "Recomendação", "Evento", "Networking"].includes(origem)
+          const tableName = isProspeccaoAtiva ? "leads_prospeccao_ativa" : "leads_inbound"
+
           // Clean data for Supabase - convert empty strings to null for date fields
           const cleanedLead: any = {}
           const dateFields = [
@@ -189,13 +200,14 @@ export const leadOperations = {
           })
 
           console.log("🧹 Cleaned data for Supabase:", cleanedLead)
+          console.log(`📊 Salvando em: ${tableName}`)
 
-          const { data, error } = await supabase.from("leads").insert([cleanedLead]).select().single()
+          const { data, error } = await supabase.from(tableName).insert([cleanedLead]).select().single()
 
           if (error) {
             console.error("Supabase error (but localStorage worked):", error)
           } else {
-            console.log("✅ Lead also saved to Supabase:", data.id)
+            console.log(`✅ Lead also saved to Supabase (${tableName}):`, data.id)
           }
         } catch (supabaseError) {
           console.error("Supabase failed (but localStorage worked):", supabaseError)
@@ -223,10 +235,17 @@ export const leadOperations = {
         cleanedLead[key] = cleanValue((lead as any)[key])
       })
 
-      const { data, error } = await supabase.from("leads").update(cleanedLead).eq("id", id).select().single()
+      const [inboundResult, prospeccaoResult] = await Promise.all([
+        supabase.from("leads_inbound").update(cleanedLead).eq("id", id).select().single(),
+        supabase.from("leads_prospeccao_ativa").update(cleanedLead).eq("id", id).select().single(),
+      ])
 
-      if (error) throw error
-      return data
+      // Retornar o resultado que teve sucesso
+      if (inboundResult.data) return inboundResult.data
+      if (prospeccaoResult.data) return prospeccaoResult.data
+
+      // Se ambos falharam, lançar erro
+      throw inboundResult.error || prospeccaoResult.error
     } catch (error) {
       console.error("Supabase error, using localStorage:", error)
       return localStorageOperations.update(id, lead)
@@ -239,9 +258,15 @@ export const leadOperations = {
     }
 
     try {
-      const { error } = await supabase.from("leads").delete().eq("id", id)
-      if (error) throw error
-      return true
+      const [inboundResult, prospeccaoResult] = await Promise.all([
+        supabase.from("leads_inbound").delete().eq("id", id),
+        supabase.from("leads_prospeccao_ativa").delete().eq("id", id),
+      ])
+
+      // Se pelo menos uma operação teve sucesso, retornar true
+      if (!inboundResult.error || !prospeccaoResult.error) return true
+
+      throw inboundResult.error || prospeccaoResult.error
     } catch (error) {
       console.error("Supabase error, using localStorage:", error)
       return localStorageOperations.delete(id)
