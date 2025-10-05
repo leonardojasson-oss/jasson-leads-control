@@ -7,7 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Filter, X, Settings } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Filter, Settings, RefreshCw, Calendar, Search } from "lucide-react"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import type { Lead } from "@/lib/supabase-operations"
 import { normalizePersonName } from "@/lib/normalizers"
@@ -31,6 +32,10 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
   const [configuringPreset, setConfiguringPreset] = useState<string | null>(null)
   const [presetConfigurations, setPresetConfigurations] = useState<Record<string, string[]>>({})
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  const [dateFilterColumn, setDateFilterColumn] = useState<string>("")
+  const [dateFilterStart, setDateFilterStart] = useState<string>("")
+  const [dateFilterEnd, setDateFilterEnd] = useState<string>("")
 
   const columns = [
     { key: "nome_empresa", label: "LEAD", width: "200px", type: "text", essential: true },
@@ -149,6 +154,8 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
         "Outros",
       ],
     },
+    // Adicionando campos de data para filtro
+    { key: "data_hora_compra", label: "DATA DA COMPRA", width: "150px", type: "date" },
   ]
 
   const defaultPresets = {
@@ -312,7 +319,17 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
 
   const clearAllFilters = () => {
     setColumnFilters({})
+    clearDateFilter() // Limpa também o filtro de data
   }
+
+  // Opções de filtro de data (mesmo do Inbound)
+  const dateFilterOptions = [
+    { value: "data_reuniao", label: "DATA DA REUNIÃO" },
+    { value: "data_ultimo_contato", label: "DATA ÚLTIMO CONTATO" },
+    { value: "data_hora_compra", label: "DATA DA COMPRA" },
+    { value: "data_marcacao", label: "DATA DA MARCAÇÃO" },
+    { value: "data_assinatura", label: "DATA DE ASSINATURA" },
+  ]
 
   const ColumnFilter = ({ column }: { column: any }) => {
     const uniqueValues = getUniqueValues(column.key)
@@ -447,6 +464,19 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
       }
     }
 
+    if (dateFilterColumn && dateFilterStart && dateFilterEnd) {
+      const leadDateValue = (lead as any)[dateFilterColumn]
+      if (!leadDateValue) return false
+
+      const leadDate = new Date(leadDateValue)
+      const startDate = new Date(dateFilterStart + "T00:00:00")
+      const endDate = new Date(dateFilterEnd + "T23:59:59.999")
+
+      if (!(leadDate >= startDate && leadDate <= endDate)) {
+        return false
+      }
+    }
+
     return true
   })
 
@@ -501,9 +531,28 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
     setEditValue("")
   }
 
+  // Funções de filtro de data (mesmo do Inbound)
+  const applyDateFilter = () => {
+    if (!dateFilterColumn) {
+      alert("Por favor, selecione uma coluna para filtrar.")
+      return
+    }
+    if (!dateFilterStart || !dateFilterEnd) {
+      alert("Por favor, selecione as datas de início e fim.")
+      return
+    }
+  }
+
+  const clearDateFilter = () => {
+    setDateFilterColumn("")
+    setDateFilterStart("")
+    setDateFilterEnd("")
+  }
+
   const renderCell = (lead: Lead, column: any) => {
     const value = lead[column.key as keyof Lead]
     const isEditing = editingCell?.leadId === lead.id && editingCell?.field === column.key
+    const isObservacoesSdr = column.key === "observacoes_sdr"
 
     if (isEditing) {
       if (column.type === "select") {
@@ -581,11 +630,12 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
       displayValue = String(value)
     }
 
+    const cellClasses = isObservacoesSdr
+      ? "p-2 cursor-pointer hover:bg-gray-100 text-xs whitespace-normal break-words overflow-visible leading-snug flex items-start"
+      : "p-2 cursor-pointer hover:bg-gray-100 text-xs min-h-[32px] flex items-center"
+
     return (
-      <div
-        className="p-2 cursor-pointer hover:bg-gray-100 text-xs min-h-[32px] flex items-center"
-        onClick={() => handleCellEdit(lead.id, column.key, value)}
-      >
+      <div className={cellClasses} onClick={() => handleCellEdit(lead.id, column.key, value)}>
         {displayValue}
       </div>
     )
@@ -667,312 +717,366 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">🎯 Prospecção Ativa</h2>
-        <div className="flex items-center space-x-4">
-          <Input
-            placeholder="Buscar leads..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-64"
-          />
-          <Dialog open={isNovoLeadOpen} onOpenChange={setIsNovoLeadOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-orange-600 hover:bg-orange-700">+ Novo Lead PA</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Novo Lead - Prospecção Ativa</DialogTitle>
-              </DialogHeader>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="lead">LEAD *</Label>
-                  <Input
-                    id="lead"
-                    value={novoLeadData.lead}
-                    onChange={(e) => setNovoLeadData({ ...novoLeadData, lead: e.target.value })}
-                    placeholder="Nome da empresa"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="nome">NOME *</Label>
-                  <Input
-                    id="nome"
-                    value={novoLeadData.nome}
-                    onChange={(e) => setNovoLeadData({ ...novoLeadData, nome: e.target.value })}
-                    placeholder="Nome do contato"
-                    required
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Label htmlFor="observacoes">OBSERVAÇÕES</Label>
-                  <Textarea
-                    id="observacoes"
-                    value={novoLeadData.observacoes}
-                    onChange={(e) => setNovoLeadData({ ...novoLeadData, observacoes: e.target.value })}
-                    placeholder="Observações sobre o lead"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="sdr">SDR *</Label>
-                  <select
-                    id="sdr"
-                    value={novoLeadData.sdr}
-                    onChange={(e) => setNovoLeadData({ ...novoLeadData, sdr: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded"
-                    required
-                  >
-                    <option value="">Selecione...</option>
-                    {columns
-                      .find((col) => col.key === "sdr")
-                      ?.options?.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="origem">ORIGEM *</Label>
-                  <Select
-                    value={novoLeadData.origem}
-                    onValueChange={(value) => setNovoLeadData({ ...novoLeadData, origem: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a origem" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Outbound">Outbound</SelectItem>
-                      <SelectItem value="Indicação">Indicação</SelectItem>
-                      <SelectItem value="Recomendação">Recomendação</SelectItem>
-                      <SelectItem value="Evento">Evento</SelectItem>
-                      <SelectItem value="Networking">Networking</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="segmento">SEGMENTO *</Label>
-                  <Input
-                    id="segmento"
-                    value={novoLeadData.segmento}
-                    onChange={(e) => setNovoLeadData({ ...novoLeadData, segmento: e.target.value })}
-                    placeholder="Segmento da empresa"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="cidade">CIDADE *</Label>
-                  <Input
-                    id="cidade"
-                    value={novoLeadData.cidade}
-                    onChange={(e) => setNovoLeadData({ ...novoLeadData, cidade: e.target.value })}
-                    placeholder="Cidade"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="regiao">REGIÃO *</Label>
-                  <Input
-                    id="regiao"
-                    value={novoLeadData.regiao}
-                    onChange={(e) => setNovoLeadData({ ...novoLeadData, regiao: e.target.value })}
-                    placeholder="Região"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="cargo">CARGO *</Label>
-                  <Input
-                    id="cargo"
-                    value={novoLeadData.cargo}
-                    onChange={(e) => setNovoLeadData({ ...novoLeadData, cargo: e.target.value })}
-                    placeholder="Cargo do contato"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email">E-MAIL *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={novoLeadData.email}
-                    onChange={(e) => setNovoLeadData({ ...novoLeadData, email: e.target.value })}
-                    placeholder="email@empresa.com"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="anuncios">ANÚNCIOS *</Label>
-                  <Input
-                    id="anuncios"
-                    value={novoLeadData.anuncios}
-                    onChange={(e) => setNovoLeadData({ ...novoLeadData, anuncios: e.target.value })}
-                    placeholder="Informações sobre anúncios"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="closer">CLOSER</Label>
-                  <select
-                    id="closer"
-                    value={novoLeadData.closer}
-                    onChange={(e) => setNovoLeadData({ ...novoLeadData, closer: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded"
-                  >
-                    <option value="">Selecione...</option>
-                    {columns
-                      .find((col) => col.key === "closer")
-                      ?.options?.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-2 mt-6">
-                <Button variant="outline" onClick={() => setIsNovoLeadOpen(false)}>
-                  Cancelar
+    <div className="bg-white rounded-lg border border-gray-200">
+      <div className="p-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <h2 className="text-lg font-bold text-gray-900">🎯 Prospecção Ativa</h2>
+            <span className="text-sm text-gray-500">
+              {visibleColumnsArray.length}/{columns.length} colunas
+            </span>
+            {Object.keys(columnFilters).length > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                <Filter className="w-3 h-3 mr-1" />
+                {Object.keys(columnFilters).length} filtro(s) ativo(s)
+              </Badge>
+            )}
+            {dateFilterColumn && dateFilterStart && dateFilterEnd && (
+              <Badge variant="secondary" className="text-xs">
+                <Calendar className="w-3 h-3 mr-1" />
+                Filtro de data ativo
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center space-x-2">
+            {Object.keys(columnFilters).length > 0 && (
+              <Button variant="outline" size="sm" onClick={clearAllFilters} className="h-8 bg-transparent">
+                <Filter className="w-3 h-3 mr-1" />
+                Limpar Filtros
+              </Button>
+            )}
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 bg-transparent">
+                  <Settings className="w-3 h-3 mr-1" />
+                  Colunas
                 </Button>
-                <Button onClick={handleNovoLead} className="bg-orange-600 hover:bg-orange-700">
-                  Salvar Lead
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-          <Button onClick={onRefresh} variant="outline">
-            🔄 Atualizar
-          </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Colunas</DialogTitle>
+                </DialogHeader>
+                <div className="p-4">
+                  <div className="mb-4">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <span className="text-red-600">🎯</span>
+                      <h4 className="font-medium text-gray-900">Presets de Visualização</h4>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {Object.entries(defaultPresets).map(([key, preset]) => (
+                        <div key={key} className="flex items-center space-x-2">
+                          <Button
+                            variant={activePreset === key ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => applyPreset(key)}
+                            className={`flex items-center justify-start space-x-2 h-10 flex-1 ${
+                              activePreset === key
+                                ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                                : "bg-white hover:bg-gray-50 text-gray-700 border-gray-300"
+                            }`}
+                          >
+                            <span>{preset.icon}</span>
+                            <span className="font-medium">{preset.name}</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openPresetConfiguration(key)}
+                            className="h-10 w-10 p-0 hover:bg-gray-100"
+                            title={`Configurar ${preset.name}`}
+                          >
+                            <Settings className="h-4 w-4 text-gray-500" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <div className="grid grid-cols-3 gap-4 max-h-80 overflow-y-auto">
+                      {columns.map((column) => (
+                        <div key={column.key} className="flex items-center space-x-2 py-1">
+                          <Checkbox
+                            id={`column-${column.key}`}
+                            checked={visibleColumns[column.key] || false}
+                            onCheckedChange={(checked) => {
+                              setVisibleColumns((prev) => ({
+                                ...prev,
+                                [column.key]: checked as boolean,
+                              }))
+                              setActivePreset("custom")
+                            }}
+                          />
+                          <label
+                            htmlFor={`column-${column.key}`}
+                            className="text-sm cursor-pointer flex-1 text-gray-700 font-medium"
+                          >
+                            {column.label}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4 mt-4">
+                    <div className="flex justify-center space-x-3">
+                      {Object.entries(defaultPresets).map(([key, preset]) => (
+                        <Button
+                          key={key}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => applyPreset(key)}
+                          className="flex items-center space-x-2 bg-white hover:bg-gray-50 border-gray-300"
+                        >
+                          <span>{preset.icon}</span>
+                          <span>{preset.name}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={isNovoLeadOpen} onOpenChange={setIsNovoLeadOpen}>
+              <DialogTrigger asChild>
+                <Button className="h-8 bg-orange-600 hover:bg-orange-700">+ Novo Lead PA</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Novo Lead - Prospecção Ativa</DialogTitle>
+                </DialogHeader>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="lead">LEAD *</Label>
+                    <Input
+                      id="lead"
+                      value={novoLeadData.lead}
+                      onChange={(e) => setNovoLeadData({ ...novoLeadData, lead: e.target.value })}
+                      placeholder="Nome da empresa"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="nome">NOME *</Label>
+                    <Input
+                      id="nome"
+                      value={novoLeadData.nome}
+                      onChange={(e) => setNovoLeadData({ ...novoLeadData, nome: e.target.value })}
+                      placeholder="Nome do contato"
+                      required
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label htmlFor="observacoes">OBSERVAÇÕES</Label>
+                    <Textarea
+                      id="observacoes"
+                      value={novoLeadData.observacoes}
+                      onChange={(e) => setNovoLeadData({ ...novoLeadData, observacoes: e.target.value })}
+                      placeholder="Observações sobre o lead"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="sdr">SDR *</Label>
+                    <select
+                      id="sdr"
+                      value={novoLeadData.sdr}
+                      onChange={(e) => setNovoLeadData({ ...novoLeadData, sdr: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded"
+                      required
+                    >
+                      <option value="">Selecione...</option>
+                      {columns
+                        .find((col) => col.key === "sdr")
+                        ?.options?.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="origem">ORIGEM *</Label>
+                    <Select
+                      value={novoLeadData.origem}
+                      onValueChange={(value) => setNovoLeadData({ ...novoLeadData, origem: value })}
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a origem" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Outbound">Outbound</SelectItem>
+                        <SelectItem value="Indicação">Indicação</SelectItem>
+                        <SelectItem value="Recomendação">Recomendação</SelectItem>
+                        <SelectItem value="Evento">Evento</SelectItem>
+                        <SelectItem value="Networking">Networking</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="segmento">SEGMENTO *</Label>
+                    <Input
+                      id="segmento"
+                      value={novoLeadData.segmento}
+                      onChange={(e) => setNovoLeadData({ ...novoLeadData, segmento: e.target.value })}
+                      placeholder="Segmento da empresa"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="cidade">CIDADE *</Label>
+                    <Input
+                      id="cidade"
+                      value={novoLeadData.cidade}
+                      onChange={(e) => setNovoLeadData({ ...novoLeadData, cidade: e.target.value })}
+                      placeholder="Cidade"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="regiao">REGIÃO *</Label>
+                    <Input
+                      id="regiao"
+                      value={novoLeadData.regiao}
+                      onChange={(e) => setNovoLeadData({ ...novoLeadData, regiao: e.target.value })}
+                      placeholder="Região"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="cargo">CARGO *</Label>
+                    <Input
+                      id="cargo"
+                      value={novoLeadData.cargo}
+                      onChange={(e) => setNovoLeadData({ ...novoLeadData, cargo: e.target.value })}
+                      placeholder="Cargo do contato"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="email">E-MAIL *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={novoLeadData.email}
+                      onChange={(e) => setNovoLeadData({ ...novoLeadData, email: e.target.value })}
+                      placeholder="email@empresa.com"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="anuncios">ANÚNCIOS *</Label>
+                    <Input
+                      id="anuncios"
+                      value={novoLeadData.anuncios}
+                      onChange={(e) => setNovoLeadData({ ...novoLeadData, anuncios: e.target.value })}
+                      placeholder="Informações sobre anúncios"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="closer">CLOSER</Label>
+                    <select
+                      id="closer"
+                      value={novoLeadData.closer}
+                      onChange={(e) => setNovoLeadData({ ...novoLeadData, closer: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded"
+                    >
+                      <option value="">Selecione...</option>
+                      {columns
+                        .find((col) => col.key === "closer")
+                        ?.options?.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-2 mt-6">
+                  <Button variant="outline" onClick={() => setIsNovoLeadOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleNovoLead} className="bg-orange-600 hover:bg-orange-700">
+                    Salvar Lead
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Button variant="outline" onClick={onRefresh} size="sm" className="h-8 bg-transparent">
+              <RefreshCw className="w-3 h-3 mr-1" />
+              Atualizar
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg">
-        <div className="p-4 border-b border-gray-200 bg-gray-50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowColumnSelector(!showColumnSelector)}
-                  className="flex items-center space-x-2"
-                >
-                  <Settings className="h-4 w-4" />
-                  <span>Colunas</span>
-                </Button>
+      {/* Barra de busca com ícone (mesmo do Inbound) */}
+      <div className="p-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center space-x-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Buscar por empresa, contato, produto, nicho, SDR ou Closer..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+              aria-label="Buscar leads"
+            />
+          </div>
+        </div>
+      </div>
 
-                {showColumnSelector && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowColumnSelector(false)} />
-                    <div className="absolute top-full left-0 mt-2 w-[800px] bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-[600px] overflow-hidden">
-                      <div className="flex items-center justify-between p-4 border-b bg-gray-50">
-                        <h3 className="text-lg font-semibold text-gray-900">Colunas</h3>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowColumnSelector(false)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
+      {/* Barra de filtro por período (mesmo do Inbound) */}
+      <div className="p-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <Calendar className="w-4 h-4 text-gray-600" />
+            <span className="text-sm font-medium text-gray-700">Filtrar por período:</span>
+          </div>
 
-                      <div className="p-4">
-                        <div className="mb-4">
-                          <div className="flex items-center space-x-2 mb-3">
-                            <span className="text-red-600">🎯</span>
-                            <h4 className="font-medium text-gray-900">Presets de Visualização</h4>
-                          </div>
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-600">Filtrar por:</label>
+            <Select value={dateFilterColumn} onValueChange={setDateFilterColumn}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Selecione uma coluna" />
+              </SelectTrigger>
+              <SelectContent>
+                {dateFilterOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-                          <div className="grid grid-cols-2 gap-3">
-                            {Object.entries(defaultPresets).map(([key, preset]) => (
-                              <div key={key} className="flex items-center space-x-2">
-                                <Button
-                                  variant={activePreset === key ? "default" : "outline"}
-                                  size="sm"
-                                  onClick={() => applyPreset(key)}
-                                  className={`flex items-center justify-start space-x-2 h-10 flex-1 ${
-                                    activePreset === key
-                                      ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
-                                      : "bg-white hover:bg-gray-50 text-gray-700 border-gray-300"
-                                  }`}
-                                >
-                                  <span>{preset.icon}</span>
-                                  <span className="font-medium">{preset.name}</span>
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openPresetConfiguration(key)}
-                                  className="h-10 w-10 p-0 hover:bg-gray-100"
-                                  title={`Configurar ${preset.name}`}
-                                >
-                                  <Settings className="h-4 w-4 text-gray-500" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-600">De:</label>
+            <Input
+              type="date"
+              value={dateFilterStart}
+              onChange={(e) => setDateFilterStart(e.target.value)}
+              className="w-36"
+            />
+          </div>
 
-                        <div className="border-t pt-4">
-                          <div className="grid grid-cols-3 gap-4 max-h-80 overflow-y-auto">
-                            {columns.map((column) => (
-                              <div key={column.key} className="flex items-center space-x-2 py-1">
-                                <Checkbox
-                                  id={`column-${column.key}`}
-                                  checked={visibleColumns[column.key] || false}
-                                  onCheckedChange={(checked) => {
-                                    setVisibleColumns((prev) => ({
-                                      ...prev,
-                                      [column.key]: checked as boolean,
-                                    }))
-                                    setActivePreset("custom")
-                                  }}
-                                />
-                                <label
-                                  htmlFor={`column-${column.key}`}
-                                  className="text-sm cursor-pointer flex-1 text-gray-700 font-medium"
-                                >
-                                  {column.label}
-                                </label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+          <div className="flex items-center space-x-2">
+            <label className="text-sm text-gray-600">Até:</label>
+            <Input
+              type="date"
+              value={dateFilterEnd}
+              onChange={(e) => setDateFilterEnd(e.target.value)}
+              className="w-36"
+            />
+          </div>
 
-                        <div className="border-t pt-4 mt-4">
-                          <div className="flex justify-center space-x-3">
-                            {Object.entries(defaultPresets).map(([key, preset]) => (
-                              <Button
-                                key={key}
-                                variant="outline"
-                                size="sm"
-                                onClick={() => applyPreset(key)}
-                                className="flex items-center space-x-2 bg-white hover:bg-gray-50 border-gray-300"
-                              >
-                                <span>{preset.icon}</span>
-                                <span>{preset.name}</span>
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={clearAllFilters}
-              disabled={Object.keys(columnFilters).length === 0}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50 bg-transparent"
-            >
+          <div className="flex items-center space-x-2">
+            <Button onClick={applyDateFilter} className="h-8">
+              Aplicar Filtro
+            </Button>
+            <Button variant="outline" onClick={clearDateFilter} className="h-8 bg-transparent">
               Limpar Filtro
             </Button>
           </div>
@@ -1054,44 +1158,59 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
         </Dialog>
       )}
 
-      <div ref={scrollContainerRef} className="overflow-x-auto max-h-[600px] overflow-y-auto">
-        <table className="w-full border-collapse">
-          <thead className="bg-red-600 text-white sticky top-0 z-10">
-            <tr>
-              {visibleColumnsArray.map((column) => (
-                <th
-                  key={column.key}
-                  className="px-2 py-3 text-xs font-bold uppercase border-r border-red-500 text-center relative"
-                  style={{ minWidth: column.width, width: column.width }}
-                >
-                  <div className="flex items-center justify-center space-x-1">
-                    <span className="flex-1">{column.label}</span>
-                    <ColumnFilter column={column} />
-                  </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
+      <div className="overflow-hidden">
+        <div
+          ref={scrollContainerRef}
+          className="overflow-x-scroll"
+          style={{
+            scrollbarWidth: "thin",
+            scrollbarColor: "#9CA3AF #E5E7EB",
+            minHeight: "400px",
+            maxHeight: "70vh",
+            overflowY: "auto",
+            scrollbarGutter: "stable",
+          }}
+        >
+          <div style={{ minWidth: "100%", width: "max-content" }}>
+            <table className="w-full" style={{ minWidth: "max-content" }}>
+              <thead className="bg-red-600 text-white sticky top-0 z-10">
+                <tr>
+                  {visibleColumnsArray.map((column) => (
+                    <th
+                      key={column.key}
+                      className="px-2 py-3 text-xs font-bold uppercase border-r border-red-500 text-center relative"
+                      style={{ minWidth: column.width, width: column.width }}
+                    >
+                      <div className="flex items-center justify-center space-x-1">
+                        <span className="flex-1">{column.label}</span>
+                        <ColumnFilter column={column} />
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
 
-          <tbody>
-            {filteredLeads.map((lead, index) => (
-              <tr
-                key={lead.id}
-                className={`border-b border-gray-200 hover:bg-gray-50 ${index % 2 === 0 ? "bg-white" : "bg-gray-25"}`}
-              >
-                {visibleColumnsArray.map((column) => (
-                  <td
-                    key={`${lead.id}-${column.key}`}
-                    className="border-r border-gray-200 p-0"
-                    style={{ minWidth: column.width, width: column.width }}
+              <tbody>
+                {filteredLeads.map((lead, index) => (
+                  <tr
+                    key={lead.id}
+                    className={`border-b border-gray-200 hover:bg-gray-50 ${index % 2 === 0 ? "bg-white" : "bg-gray-25"}`}
                   >
-                    {renderCell(lead, column)}
-                  </td>
+                    {visibleColumnsArray.map((column) => (
+                      <td
+                        key={`${lead.id}-${column.key}`}
+                        className="border-r border-gray-200 p-0"
+                        style={{ minWidth: column.width, width: column.width }}
+                      >
+                        {renderCell(lead, column)}
+                      </td>
+                    ))}
+                  </tr>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <div className="p-2 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">

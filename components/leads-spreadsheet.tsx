@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, Settings, Filter, Calendar } from "lucide-react"
+import { RefreshCw, Settings, Filter, Calendar, Search } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { Lead } from "@/app/page"
@@ -20,6 +20,8 @@ interface LeadsSpreadsheetProps {
 export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpreadsheetProps) {
   console.log("[v0] LeadsSpreadsheet renderizando com", leads.length, "leads")
 
+  const [qInbound, setQInbound] = useState("")
+  const [debouncedQInbound, setDebouncedQInbound] = useState("")
   const [editingCell, setEditingCell] = useState<string | null>(null)
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({})
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({})
@@ -219,6 +221,14 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     }
   }, [])
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQInbound(qInbound)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [qInbound])
+
   useLayoutEffect(() => {
     console.log("[v0] useLayoutEffect executado - leads.length:", leads.length)
 
@@ -365,6 +375,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
     const cellKey = `${lead.id}-${column.key}`
     const isEditingThisCell = editingCell === cellKey
     const value = getCellValue(lead, column.key)
+
+    const isObservacoesSdr = column.key === "observacoes_sdr"
+    const cellClasses = isObservacoesSdr
+      ? "px-2 py-1 text-xs cursor-pointer hover:bg-gray-100 whitespace-normal break-words overflow-visible leading-snug"
+      : "h-8 px-2 py-1 text-xs cursor-pointer hover:bg-gray-100 min-h-[32px]"
 
     if (isEditingThisCell) {
       switch (column.type) {
@@ -516,17 +531,28 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
 
     const isFirstColumn = column.key === "nome_empresa"
 
-    return (
-      <div
-        className={`h-8 px-2 py-1 text-xs cursor-pointer hover:bg-gray-100 min-h-[32px]`}
-        onClick={() => setEditingCell(cellKey)}
-        title={`Clique para editar • Valor: ${displayValue}`}
-        style={{
+    const alignmentStyle = isObservacoesSdr
+      ? {
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: isFirstColumn ? "flex-start" : "center",
+          minHeight: "32px",
+          paddingTop: "8px",
+          paddingBottom: "8px",
+        }
+      : {
           display: "flex",
           alignItems: "center",
           justifyContent: isFirstColumn ? "flex-start" : "center",
           height: "32px",
-        }}
+        }
+
+    return (
+      <div
+        className={cellClasses}
+        onClick={() => setEditingCell(cellKey)}
+        title={`Clique para editar • Valor: ${displayValue}`}
+        style={alignmentStyle}
       >
         {column.key === "status" ||
         column.key === "tem_comentario_lbf" ||
@@ -550,7 +576,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
           <span
             style={{
               display: "flex",
-              alignItems: "center",
+              alignItems: isObservacoesSdr ? "flex-start" : "center",
               justifyContent: isFirstColumn ? "flex-start" : "center",
               width: "100%",
               textAlign: isFirstColumn ? "left" : "center",
@@ -729,6 +755,13 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
   const visibleColumnsArray = columns.filter((col) => visibleColumns[col.key])
   const filteredLeads = leads
     .filter((lead) => {
+      const passesSearchFilter = (() => {
+        if (!debouncedQInbound.trim()) return true
+        const nomeEmpresa = String(lead.nome_empresa || "").toLowerCase()
+        const searchTerm = debouncedQInbound.trim().toLowerCase()
+        return nomeEmpresa.includes(searchTerm)
+      })()
+
       // Column filters
       const passesColumnFilters = Object.entries(columnFilters).every(([columnKey, selectedValues]) => {
         if (selectedValues.length === 0) return true
@@ -786,7 +819,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
         return leadDate >= startDate && leadDate <= endDate
       })()
 
-      return passesColumnFilters && passesDateFilter
+      return passesSearchFilter && passesColumnFilters && passesDateFilter
     })
     .sort((a, b) => {
       const dateA = a.data_hora_compra ? new Date(a.data_hora_compra).getTime() : 0
@@ -1096,6 +1129,21 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
               <RefreshCw className="w-3 h-3 mr-1" />
               Atualizar
             </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center space-x-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Buscar por empresa, contato, produto, nicho, SDR ou Closer..."
+              value={qInbound}
+              onChange={(e) => setQInbound(e.target.value)}
+              className="pl-10"
+              aria-label="Buscar por nome do lead"
+            />
           </div>
         </div>
       </div>
