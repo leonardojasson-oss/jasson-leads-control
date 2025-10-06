@@ -702,7 +702,7 @@ export default function LeadsControl() {
       case "planilha":
         const inboundLeads = leads.filter((lead) => {
           const origem = lead.origem || lead.tipo_lead || lead.origemLead || ""
-          return ["LeadBroker", "Blackbox"].some((o) => origem.toLowerCase().includes(o.toLowerCase()))
+          return ["LeadBroker", "Blackbox", "Inside Box"].some((o) => origem.toLowerCase().includes(o.toLowerCase()))
         })
         return <LeadsSpreadsheet leads={inboundLeads} onUpdateLead={handleUpdateLead} onRefresh={handleRefresh} />
       case "prospeccao": // Filtrando apenas leads com origem específica da Prospecção Ativa

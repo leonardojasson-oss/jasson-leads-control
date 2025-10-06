@@ -39,10 +39,10 @@ function toTitleCaseBR(s: string): string {
 export function normalizePersonName(input?: string | null): string {
   if (!input) return ""
 
-  const t = toTitleCaseBR(input)
+  const lowerInput = input.trim().toLocaleLowerCase("pt-BR")
+  if (lowerInput === "vinicius") return "Vinícius"
 
-  // Caso especial: Vinicius → Vinícius
-  if (t.toLocaleLowerCase("pt-BR") === "vinicius") return "Vinícius"
+  const t = toTitleCaseBR(input)
 
   // Verificar se existe na lista oficial
   const mapped = OFFICIAL_LOOKUP.get(t.toLocaleLowerCase("pt-BR"))

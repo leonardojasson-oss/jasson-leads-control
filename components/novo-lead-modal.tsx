@@ -612,8 +612,9 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="leadbroker">LeadBroker</SelectItem>
-                    <SelectItem value="indicacao">Indicação</SelectItem>
+                    <SelectItem value="inside box">Inside Box</SelectItem>
                     <SelectItem value="blackbox">Blackbox</SelectItem>
+                    <SelectItem value="indicacao">Indicação</SelectItem>
                     <SelectItem value="recomendacao">Recomendação</SelectItem>
                     <SelectItem value="outbound">Outbound</SelectItem>
                     <SelectItem value="evento">Evento</SelectItem>
@@ -803,6 +804,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectItem value="leonardo">Leonardo</SelectItem>
                     <SelectItem value="guilherme">Guilherme</SelectItem>
                     <SelectItem value="marcelo">Marcelo</SelectItem>
+                    <SelectItem value="allan">Allan</SelectItem>
                     <SelectItem value="matriz">Matriz</SelectItem> {/* Added option Matriz */}
                   </SelectContent>
                 </Select>
