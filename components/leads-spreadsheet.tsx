@@ -10,15 +10,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from "@/components/ui/checkbox"
 import type { Lead } from "@/app/page"
 import { normalizePersonName } from "@/lib/normalizers"
-import Link from "next/link"
 
 interface LeadsSpreadsheetProps {
   leads: Lead[]
   onUpdateLead: (id: string, updates: Partial<Lead>) => void
   onRefresh: () => void
+  onNavigateToDashboard?: (sectionId?: string) => void // Adicionando callback para navegação
 }
 
-export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpreadsheetProps) {
+export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToDashboard }: LeadsSpreadsheetProps) {
   console.log("[v0] LeadsSpreadsheet renderizando com", leads.length, "leads")
 
   const [qInbound, setQInbound] = useState("")
@@ -988,16 +988,15 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
             )}
           </div>
           <div className="flex items-center space-x-2">
-            <Link href="/dashboard-analytics#indicadores-por-origem">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
-              >
-                <TrendingUp className="w-3 h-3 mr-1" />
-                Ver Indicadores por Origem
-              </Button>
-            </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+              onClick={() => onNavigateToDashboard?.("indicadores-por-origem")}
+            >
+              <TrendingUp className="w-3 h-3 mr-1" />
+              Ver Indicadores por Origem
+            </Button>
             {Object.keys(columnFilters).length > 0 && (
               <Button variant="outline" size="sm" onClick={() => setColumnFilters({})} className="h-8 bg-transparent">
                 <Filter className="w-3 h-3 mr-1" />

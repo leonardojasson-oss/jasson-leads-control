@@ -631,6 +631,20 @@ export default function LeadsControl() {
     }
   }
 
+  const handleNavigateToDashboard = (sectionId?: string) => {
+    setActiveTab("dashboard")
+
+    // Aguardar o DOM atualizar antes de fazer o scroll
+    setTimeout(() => {
+      if (sectionId) {
+        const element = document.getElementById(sectionId)
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+      }
+    }, 100)
+  }
+
   // Calcular KPIs
   const totalLeads = leads.length
   const totalInvestido = leads.reduce((sum, lead) => {
@@ -704,7 +718,14 @@ export default function LeadsControl() {
           const origem = lead.origem || lead.tipo_lead || lead.origemLead || ""
           return ["LeadBroker", "Blackbox", "Inside Box"].some((o) => origem.toLowerCase().includes(o.toLowerCase()))
         })
-        return <LeadsSpreadsheet leads={inboundLeads} onUpdateLead={handleUpdateLead} onRefresh={handleRefresh} />
+        return (
+          <LeadsSpreadsheet
+            leads={inboundLeads}
+            onUpdateLead={handleUpdateLead}
+            onRefresh={handleRefresh}
+            onNavigateToDashboard={handleNavigateToDashboard}
+          />
+        )
       case "prospeccao": // Filtrando apenas leads com origem específica da Prospecção Ativa
         const prospeccaoAtivaLeads = leads.filter((lead) => {
           const origem = lead.origem || lead.tipo_lead || lead.origemLead || ""
