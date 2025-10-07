@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, Settings, Filter, Calendar, Search } from "lucide-react"
+import { RefreshCw, Settings, Filter, Calendar, Search, TrendingUp } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { Lead } from "@/app/page"
 import { normalizePersonName } from "@/lib/normalizers"
+import Link from "next/link"
 
 interface LeadsSpreadsheetProps {
   leads: Lead[]
@@ -987,6 +988,16 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh }: LeadsSpread
             )}
           </div>
           <div className="flex items-center space-x-2">
+            <Link href="/dashboard-analytics#indicadores-por-origem">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+              >
+                <TrendingUp className="w-3 h-3 mr-1" />
+                Ver Indicadores por Origem
+              </Button>
+            </Link>
             {Object.keys(columnFilters).length > 0 && (
               <Button variant="outline" size="sm" onClick={() => setColumnFilters({})} className="h-8 bg-transparent">
                 <Filter className="w-3 h-3 mr-1" />

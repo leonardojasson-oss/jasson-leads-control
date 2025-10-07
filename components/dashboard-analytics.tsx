@@ -10,6 +10,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import type { Lead } from "@/app/page"
 import { normalizePersonName } from "@/lib/normalizers"
 import { computeStepPercents } from "@/lib/funnel"
+import { IndicadoresPorOrigem } from "@/components/analytics/IndicadoresPorOrigem"
 
 interface DashboardAnalyticsProps {
   leads: Lead[]
@@ -723,6 +724,8 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
           </div>
         </div>
       </div>
+
+      <IndicadoresPorOrigem leads={filteredLeads} />
 
       <div className="mb-4">
         <VisualFunnel title="🎯 Funil Geral" funnel={generalFunnel} totalLeads={filteredLeads.length} color="#dc2626" />
