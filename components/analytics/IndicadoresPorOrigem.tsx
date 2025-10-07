@@ -2,14 +2,8 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { Lead } from "@/lib/supabase-operations"
-import {
-  calculateOriginMetrics,
-  calculateROAS,
-  fmtBRL,
-  fmtPct,
-  toStepPercents,
-  type OriginKey,
-} from "@/lib/origins-metrics"
+import { calculateCompleteOriginMetrics, fmtBRL, fmtPct, toStepPercents, type OriginKey } from "@/lib/origins-metrics"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface IndicadoresPorOrigemProps {
   leads: Lead[]
@@ -24,6 +18,11 @@ const ORIGIN_COLORS = {
 }
 
 export function IndicadoresPorOrigem({ leads }: IndicadoresPorOrigemProps) {
+  const allMetrics = ORIGINS.map((origin) => ({
+    origin,
+    metrics: calculateCompleteOriginMetrics(leads, origin),
+  }))
+
   return (
     <div id="indicadores-por-origem" className="space-y-6 mb-8">
       {/* Título da Seção */}
@@ -40,9 +39,11 @@ export function IndicadoresPorOrigem({ leads }: IndicadoresPorOrigemProps) {
       {/* Grid de Cards por Origem */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {ORIGINS.map((origin) => {
-          const metrics = calculateOriginMetrics(leads, origin)
+          const originData = allMetrics.find((m) => m.origin === origin)
+          if (!originData) return null
+
+          const metrics = originData.metrics
           const stepPercents = toStepPercents(metrics)
-          const roas = calculateROAS(metrics.receita, metrics.custo)
 
           // Calcular largura das barras (normalizar pelo total de leads)
           const maxValue = metrics.leads
@@ -57,10 +58,10 @@ export function IndicadoresPorOrigem({ leads }: IndicadoresPorOrigemProps) {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-bold uppercase">{origin}</CardTitle>
                   <div className="text-right">
-                    {roas !== null ? (
+                    {metrics.roas !== null ? (
                       <div>
                         <div className="text-xs opacity-90">ROAS</div>
-                        <div className="text-xl font-bold">{roas.toFixed(2)}x</div>
+                        <div className="text-xl font-bold">{metrics.roas.toFixed(2)}x</div>
                       </div>
                     ) : (
                       <div className="text-xs opacity-75" title="Sem dados de custo">
@@ -136,23 +137,77 @@ export function IndicadoresPorOrigem({ leads }: IndicadoresPorOrigemProps) {
                   </div>
                 </div>
 
-                {/* Rodapé: Funnel Hit Rate e Receita */}
-                <div className="pt-4 border-t border-gray-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-600">Funnel Hit Rate:</span>
-                    <span className="text-lg font-bold text-blue-600">{fmtPct(stepPercents.hit_rate)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-600">Receita Total:</span>
-                    <span className="text-lg font-bold text-green-600">{fmtBRL(metrics.receita)}</span>
-                  </div>
-                  {metrics.custo !== null && (
+                <TooltipProvider>
+                  <div className="pt-4 border-t border-gray-200 space-y-2">
+                    {/* 1. Funnel Hit Rate */}
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-600">Custo Total:</span>
-                      <span className="text-sm font-medium text-gray-700">{fmtBRL(metrics.custo)}</span>
+                      <span className="text-sm font-medium text-gray-600">Funnel Hit Rate:</span>
+                      <span className="text-lg font-bold text-blue-600">{fmtPct(stepPercents.hit_rate)}</span>
                     </div>
-                  )}
-                </div>
+
+                    {/* 2. Receita Total */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-600">Receita Total:</span>
+                      <span className="text-lg font-bold text-green-600">{fmtBRL(metrics.receita)}</span>
+                    </div>
+
+                    {/* 3. Custo Total */}
+                    {metrics.custo !== null && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-600">Custo Total:</span>
+                        <span className="text-sm font-medium text-gray-700">{fmtBRL(metrics.custo)}</span>
+                      </div>
+                    )}
+
+                    {/* 4. CPRR (Custo por Reunião Realizada) */}
+                    <div className="flex items-center justify-between">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-sm font-medium text-gray-600 cursor-help">CPRR:</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Custo por Reunião Realizada = Custo Total / RR</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      {metrics.cprr !== null ? (
+                        <span className="text-sm font-medium text-gray-700">{fmtBRL(metrics.cprr)}</span>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-sm font-medium text-gray-400 cursor-help">—</span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Indisponível (sem reuniões realizadas)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+
+                    {/* 5. CAC (Custo de Aquisição de Cliente) */}
+                    <div className="flex items-center justify-between">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-sm font-medium text-gray-600 cursor-help">CAC:</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Custo de Aquisição de Cliente = Custo Total / Vendas</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      {metrics.cac !== null ? (
+                        <span className="text-sm font-medium text-gray-700">{fmtBRL(metrics.cac)}</span>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-sm font-medium text-gray-400 cursor-help">—</span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Indisponível (sem vendas)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                  </div>
+                </TooltipProvider>
               </CardContent>
             </Card>
           )

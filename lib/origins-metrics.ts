@@ -16,6 +16,14 @@ export interface OriginCounts {
   custo: number | null
 }
 
+export interface OriginMetrics extends OriginCounts {
+  cpl: number | null // Custo por Lead
+  cprr: number | null // Custo por Reunião Realizada
+  cac: number | null // Custo de Aquisição de Cliente
+  ticketMedio: number | null // Receita / Vendas
+  roas: number | null // Return on Ad Spend
+}
+
 export interface OriginStepPercents {
   leads: number // sempre 100%
   rm_over_leads: number // RM / Leads
@@ -141,4 +149,52 @@ export function calculateOriginMetrics(leads: Lead[], origin: OriginKey): Origin
 export function calculateROAS(receita: number, custo: number | null): number | null {
   if (!custo || custo === 0) return null
   return receita / custo
+}
+
+/**
+ * Calcula CPL (Custo por Lead)
+ */
+export function calculateCPL(custo: number | null, leads: number): number | null {
+  if (!custo || custo === 0 || leads === 0) return null
+  return custo / leads
+}
+
+/**
+ * Calcula CPRR (Custo por Reunião Realizada)
+ */
+export function calculateCPRR(custo: number | null, rr: number): number | null {
+  if (!custo || custo === 0 || rr === 0) return null
+  return custo / rr
+}
+
+/**
+ * Calcula CAC (Custo de Aquisição de Cliente)
+ */
+export function calculateCAC(custo: number | null, vendas: number): number | null {
+  if (!custo || custo === 0 || vendas === 0) return null
+  return custo / vendas
+}
+
+/**
+ * Calcula Ticket Médio
+ */
+export function calculateTicketMedio(receita: number, vendas: number): number | null {
+  if (vendas === 0) return null
+  return receita / vendas
+}
+
+/**
+ * Calcula todas as métricas para uma origem (incluindo CPRR e CAC)
+ */
+export function calculateCompleteOriginMetrics(leads: Lead[], origin: OriginKey): OriginMetrics {
+  const counts = calculateOriginMetrics(leads, origin)
+
+  return {
+    ...counts,
+    cpl: calculateCPL(counts.custo, counts.leads),
+    cprr: calculateCPRR(counts.custo, counts.rr),
+    cac: calculateCAC(counts.custo, counts.vendas),
+    ticketMedio: calculateTicketMedio(counts.receita, counts.vendas),
+    roas: calculateROAS(counts.receita, counts.custo),
+  }
 }
