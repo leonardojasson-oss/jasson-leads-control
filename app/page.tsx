@@ -379,29 +379,24 @@ export default function LeadsControl() {
       })
     }
 
-    // Para FEE MRR e FEE ONE-TIME: TODOS os leads com data de assinatura no período
-    const leadsParaReceita = leadsToAnalyze.filter((lead) => lead.data_assinatura)
-
-    // Para Qtd. Leads e Custo por Lead: apenas leads comprados no mês atual com origem "LeadBroker"
-    const leadsLeadBroker = leadsToAnalyze.filter((lead) => {
+    const inboundLeads = leadsToAnalyze.filter((lead) => {
       const origem = (lead.tipo_lead || lead.origem_lead || lead.origemLead || "").toLowerCase()
-      return origem === "leadbroker" || origem === "lead broker"
+      return origem === "leadbroker" || origem === "lead broker" || origem === "blackbox" || origem === "inside box"
     })
 
-    // Valor Compra - baseado em leads LeadBroker
-    const valorCompra = leadsLeadBroker.reduce((sum, lead) => {
+    const inboundLeadsParaReceita = inboundLeads.filter((lead) => lead.data_assinatura)
+
+    const valorCompra = inboundLeads.reduce((sum, lead) => {
       const valor = Number.parseFloat(String(lead.valor_pago_lead || "0"))
       return sum + (isNaN(valor) ? 0 : valor)
     }, 0)
 
-    // FEE MRR - TODO valor de venda realizado no mês (independente da origem)
-    const feeMRR = leadsParaReceita.reduce((sum, lead) => {
+    const feeMRR = inboundLeadsParaReceita.reduce((sum, lead) => {
       const valor = Number.parseFloat(String(lead.fee_mrr || "0"))
       return sum + (isNaN(valor) ? 0 : valor)
     }, 0)
 
-    // FEE ONE-TIME - TODO valor de venda realizado no mês (independente da origem)
-    const feeOneTime = leadsParaReceita.reduce((sum, lead) => {
+    const feeOneTime = inboundLeadsParaReceita.reduce((sum, lead) => {
       const valor = Number.parseFloat(String(lead.escopo_fechado || "0"))
       return sum + (isNaN(valor) ? 0 : valor)
     }, 0)
@@ -409,17 +404,13 @@ export default function LeadsControl() {
     const totalReceita = feeMRR + feeOneTime
     const roas = valorCompra > 0 ? totalReceita / valorCompra : 0
 
-    // Quantidade de Leads - apenas LeadBroker
-    const qtdLeads = leadsLeadBroker.length
+    const qtdLeads = inboundLeads.length
 
-    // Ticket Médio - baseado em TODAS as vendas do período
-    const ticketMedio = leadsParaReceita.length > 0 ? totalReceita / leadsParaReceita.length : 0
+    const ticketMedio = inboundLeadsParaReceita.length > 0 ? totalReceita / inboundLeadsParaReceita.length : 0
 
-    // Custo por Lead - baseado apenas em leads LeadBroker
     const custoPorLead = qtdLeads > 0 ? valorCompra / qtdLeads : 0
 
-    // Quantidade de Vendas - TODAS as vendas do período
-    const qtdVendas = leadsParaReceita.length
+    const qtdVendas = inboundLeadsParaReceita.length
 
     return {
       valorCompra,
