@@ -12,6 +12,7 @@ import { Filter, Settings, RefreshCw, Calendar, Search } from "lucide-react"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import type { Lead } from "@/lib/supabase-operations"
 import { normalizePersonName } from "@/lib/normalizers"
+import { maskPhone, unmaskPhone, isValidPhone, formatPhoneDisplay } from "@/lib/phone-utils"
 
 interface ProspeccaoAtivaProps {
   leads: Lead[]
@@ -39,6 +40,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
 
   const columns = [
     { key: "nome_empresa", label: "LEAD", width: "200px", type: "text", essential: true },
+    { key: "telefone", label: "TELEFONE", width: "200px", type: "phone", essential: true },
     {
       key: "status",
       label: "STATUS",
@@ -297,6 +299,10 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
       const value = lead[columnKey as keyof Lead]
       if (value === null || value === undefined) return ""
       if (typeof value === "boolean") return value ? "Sim" : "Não"
+      // Normalizando valores de telefone para obter valores únicos
+      if (columnKey === "telefone" && value) {
+        return unmaskPhone(String(value))
+      }
       return String(value)
     })
     return [...new Set(values)].sort()
@@ -436,11 +442,16 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
     // Filtro de busca
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase()
-      const matchesSearch = Object.values(lead).some((value) =>
-        String(value || "")
-          .toLowerCase()
-          .includes(searchLower),
-      )
+      const searchDigits = unmaskPhone(searchTerm)
+      const telefone = String(lead.telefone || "")
+
+      const matchesSearch =
+        Object.values(lead).some((value) =>
+          String(value || "")
+            .toLowerCase()
+            .includes(searchLower),
+        ) || telefone.includes(searchDigits)
+
       if (!matchesSearch) return false
     }
 
@@ -455,6 +466,9 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
         displayValue = ""
       } else if (typeof leadValue === "boolean") {
         displayValue = leadValue ? "Sim" : "Não"
+      } else if (columnKey === "telefone" && leadValue) {
+        // Normalizando para comparação no filtro
+        displayValue = unmaskPhone(String(leadValue))
       } else {
         displayValue = String(leadValue)
       }
@@ -493,13 +507,18 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
     regiao: "",
     cargo: "",
     email: "",
+    telefone: "",
     anuncios: "",
     closer: "",
   })
 
   const handleCellEdit = (leadId: string, field: string, currentValue: any) => {
     setEditingCell({ leadId, field })
-    setEditValue(String(currentValue || ""))
+    if (field === "telefone") {
+      setEditValue(maskPhone(String(currentValue || "")))
+    } else {
+      setEditValue(String(currentValue || ""))
+    }
   }
 
   const handleSaveCell = async () => {
@@ -507,6 +526,17 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
 
     const { leadId, field } = editingCell
     let processedValue: any = editValue
+
+    if (field === "telefone") {
+      const digits = unmaskPhone(editValue)
+      if (digits && !isValidPhone(digits)) {
+        alert("Telefone inválido. Deve conter 10 ou 11 dígitos.")
+        setEditingCell(null)
+        setEditValue("")
+        return
+      }
+      processedValue = digits // Salvar apenas dígitos
+    }
 
     // Processar valores booleanos para campos tristate
     if (field === "conseguiu_contato" || field === "reuniao_agendada" || field === "reuniao_realizada") {
@@ -555,7 +585,32 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
     const isObservacoesSdr = column.key === "observacoes_sdr"
 
     if (isEditing) {
-      if (column.type === "select") {
+      if (column.type === "phone") {
+        return (
+          <div className="p-1">
+            <Input
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(maskPhone(e.target.value))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const digits = unmaskPhone(editValue)
+                  if (digits && !isValidPhone(digits)) {
+                    alert("Telefone inválido. Deve conter 10 ou 11 dígitos.")
+                    return
+                  }
+                  handleSaveCell()
+                }
+                if (e.key === "Escape") handleCancelEdit()
+              }}
+              onBlur={handleSaveCell}
+              className="h-7 text-xs border-gray-300"
+              placeholder="(11) 9XXXX-XXXX"
+              autoFocus
+            />
+          </div>
+        )
+      } else if (column.type === "select") {
         return (
           <div className="p-1">
             <select
@@ -626,6 +681,33 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
       displayValue = value ? "Sim" : "Não"
     } else if (column.type === "date" && value) {
       displayValue = new Date(value as string).toLocaleDateString("pt-BR")
+    } else if (column.type === "phone") {
+      if (!value || value === "") {
+        displayValue = "—"
+      } else {
+        const formattedPhone = formatPhoneDisplay(value as string)
+        const digits = unmaskPhone(value as string)
+        return (
+          <div
+            className="p-2 cursor-pointer hover:bg-gray-100 text-xs min-h-[32px] flex items-center"
+            onClick={() => handleCellEdit(lead.id, column.key, value)}
+          >
+            <div className="flex items-center space-x-2 whitespace-nowrap">
+              <span title={`Telefone: ${digits}`}>{formattedPhone}</span>
+              {digits && (
+                <a
+                  href={`tel:+55${digits}`}
+                  className="text-blue-600 hover:text-blue-800"
+                  onClick={(e) => e.stopPropagation()}
+                  title="Ligar para este número"
+                >
+                  📞
+                </a>
+              )}
+            </div>
+          </div>
+        )
+      }
     } else {
       displayValue = String(value)
     }
@@ -660,6 +742,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
       { campo: "regiao", nome: "REGIÃO" },
       { campo: "cargo", nome: "CARGO" },
       { campo: "email", nome: "E-MAIL" },
+      { campo: "telefone", nome: "TELEFONE" },
       { campo: "anuncios", nome: "ANÚNCIOS" },
     ]
 
@@ -669,6 +752,12 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
     if (camposVazios.length > 0) {
       console.log("[v0] Validação falhou - campos obrigatórios vazios")
       alert(`Os seguintes campos são obrigatórios: ${camposVazios.map((item) => item.nome).join(", ")}`)
+      return
+    }
+
+    const telefoneDigits = unmaskPhone(novoLeadData.telefone)
+    if (!isValidPhone(telefoneDigits)) {
+      alert("Telefone inválido. Deve conter 10 ou 11 dígitos.")
       return
     }
 
@@ -687,6 +776,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
         regiao: novoLeadData.regiao,
         cargo_contato: novoLeadData.cargo,
         email: novoLeadData.email,
+        telefone: telefoneDigits,
         anuncios: novoLeadData.anuncios,
         closer: normalizePersonName(novoLeadData.closer),
         canal: "prospeccao_ativa",
@@ -706,6 +796,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
         regiao: "",
         cargo: "",
         email: "",
+        telefone: "",
         anuncios: "",
         closer: "",
       })
@@ -935,7 +1026,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
                     />
                   </div>
                   <div>
-                    <Label htmlFor="regiao">REGIÃO *</Label>
+                    <Label htmlFor="regiao"> REGIÃO *</Label>
                     <Input
                       id="regiao"
                       value={novoLeadData.regiao}
@@ -962,6 +1053,17 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
                       value={novoLeadData.email}
                       onChange={(e) => setNovoLeadData({ ...novoLeadData, email: e.target.value })}
                       placeholder="email@empresa.com"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="telefone">TELEFONE *</Label>
+                    <Input
+                      id="telefone"
+                      type="text"
+                      value={maskPhone(novoLeadData.telefone)}
+                      onChange={(e) => setNovoLeadData({ ...novoLeadData, telefone: unmaskPhone(e.target.value) })}
+                      placeholder="(11) 9XXXX-XXXX"
                       required
                     />
                   </div>

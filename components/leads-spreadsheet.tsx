@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from "@/components/ui/checkbox"
 import type { Lead } from "@/app/page"
 import { normalizePersonName } from "@/lib/normalizers"
+import { maskPhone, unmaskPhone, isValidPhone, formatPhoneDisplay } from "@/lib/phone-utils"
 
 interface LeadsSpreadsheetProps {
   leads: Lead[]
@@ -49,6 +50,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
 
   const columns = [
     { key: "nome_empresa", label: "LEAD", width: "200px", type: "text", essential: true },
+    { key: "telefone", label: "TELEFONE", width: "200px", type: "phone", essential: true },
     {
       key: "status",
       label: "STATUS",
@@ -285,6 +287,16 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
 
     let updates: Partial<Lead> = { [field]: value }
 
+    if (field === "telefone") {
+      const digits = unmaskPhone(value)
+      if (digits && !isValidPhone(digits)) {
+        alert("Telefone inválido. Deve conter 10 ou 11 dígitos.")
+        return
+      }
+      updates[field] = digits // Salvar apenas dígitos no Supabase
+      console.log(`[v0] Telefone normalizado: "${value}" → "${digits}"`)
+    }
+
     if (field === "closer" || field === "sdr" || field === "arrematador") {
       updates[field] = normalizePersonName(value)
       console.log(`[v0] Nome normalizado: "${value}" → "${updates[field]}"`)
@@ -346,6 +358,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
     if (value === null || value === undefined) return ""
 
     switch (type) {
+      case "phone":
+        return formatPhoneDisplay(value)
       case "datetime-local":
         if (typeof value === "string" && value.includes("T")) {
           return value.slice(0, 16)
@@ -393,6 +407,56 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
 
     if (isEditingThisCell) {
       switch (column.type) {
+        case "phone":
+          return (
+            <Input
+              type="text"
+              value={isEditing ? tempValue : maskPhone(value || "")}
+              onChange={(e) => {
+                const masked = maskPhone(e.target.value)
+                setTempValue(masked)
+              }}
+              onFocus={() => {
+                setIsEditing(true)
+                setTempValue(maskPhone(value || ""))
+              }}
+              onBlur={(e) => {
+                const digits = unmaskPhone(e.target.value)
+                if (digits && !isValidPhone(digits)) {
+                  alert("Telefone inválido. Deve conter 10 ou 11 dígitos.")
+                  setEditingCell(null)
+                  setIsEditing(false)
+                  setTempValue("")
+                  return
+                }
+                handleCellEdit(lead.id, column.key, digits)
+                setEditingCell(null)
+                setIsEditing(false)
+                setTempValue("")
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const digits = unmaskPhone(e.currentTarget.value)
+                  if (digits && !isValidPhone(digits)) {
+                    alert("Telefone inválido. Deve conter 10 ou 11 dígitos.")
+                    return
+                  }
+                  handleCellEdit(lead.id, column.key, digits)
+                  setEditingCell(null)
+                  setIsEditing(false)
+                  setTempValue("")
+                }
+                if (e.key === "Escape") {
+                  setEditingCell(null)
+                  setIsEditing(false)
+                  setTempValue("")
+                }
+              }}
+              className="h-7 text-xs border-blue-500 text-left px-2"
+              placeholder="(11) 9XXXX-XXXX"
+              autoFocus
+            />
+          )
         case "select":
           return (
             <Select
@@ -486,6 +550,25 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
 
     const displayValue = (() => {
       switch (column.type) {
+        case "phone":
+          if (!value || value === "") return "—"
+          const formattedPhone = formatPhoneDisplay(value)
+          const digits = unmaskPhone(value)
+          return (
+            <div className="flex items-center space-x-2 whitespace-nowrap">
+              <span title={`Telefone: ${digits}`}>{formattedPhone}</span>
+              {digits && (
+                <a
+                  href={`tel:+55${digits}`}
+                  className="text-blue-600 hover:text-blue-800"
+                  onClick={(e) => e.stopPropagation()}
+                  title="Ligar para este número"
+                >
+                  📞
+                </a>
+              )}
+            </div>
+          )
         case "boolean":
         case "tristate":
           if (column.key === "reuniao_realizada") {
@@ -621,6 +704,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
           return value === true ? "✅" : value === false ? "❌" : ""
         }
         return value ? "✅" : ""
+      } else if (column?.type === "phone") {
+        return formatPhoneDisplay(value)
       } else if (column?.type === "number" && (columnKey === "fee_mrr" || columnKey === "escopo_fechado")) {
         const numValue = Number(value)
         return isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -768,8 +853,11 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
       const passesSearchFilter = (() => {
         if (!debouncedQInbound.trim()) return true
         const nomeEmpresa = String(lead.nome_empresa || "").toLowerCase()
+        const telefone = String(lead.telefone || "").toLowerCase()
         const searchTerm = debouncedQInbound.trim().toLowerCase()
-        return nomeEmpresa.includes(searchTerm)
+        const searchDigits = unmaskPhone(searchTerm)
+
+        return nomeEmpresa.includes(searchTerm) || telefone.includes(searchDigits) || telefone.includes(searchTerm)
       })()
 
       // Column filters
@@ -788,6 +876,8 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
           } else {
             displayValue = value ? "✅" : ""
           }
+        } else if (column?.type === "phone") {
+          displayValue = formatPhoneDisplay(value)
         } else if (column?.type === "number" && (columnKey === "fee_mrr" || columnKey === "escopo_fechado")) {
           const numValue = Number(value)
           displayValue = isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -869,6 +959,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
       emoji: "🎯",
       columns: presetColumns.complete || [
         "nome_empresa",
+        "telefone",
         "status",
         "observacoes_sdr",
         "tem_comentario_lbf",
@@ -897,6 +988,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
       emoji: "📞",
       columns: presetColumns.sdr || [
         "nome_empresa",
+        "telefone",
         "status",
         "observacoes_sdr",
         "tem_comentario_lbf",
@@ -919,6 +1011,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
       emoji: "💰",
       columns: presetColumns.closer || [
         "nome_empresa",
+        "telefone",
         "status",
         "observacoes_sdr",
         "tem_comentario_lbf",
