@@ -38,6 +38,39 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
   const [dateFilterStart, setDateFilterStart] = useState<string>("")
   const [dateFilterEnd, setDateFilterEnd] = useState<string>("")
 
+  const [closerOptions, setCloserOptions] = useState<Array<{ key: string; label: string }>>([])
+  const [sdrOptions, setSdrOptions] = useState<Array<{ key: string; label: string }>>([])
+
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      try {
+        const { createBrowserClient } = await import("@supabase/ssr")
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        )
+
+        // Fetch closer options
+        const { data: closerData } = await supabase.from("v_closer_options").select("key, label").order("label")
+
+        if (closerData) {
+          setCloserOptions(closerData)
+        }
+
+        // Fetch SDR options
+        const { data: sdrData } = await supabase.from("v_sdr_options").select("key, label").order("label")
+
+        if (sdrData) {
+          setSdrOptions(sdrData)
+        }
+      } catch (error) {
+        console.error("[v0] Erro ao buscar opções de filtro:", error)
+      }
+    }
+
+    fetchFilterOptions()
+  }, [])
+
   const columns = [
     { key: "nome_empresa", label: "LEAD", width: "200px", type: "text", essential: true },
     { key: "telefone", label: "TELEFONE", width: "200px", type: "phone", essential: true },
@@ -295,6 +328,19 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
   }, [])
 
   const getUniqueValues = (columnKey: string) => {
+    if (columnKey === "closer" && closerOptions.length > 0) {
+      return closerOptions.map((opt) => opt.label)
+    }
+
+    if (columnKey === "sdr" && sdrOptions.length > 0) {
+      return sdrOptions.map((opt) => opt.label)
+    }
+
+    const column = columns.find((col) => col.key === columnKey)
+    if (column?.type === "select" && column.options) {
+      return column.options.sort()
+    }
+
     const values = leads.map((lead) => {
       const value = lead[columnKey as keyof Lead]
       if (value === null || value === undefined) return ""
@@ -455,9 +501,36 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
       if (!matchesSearch) return false
     }
 
-    // Filtros por coluna
     for (const [columnKey, filterValues] of Object.entries(columnFilters)) {
       if (filterValues.length === 0) continue
+
+      if (columnKey === "closer" || columnKey === "sdr") {
+        const leadKeyValue = (lead as any)[`${columnKey}_key`]
+        if (!leadKeyValue) return false
+
+        // Map selected labels to keys
+        let selectedKeys: string[] = []
+        if (columnKey === "closer") {
+          selectedKeys = filterValues
+            .map((label) => {
+              const option = closerOptions.find((opt) => opt.label === label)
+              return option?.key || ""
+            })
+            .filter(Boolean)
+        } else if (columnKey === "sdr") {
+          selectedKeys = filterValues
+            .map((label) => {
+              const option = sdrOptions.find((opt) => opt.label === label)
+              return option?.key || ""
+            })
+            .filter(Boolean)
+        }
+
+        if (!selectedKeys.includes(leadKeyValue)) {
+          return false
+        }
+        continue
+      }
 
       const leadValue = lead[columnKey as keyof Lead]
       let displayValue = ""
@@ -977,13 +1050,11 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
                       required
                     >
                       <option value="">Selecione...</option>
-                      {columns
-                        .find((col) => col.key === "sdr")
-                        ?.options?.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
+                      {sdrOptions.map((option) => (
+                        <option key={option.key} value={option.label}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -1026,7 +1097,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
                     />
                   </div>
                   <div>
-                    <Label htmlFor="regiao">REGIÃO *</Label>
+                    <Label htmlFor="regiao"> REGIÃO *</Label>
                     <Input
                       id="regiao"
                       value={novoLeadData.regiao}
@@ -1086,13 +1157,11 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
                       className="w-full p-2 border border-gray-300 rounded"
                     >
                       <option value="">Selecione...</option>
-                      {columns
-                        .find((col) => col.key === "closer")
-                        ?.options?.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
+                      {closerOptions.map((option) => (
+                        <option key={option.key} value={option.label}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>

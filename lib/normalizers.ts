@@ -68,3 +68,19 @@ export function normalizeNamesForUI(names: (string | null | undefined)[]): strin
  * Lista oficial de nomes padronizados
  */
 export { OFFICIAL_NAMES }
+
+/**
+ * Normaliza uma string para uso como chave de comparação (key).
+ * Remove acentos, converte para lowercase e normaliza espaços.
+ * Reproduz a lógica do SQL normalize_key do Supabase.
+ *
+ * @param s - String a ser normalizada
+ * @returns String normalizada para uso como chave
+ */
+export function normalizeKey(s: string): string {
+  if (!s) return ""
+  // Remove diacríticos (acentos)
+  const noDiacritics = s.normalize("NFD").replace(/\p{Diacritic}/gu, "")
+  // Normaliza espaços e converte para lowercase
+  return noDiacritics.replace(/\s+/g, " ").trim().toLowerCase()
+}

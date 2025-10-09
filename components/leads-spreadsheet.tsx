@@ -40,6 +40,45 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const scrollPositionRef = useRef<number>(0)
 
+  const [closerOptions, setCloserOptions] = useState<Array<{ key: string; label: string }>>([])
+  const [sdrOptions, setSdrOptions] = useState<Array<{ key: string; label: string }>>([])
+  const [arrematadorOptions, setArrematadorOptions] = useState<Array<{ key: string; label: string }>>([])
+
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      try {
+        const { createBrowserClient } = await import("@supabase/ssr")
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        )
+
+        // Fetch closer options
+        const { data: closerData } = await supabase.from("v_closer_options").select("key, label").order("label")
+
+        if (closerData) {
+          setCloserOptions(closerData)
+        }
+
+        // Fetch SDR options
+        const { data: sdrData } = await supabase.from("v_sdr_options").select("key, label").order("label")
+
+        if (sdrData) {
+          setSdrOptions(sdrData)
+        }
+
+        // For arrematador, we'll use the same closer options since they share the same pool
+        if (closerData) {
+          setArrematadorOptions(closerData)
+        }
+      } catch (error) {
+        console.error("[v0] Erro ao buscar opções de filtro:", error)
+      }
+    }
+
+    fetchFilterOptions()
+  }, [])
+
   const dateFilterOptions = [
     { value: "data_reuniao", label: "DATA DA REUNIÃO" },
     { value: "data_ultimo_contato", label: "DATA ÚLTIMO CONTATO" },
@@ -695,10 +734,22 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
 
   const getUniqueValues = (columnKey: string): string[] => {
     const column = columns.find((col) => col.key === columnKey)
+
+    if (columnKey === "closer" && closerOptions.length > 0) {
+      return closerOptions.map((opt) => opt.label)
+    }
+
+    if (columnKey === "sdr" && sdrOptions.length > 0) {
+      return sdrOptions.map((opt) => opt.label)
+    }
+
+    if (columnKey === "arrematador" && arrematadorOptions.length > 0) {
+      return arrematadorOptions.map((opt) => opt.label)
+    }
+
     if (column?.type === "select" && column.options) {
       return column.options.sort()
     }
-    // </CHANGE>
 
     const values = leads.map((lead) => {
       const value = getCellValue(lead, columnKey)
@@ -713,7 +764,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
         return value ? "✅" : ""
       } else if (column?.type === "phone") {
         return formatPhoneDisplay(value)
-      } else if (column?.type === "number" && (columnKey === "fee_mrr" || columnKey === "escopo_fechado")) {
+      } else if (column?.type === "number" && (columnKey === "fee_mrr" || column.key === "escopo_fechado")) {
         const numValue = Number(value)
         return isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
       } else if (column?.type === "date" || column?.type === "datetime-local") {
@@ -867,12 +918,43 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
         return nomeEmpresa.includes(searchTerm) || telefone.includes(searchDigits) || telefone.includes(searchTerm)
       })()
 
-      // Column filters
       const passesColumnFilters = Object.entries(columnFilters).every(([columnKey, selectedValues]) => {
         if (selectedValues.length === 0) return true
 
         const value = getCellValue(lead, columnKey)
         const column = columns.find((col) => col.key === columnKey)
+
+        if (columnKey === "closer" || columnKey === "sdr" || columnKey === "arrematador") {
+          const leadKeyValue = (lead as any)[`${columnKey}_key`]
+          if (!leadKeyValue) return false
+
+          // Map selected labels to keys
+          let selectedKeys: string[] = []
+          if (columnKey === "closer") {
+            selectedKeys = selectedValues
+              .map((label) => {
+                const option = closerOptions.find((opt) => opt.label === label)
+                return option?.key || ""
+              })
+              .filter(Boolean)
+          } else if (columnKey === "sdr") {
+            selectedKeys = selectedValues
+              .map((label) => {
+                const option = sdrOptions.find((opt) => opt.label === label)
+                return option?.key || ""
+              })
+              .filter(Boolean)
+          } else if (columnKey === "arrematador") {
+            selectedKeys = selectedValues
+              .map((label) => {
+                const option = arrematadorOptions.find((opt) => opt.label === label)
+                return option?.key || ""
+              })
+              .filter(Boolean)
+          }
+
+          return selectedKeys.includes(leadKeyValue)
+        }
 
         let displayValue = ""
         if (value === null || value === undefined) {
@@ -885,7 +967,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
           }
         } else if (column?.type === "phone") {
           displayValue = formatPhoneDisplay(value)
-        } else if (column?.type === "number" && (columnKey === "fee_mrr" || column.key === "escopo_fechado")) {
+        } else if (column?.type === "number" && (column.key === "fee_mrr" || column.key === "escopo_fechado")) {
           const numValue = Number(value)
           displayValue = isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
         } else if (column?.type === "date" || column?.type === "datetime-local") {
@@ -909,6 +991,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
 
         return selectedValues.includes(displayValue)
       })
+      // </CHANGE>
 
       // Date filter
       const passesDateFilter = (() => {
