@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Trash2 } from "lucide-react"
+import { Trash2, ArrowLeft } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 interface UserManagementClientProps {
@@ -35,6 +36,7 @@ export function UserManagementClient({ initialProfiles }: UserManagementClientPr
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const supabase = createClient()
   const { toast } = useToast()
+  const router = useRouter()
 
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -148,9 +150,15 @@ export function UserManagementClient({ initialProfiles }: UserManagementClientPr
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Gerenciar Usuários</h1>
-            <p className="text-gray-600 mt-1">Convide e gerencie usuários do sistema</p>
+          <div className="flex items-center gap-4">
+            <Button onClick={() => router.push("/")} variant="outline" className="flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Gerenciar Usuários</h1>
+              <p className="text-gray-600 mt-1">Convide e gerencie usuários do sistema</p>
+            </div>
           </div>
           <div className="flex gap-2">
             <Button

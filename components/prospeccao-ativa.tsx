@@ -1026,7 +1026,7 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
                     />
                   </div>
                   <div>
-                    <Label htmlFor="regiao"> REGIÃO *</Label>
+                    <Label htmlFor="regiao">REGIÃO *</Label>
                     <Input
                       id="regiao"
                       value={novoLeadData.regiao}
@@ -1263,52 +1263,63 @@ export function ProspeccaoAtiva({ leads, onUpdateLead, onRefresh, onAddLead }: P
       <div className="overflow-hidden">
         <div
           ref={scrollContainerRef}
-          className="overflow-x-scroll"
+          className="overflow-auto"
           style={{
             scrollbarWidth: "thin",
             scrollbarColor: "#9CA3AF #E5E7EB",
             minHeight: "400px",
             maxHeight: "70vh",
-            overflowY: "auto",
             scrollbarGutter: "stable",
           }}
         >
           <div style={{ minWidth: "100%", width: "max-content" }}>
             <table className="w-full" style={{ minWidth: "max-content" }}>
-              <thead className="bg-red-600 text-white sticky top-0 z-10">
+              <thead className="bg-red-600 text-white sticky top-0 z-30">
                 <tr>
-                  {visibleColumnsArray.map((column) => (
-                    <th
-                      key={column.key}
-                      className="px-2 py-3 text-xs font-bold uppercase border-r border-red-500 text-center relative"
-                      style={{ minWidth: column.width, width: column.width }}
-                    >
-                      <div className="flex items-center justify-center space-x-1">
-                        <span className="flex-1">{column.label}</span>
-                        <ColumnFilter column={column} />
-                      </div>
-                    </th>
-                  ))}
+                  {visibleColumnsArray.map((column) => {
+                    const isLeadColumn = column.key === "nome_empresa"
+                    return (
+                      <th
+                        key={column.key}
+                        className={`px-2 py-3 text-xs font-bold uppercase border-r border-red-500 text-center relative ${
+                          isLeadColumn ? "sticky left-0 z-[35] bg-red-600 shadow-[2px_0_4px_rgba(0,0,0,0.1)]" : ""
+                        }`}
+                        style={{ minWidth: column.width, width: column.width }}
+                      >
+                        <div className="flex items-center justify-center space-x-1">
+                          <span className="flex-1">{column.label}</span>
+                          <ColumnFilter column={column} />
+                        </div>
+                      </th>
+                    )
+                  })}
                 </tr>
               </thead>
 
               <tbody>
-                {filteredLeads.map((lead, index) => (
-                  <tr
-                    key={lead.id}
-                    className={`border-b border-gray-200 hover:bg-gray-50 ${index % 2 === 0 ? "bg-white" : "bg-gray-25"}`}
-                  >
-                    {visibleColumnsArray.map((column) => (
-                      <td
-                        key={`${lead.id}-${column.key}`}
-                        className="border-r border-gray-200 p-0"
-                        style={{ minWidth: column.width, width: column.width }}
-                      >
-                        {renderCell(lead, column)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                {filteredLeads.map((lead, index) => {
+                  const rowBgColor = index % 2 === 0 ? "bg-white" : "bg-gray-25"
+                  return (
+                    <tr key={lead.id} className={`border-b border-gray-200 hover:bg-gray-50 ${rowBgColor}`}>
+                      {visibleColumnsArray.map((column) => {
+                        const isLeadColumn = column.key === "nome_empresa"
+                        return (
+                          <td
+                            key={`${lead.id}-${column.key}`}
+                            className={`border-r border-gray-200 p-0 ${
+                              isLeadColumn
+                                ? `sticky left-0 z-[25] ${rowBgColor} shadow-[2px_0_4px_rgba(0,0,0,0.1)]`
+                                : ""
+                            }`}
+                            style={{ minWidth: column.width, width: column.width }}
+                          >
+                            {renderCell(lead, column)}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

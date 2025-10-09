@@ -1324,13 +1324,12 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
       <div className="overflow-hidden">
         <div
           ref={scrollContainerRef}
-          className="overflow-x-scroll"
+          className="overflow-auto" // Changed from overflow-x-scroll to overflow-auto for both directions
           style={{
             scrollbarWidth: "thin",
             scrollbarColor: "#9CA3AF #E5E7EB",
             minHeight: "400px",
             maxHeight: "70vh",
-            overflowY: "auto",
             scrollbarGutter: "stable",
           }}
         >
@@ -1344,7 +1343,9 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
                       <th
                         key={column.key}
                         className={`px-2 py-2 text-xs font-medium text-left border-r border-red-500 ${
-                          isLeadColumn ? "sticky left-0 z-20 bg-red-600 shadow-lg" : ""
+                          isLeadColumn
+                            ? "sticky left-0 z-[35] bg-red-600 shadow-[2px_0_4px_rgba(0,0,0,0.1)]"
+                            : "sticky top-0 z-30 bg-red-600"
                         }`}
                         style={{
                           width: column.width,
@@ -1371,7 +1372,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
                         <td
                           key={`${lead.id}-${column.key}`}
                           className={`border-r border-gray-200 ${
-                            isLeadColumn ? `sticky left-0 z-10 ${rowBgColor} shadow-lg` : ""
+                            isLeadColumn ? `sticky left-0 z-[25] ${rowBgColor} shadow-[2px_0_4px_rgba(0,0,0,0.1)]` : ""
                           }`}
                           style={{
                             width: column.width,
