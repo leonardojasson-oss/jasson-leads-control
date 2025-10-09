@@ -885,7 +885,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
           }
         } else if (column?.type === "phone") {
           displayValue = formatPhoneDisplay(value)
-        } else if (column?.type === "number" && (columnKey === "fee_mrr" || columnKey === "escopo_fechado")) {
+        } else if (column?.type === "number" && (columnKey === "fee_mrr" || column.key === "escopo_fechado")) {
           const numValue = Number(value)
           displayValue = isNaN(numValue) ? "" : numValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
         } else if (column?.type === "date" || column?.type === "datetime-local") {
@@ -1344,7 +1344,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
                         key={column.key}
                         className={`px-2 py-2 text-xs font-medium text-left border-r border-red-500 ${
                           isLeadColumn
-                            ? "sticky left-0 z-[35] bg-red-600 shadow-[2px_0_4px_rgba(0,0,0,0.1)]"
+                            ? "sticky top-0 left-0 z-[35] bg-red-600 shadow-[2px_0_4px_rgba(0,0,0,0.1)]"
                             : "sticky top-0 z-30 bg-red-600"
                         }`}
                         style={{
