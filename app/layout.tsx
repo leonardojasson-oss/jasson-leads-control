@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { EnvHealthBanner } from "@/components/admin/EnvHealthBanner"
+import { Suspense } from "react"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -21,7 +22,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={inter.className}>
-        <EnvHealthBanner />
+        <Suspense fallback={null}>
+          <EnvHealthBanner />
+        </Suspense>
         <div id="root">{children}</div>
       </body>
     </html>
