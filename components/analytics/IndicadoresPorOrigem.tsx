@@ -32,7 +32,7 @@ export function IndicadoresPorOrigem({ leads }: IndicadoresPorOrigemProps) {
         </div>
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Indicadores por Origem (Inbound)</h2>
-          <p className="text-sm text-gray-600">Conversão step-by-step: Leads → RM → RR → Vendas</p>
+          <p className="text-sm text-gray-600">Conversão step-by-step: Leads → MQL → RM → RR → Vendas</p>
         </div>
       </div>
 
@@ -89,11 +89,33 @@ export function IndicadoresPorOrigem({ leads }: IndicadoresPorOrigemProps) {
                   </div>
                 </div>
 
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="font-medium text-gray-700 cursor-help">MQL (Marketing Qualified)</span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Leads inbound excluindo NON-SAL</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <span className="font-bold text-teal-600">{fmtPct(stepPercents.mql_over_leads)}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-6 relative overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-teal-400 to-teal-500 h-full rounded-full flex items-center justify-center text-white text-xs font-bold"
+                      style={{ width: getBarWidth(metrics.mql) }}
+                    >
+                      {metrics.mql}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Barra: RM (Reunião Marcada) */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-gray-700">RM (Reunião Marcada)</span>
-                    <span className="font-bold text-green-600">{fmtPct(stepPercents.rm_over_leads)}</span>
+                    <span className="font-bold text-green-600">{fmtPct(stepPercents.rm_over_mql)}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-6 relative overflow-hidden">
                     <div

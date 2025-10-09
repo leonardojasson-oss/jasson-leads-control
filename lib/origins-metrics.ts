@@ -1,6 +1,6 @@
 /**
  * Utilitários para cálculo de métricas por origem (Inbound)
- * Calcula conversões step-by-step: Leads → RM → RR → Vendas
+ * Calcula conversões step-by-step: Leads → MQL → RM → RR → Vendas
  */
 
 import type { Lead } from "@/lib/supabase-operations"
@@ -9,6 +9,7 @@ export type OriginKey = "Blackbox" | "Leadbroker" | "Inside Box"
 
 export interface OriginCounts {
   leads: number
+  mql: number // Adicionando MQL (Marketing Qualified Lead)
   rm: number // Reunião Marcada
   rr: number // Reunião Realizada
   vendas: number
@@ -26,7 +27,8 @@ export interface OriginMetrics extends OriginCounts {
 
 export interface OriginStepPercents {
   leads: number // sempre 100%
-  rm_over_leads: number // RM / Leads
+  mql_over_leads: number // MQL / Leads
+  rm_over_mql: number // RM / MQL (antes era RM / Leads)
   rr_over_rm: number // RR / RM
   vendas_over_rr: number // Vendas / RR
   hit_rate: number // Vendas / Leads (funil completo)
@@ -40,7 +42,8 @@ export function toStepPercents(c: OriginCounts): OriginStepPercents {
 
   return {
     leads: 100,
-    rm_over_leads: pct(c.rm, c.leads),
+    mql_over_leads: pct(c.mql, c.leads), // Adicionando conversão Leads → MQL
+    rm_over_mql: pct(c.rm, c.mql), // Mudando base de Leads para MQL
     rr_over_rm: pct(c.rr, c.rm),
     vendas_over_rr: pct(c.vendas, c.rr),
     hit_rate: pct(c.vendas, c.leads),
@@ -62,6 +65,20 @@ export const fmtBRL = (n: number) =>
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(n)
+
+/**
+ * Verifica se um lead é MQL (Marketing Qualified Lead)
+ * MQL = Lead inbound que NÃO está com status NON-SAL
+ */
+function isMQL(lead: Lead): boolean {
+  const status = (lead.status || "").toUpperCase().trim()
+
+  const normalizedStatus = status.replace(/\s+/g, "").replace(/-/g, "")
+
+  if (normalizedStatus === "NONSAL") return false
+
+  return true
+}
 
 /**
  * Verifica se um lead é RM (Reunião Marcada)
@@ -94,14 +111,11 @@ function isVenda(lead: Lead): boolean {
  * Calcula métricas para uma origem específica
  */
 export function calculateOriginMetrics(leads: Lead[], origin: OriginKey): OriginCounts {
-  // Filtrar leads da origem
   const originLeads = leads.filter((lead) => {
     const origemLead = (lead.tipo_lead || lead.origem_lead || lead.origemLead || "").toLowerCase()
 
-    // Normalizar nome da origem
     const normalizedOrigin = origin.toLowerCase().replace(/\s+/g, "")
 
-    // Casos especiais
     if (normalizedOrigin === "leadbroker") {
       return origemLead === "leadbroker" || origemLead === "lead broker"
     }
@@ -113,13 +127,12 @@ export function calculateOriginMetrics(leads: Lead[], origin: OriginKey): Origin
     return origemLead === normalizedOrigin
   })
 
-  // Contar leads em cada etapa
   const totalLeads = originLeads.length
+  const mql = originLeads.filter(isMQL).length
   const rm = originLeads.filter(isRM).length
   const rr = originLeads.filter(isRR).length
   const vendas = originLeads.filter(isVenda).length
 
-  // Calcular receita (apenas leads com data_assinatura)
   const leadsComAssinatura = originLeads.filter((lead) => lead.data_assinatura)
   const receita = leadsComAssinatura.reduce((sum, lead) => {
     const feeMRR = Number.parseFloat(String(lead.fee_mrr || "0")) || 0
@@ -127,7 +140,6 @@ export function calculateOriginMetrics(leads: Lead[], origin: OriginKey): Origin
     return sum + feeMRR + feeOneTime
   }, 0)
 
-  // Calcular custo (se existir coluna custo_lead)
   const custo = originLeads.reduce((sum, lead) => {
     const custoLead = Number.parseFloat(String(lead.valor_pago_lead || "0")) || 0
     return sum + custoLead
@@ -135,6 +147,7 @@ export function calculateOriginMetrics(leads: Lead[], origin: OriginKey): Origin
 
   return {
     leads: totalLeads,
+    mql,
     rm,
     rr,
     vendas,

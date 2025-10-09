@@ -64,6 +64,8 @@ export type Lead = {
   status_comissao?: string
   created_at?: string
   updated_at?: string
+  created_by?: string
+  assigned_to?: string
 }
 
 // Operações localStorage como fallback
@@ -242,6 +244,19 @@ export const leadOperations = {
     console.log("🔄 === CRIANDO LEAD ===")
     console.log("📝 Dados recebidos:", lead)
 
+    let userId: string | null = null
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        userId = user?.id || null
+        console.log("👤 Usuário autenticado:", userId)
+      } catch (error) {
+        console.log("⚠️ Não foi possível obter usuário autenticado:", error)
+      }
+    }
+
     // Sempre salvar no localStorage primeiro (garantia)
     const localResult = localStorageOperations.create(lead)
     console.log("✅ Lead salvo no localStorage:", localResult.id)
@@ -251,8 +266,13 @@ export const leadOperations = {
       try {
         console.log("🌐 Tentando salvar no Supabase...")
 
+        const leadWithAuth = {
+          ...lead,
+          created_by: userId,
+        }
+
         // Limpar dados para Supabase
-        const cleanedLead = cleanDataForSupabase(lead)
+        const cleanedLead = cleanDataForSupabase(leadWithAuth)
         console.log("🧹 Dados limpos para Supabase:", cleanedLead)
 
         const { data, error } = await supabase.from("leads").insert([cleanedLead]).select().single()

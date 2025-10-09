@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { BarChart3, X } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
@@ -546,309 +547,598 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <div
-        className="bg-gradient-to-r from-blue-600 to-blue-700 text-white relative overflow-hidden"
-        style={{ padding: "12px 16px" }}
-      >
-        <div className="absolute inset-0 bg-black/10"></div>
-        <div className="relative z-10">
-          <div className="da-header-row" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div className="da-title" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                  <BarChart3 className="w-4 h-4 text-white" />
+    <TooltipProvider>
+      <div className="space-y-4">
+        <div
+          className="bg-gradient-to-r from-blue-600 to-blue-700 text-white relative overflow-hidden"
+          style={{ padding: "12px 16px" }}
+        >
+          <div className="absolute inset-0 bg-black/10"></div>
+          <div className="relative z-10">
+            <div className="da-header-row" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div className="da-title" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                    <BarChart3 className="w-4 h-4 text-white" />
+                  </div>
+                  <h1 className="text-xl font-bold">Dashboard & Analytics</h1>
                 </div>
-                <h1 className="text-xl font-bold">Dashboard & Analytics</h1>
+                <p className="text-sm text-white/80">
+                  Análise de Performance e Funis de Conversão • {getDisplayPeriod()}
+                  {origemLeadFilter !== "todos" && (
+                    <span className="ml-2 bg-white/20 px-2 py-1 rounded text-xs">
+                      Origem: {origemLeadOptions.find((opt) => opt.value === origemLeadFilter)?.label}
+                    </span>
+                  )}
+                </p>
               </div>
-              <p className="text-sm text-white/80">
-                Análise de Performance e Funis de Conversão • {getDisplayPeriod()}
-                {origemLeadFilter !== "todos" && (
-                  <span className="ml-2 bg-white/20 px-2 py-1 rounded text-xs">
-                    Origem: {origemLeadOptions.find((opt) => opt.value === origemLeadFilter)?.label}
-                  </span>
-                )}
-              </p>
+
+              <div
+                className="da-datebar"
+                style={{
+                  marginLeft: "auto",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  flexWrap: "nowrap",
+                }}
+              >
+                <label
+                  style={{
+                    fontSize: "12px",
+                    color: "rgba(255,255,255,0.85)",
+                    marginRight: "4px",
+                  }}
+                >
+                  De
+                </label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  className="date-input"
+                  style={{
+                    height: "32px",
+                    minWidth: "150px",
+                    fontSize: "14px",
+                    padding: "0 8px",
+                    borderRadius: "8px",
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    borderColor: "rgba(255,255,255,0.2)",
+                    color: "white",
+                  }}
+                  placeholder="dd/mm/aaaa"
+                />
+                <label
+                  style={{
+                    fontSize: "12px",
+                    color: "rgba(255,255,255,0.85)",
+                    marginRight: "4px",
+                  }}
+                >
+                  até
+                </label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
+                  className="date-input"
+                  style={{
+                    height: "32px",
+                    minWidth: "150px",
+                    fontSize: "14px",
+                    padding: "0 8px",
+                    borderRadius: "8px",
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    borderColor: "rgba(255,255,255,0.2)",
+                    color: "white",
+                  }}
+                  placeholder="dd/mm/aaaa"
+                />
+                <Button
+                  onClick={clearFilters}
+                  className="btn-clear"
+                  style={{
+                    height: "32px",
+                    padding: "0 10px",
+                    fontSize: "13px",
+                    borderRadius: "8px",
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    borderColor: "rgba(255,255,255,0.2)",
+                    color: "white",
+                  }}
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Limpar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gray-50 border-b px-4 py-3">
+          <div className="flex items-center space-x-4 flex-wrap gap-2">
+            <div className="flex items-center space-x-2">
+              <label className="text-sm text-gray-600 whitespace-nowrap">🎯 Origem do Lead:</label>
+              <Select value={origemLeadFilter} onValueChange={setOrigemLeadFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Selecione uma origem" />
+                </SelectTrigger>
+                <SelectContent>
+                  {origemLeadOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <div
-              className="da-datebar"
-              style={{
-                marginLeft: "auto",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                flexWrap: "nowrap",
-              }}
-            >
-              <label
-                style={{
-                  fontSize: "12px",
-                  color: "rgba(255,255,255,0.85)",
-                  marginRight: "4px",
-                }}
-              >
-                De
-              </label>
+            <div className="flex items-center space-x-2">
+              <label className="text-sm text-gray-600 whitespace-nowrap">📅 Filtrar por período:</label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <label className="text-sm text-gray-600">Filtrar por:</label>
+              <Select value={dateFilterColumn} onValueChange={setDateFilterColumn}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Selecione uma coluna" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dateFilterOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <label className="text-sm text-gray-600">De:</label>
               <Input
                 type="date"
-                value={startDate}
-                onChange={(e) => handleStartDateChange(e.target.value)}
-                className="date-input"
-                style={{
-                  height: "32px",
-                  minWidth: "150px",
-                  fontSize: "14px",
-                  padding: "0 8px",
-                  borderRadius: "8px",
-                  backgroundColor: "rgba(255,255,255,0.1)",
-                  borderColor: "rgba(255,255,255,0.2)",
-                  color: "white",
-                }}
+                value={dateFilterStart}
+                onChange={(e) => setDateFilterStart(e.target.value)}
+                className="w-36"
                 placeholder="dd/mm/aaaa"
               />
-              <label
-                style={{
-                  fontSize: "12px",
-                  color: "rgba(255,255,255,0.85)",
-                  marginRight: "4px",
-                }}
-              >
-                até
-              </label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <label className="text-sm text-gray-600">Até:</label>
               <Input
                 type="date"
-                value={endDate}
-                onChange={(e) => handleEndDateChange(e.target.value)}
-                className="date-input"
-                style={{
-                  height: "32px",
-                  minWidth: "150px",
-                  fontSize: "14px",
-                  padding: "0 8px",
-                  borderRadius: "8px",
-                  backgroundColor: "rgba(255,255,255,0.1)",
-                  borderColor: "rgba(255,255,255,0.2)",
-                  color: "white",
-                }}
+                value={dateFilterEnd}
+                onChange={(e) => setDateFilterEnd(e.target.value)}
+                className="w-36"
                 placeholder="dd/mm/aaaa"
               />
-              <Button
-                onClick={clearFilters}
-                className="btn-clear"
-                style={{
-                  height: "32px",
-                  padding: "0 10px",
-                  fontSize: "13px",
-                  borderRadius: "8px",
-                  backgroundColor: "rgba(255,255,255,0.1)",
-                  borderColor: "rgba(255,255,255,0.2)",
-                  color: "white",
-                }}
-              >
-                <X className="w-4 h-4 mr-1" />
-                Limpar
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Button onClick={applyDateFilter} className="h-8">
+                Aplicar Filtro
+              </Button>
+              <Button variant="outline" onClick={clearDateFilter} className="h-8 bg-transparent">
+                Limpar Filtro
               </Button>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="bg-gray-50 border-b px-4 py-3">
-        <div className="flex items-center space-x-4 flex-wrap gap-2">
-          <div className="flex items-center space-x-2">
-            <label className="text-sm text-gray-600 whitespace-nowrap">🎯 Origem do Lead:</label>
-            <Select value={origemLeadFilter} onValueChange={setOrigemLeadFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Selecione uma origem" />
-              </SelectTrigger>
-              <SelectContent>
-                {origemLeadOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <IndicadoresPorOrigem leads={filteredLeads} />
 
-          <div className="flex items-center space-x-2">
-            <label className="text-sm text-gray-600 whitespace-nowrap">📅 Filtrar por período:</label>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <label className="text-sm text-gray-600">Filtrar por:</label>
-            <Select value={dateFilterColumn} onValueChange={setDateFilterColumn}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Selecione uma coluna" />
-              </SelectTrigger>
-              <SelectContent>
-                {dateFilterOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <label className="text-sm text-gray-600">De:</label>
-            <Input
-              type="date"
-              value={dateFilterStart}
-              onChange={(e) => setDateFilterStart(e.target.value)}
-              className="w-36"
-              placeholder="dd/mm/aaaa"
-            />
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <label className="text-sm text-gray-600">Até:</label>
-            <Input
-              type="date"
-              value={dateFilterEnd}
-              onChange={(e) => setDateFilterEnd(e.target.value)}
-              className="w-36"
-              placeholder="dd/mm/aaaa"
-            />
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Button onClick={applyDateFilter} className="h-8">
-              Aplicar Filtro
-            </Button>
-            <Button variant="outline" onClick={clearDateFilter} className="h-8 bg-transparent">
-              Limpar Filtro
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <IndicadoresPorOrigem leads={filteredLeads} />
-
-      <div className="mb-4">
-        <VisualFunnel title="🎯 Funil Geral" funnel={generalFunnel} totalLeads={filteredLeads.length} color="#dc2626" />
-      </div>
-
-      <div className="mb-4">
-        <div className="mb-3">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <span className="text-orange-600">📈</span>
-            Forecast – Propostas em Aberto
-          </h2>
-          <p className="text-sm text-gray-500">Potencial de receita futura • Propostas apresentadas mas não fechadas</p>
+        <div className="mb-4">
+          <VisualFunnel
+            title="🎯 Funil Geral"
+            funnel={generalFunnel}
+            totalLeads={filteredLeads.length}
+            color="#dc2626"
+          />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          <Card className="border border-gray-200 bg-white shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Propostas Abertas</p>
-                  <p className="text-2xl font-bold text-orange-600">{forecast.quantidade}</p>
-                </div>
-                <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                  <span className="text-orange-600 text-lg">📋</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="mb-4">
+          <div className="mb-3">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <span className="text-orange-600">📈</span>
+              Forecast – Propostas em Aberto
+            </h2>
+            <p className="text-sm text-gray-500">
+              Potencial de receita futura • Propostas apresentadas mas não fechadas
+            </p>
+          </div>
 
-          <Card className="border border-gray-200 bg-white shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Potencial FEE MRR</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    R$ {forecast.potencialFeeMrr.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                  </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <Card className="border border-gray-200 bg-white shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Propostas Abertas</p>
+                    <p className="text-2xl font-bold text-orange-600">{forecast.quantidade}</p>
+                  </div>
+                  <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <span className="text-orange-600 text-lg">📋</span>
+                  </div>
                 </div>
-                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                  <span className="text-green-600 text-lg">💰</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="border border-gray-200 bg-white shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Potencial FEE ONE-TIME</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    R$ {forecast.potencialFeeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                  </p>
+            <Card className="border border-gray-200 bg-white shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Potencial FEE MRR</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      R$ {forecast.potencialFeeMrr.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                    <span className="text-green-600 text-lg">💰</span>
+                  </div>
                 </div>
-                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <span className="text-blue-600 text-lg">💎</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="border border-gray-200 bg-white shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total em Oportunidade</p>
-                  <p className="text-2xl font-bold text-orange-700">
-                    R$ {forecast.totalOportunidade.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                  </p>
+            <Card className="border border-gray-200 bg-white shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Potencial FEE ONE-TIME</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      R$ {forecast.potencialFeeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <span className="text-blue-600 text-lg">💎</span>
+                  </div>
                 </div>
-                <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                  <span className="text-orange-700 text-lg">🎯</span>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-gray-200 bg-white shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Total em Oportunidade</p>
+                    <p className="text-2xl font-bold text-orange-700">
+                      R$ {forecast.totalOportunidade.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                  <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <span className="text-orange-700 text-lg">🎯</span>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
+
+          {forecastByCloser.length > 0 && (
+            <Card className="border border-gray-200 bg-white shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <span className="text-purple-600">👥</span>
+                  Forecast por Closer
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50">
+                        <th className="text-left py-3 px-4 font-semibold text-gray-700">Closer</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Propostas</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">FEE MRR</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">FEE ONE-TIME</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-700">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {forecastByCloser.map((closer, index) => (
+                        <tr
+                          key={closer.name}
+                          className={`border-b border-gray-100 hover:bg-gray-50 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
+                        >
+                          <td className="py-3 px-4 font-medium text-gray-900">{closer.name}</td>
+                          <td className="text-center py-3 px-4">
+                            <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full font-semibold text-xs">
+                              {closer.quantidade}
+                            </span>
+                          </td>
+                          <td className="text-center py-3 px-4 font-semibold text-green-600">
+                            R$ {closer.potencialFeeMrr.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                          </td>
+                          <td className="text-center py-3 px-4 font-semibold text-blue-600">
+                            R$ {closer.potencialFeeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                          </td>
+                          <td className="text-center py-3 px-4">
+                            <span
+                              className={`font-bold px-1.5 py-0.5 rounded text-xs ${
+                                closer.totalOportunidade >= 10
+                                  ? "bg-green-100 text-green-800"
+                                  : closer.totalOportunidade >= 5
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              R$ {closer.totalOportunidade.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
-        {forecastByCloser.length > 0 && (
-          <Card className="border border-gray-200 bg-white shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                <span className="text-purple-600">👥</span>
-                Forecast por Closer
+        <div className="space-y-4">
+          <h2 className="text-lg font-bold text-gray-900 mb-3">👥 Funis por Closer</h2>
+
+          {closerFunnels.length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+              {closerFunnels.map((closerFunnel, index) => {
+                const colors = [
+                  "#2563eb",
+                  "#dc2626",
+                  "#059669",
+                  "#7c3aed",
+                  "#ea580c",
+                  "#0891b2",
+                  "#be123c",
+                  "#65a30d",
+                  "#4338ca",
+                  "#c2410c",
+                ]
+
+                const closerColor = colors[index % colors.length]
+
+                return (
+                  <VisualFunnel
+                    key={closerFunnel.name}
+                    title={`${closerFunnel.name}`}
+                    funnel={closerFunnel.funnel}
+                    totalLeads={closerStats[closerFunnel.name.toLowerCase()].length}
+                    color={closerColor}
+                  />
+                )
+              })}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-base font-semibold text-gray-900 mb-2">Nenhum Closer Encontrado</h3>
+                <p className="text-sm text-gray-500">Não foram encontrados leads com closers atribuídos no sistema.</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <h2 className="text-lg font-bold text-gray-900 mb-3">🎯 Funis por SDR</h2>
+
+          {sdrFunnels.length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+              {sdrFunnels.map((sdrFunnel, index) => {
+                const colors = [
+                  "#16a34a",
+                  "#dc2626",
+                  "#2563eb",
+                  "#7c3aed",
+                  "#ea580c",
+                  "#0891b2",
+                  "#be123c",
+                  "#65a30d",
+                  "#4338ca",
+                  "#c2410c",
+                ]
+
+                const sdrColor = colors[index % colors.length]
+
+                return (
+                  <VisualFunnel
+                    key={sdrFunnel.name}
+                    title={`${sdrFunnel.name}`}
+                    funnel={sdrFunnel.funnel}
+                    totalLeads={sdrStats[sdrFunnel.name.toLowerCase()].length}
+                    color={sdrColor}
+                  />
+                )
+              })}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-base font-semibold text-gray-900 mb-2">Nenhum SDR Encontrado</h3>
+                <p className="text-sm text-gray-500">Não foram encontrados leads com SDRs atribuídos no sistema.</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {closerFunnels.length > 0 && (
+          <Card className="mt-4">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold text-gray-900">
+                📈 Comparativo de Performance - CLOSERs
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="p-4">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50">
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Closer</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Propostas</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-700">FEE MRR</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-700">FEE ONE-TIME</th>
-                      <th className="text-center py-3 px-4 font-semibold text-gray-700">Total</th>
+                    <tr className="border-b">
+                      <th className="text-left py-1.5 font-semibold">Closer</th>
+                      <th className="text-center py-1.5 font-semibold">Leads</th>
+                      <th className="text-center py-1.5 font-semibold">Contato</th>
+                      <th className="text-center py-1.5 font-semibold">Agendadas</th>
+                      <th className="text-center py-1.5 font-semibold">Realizadas</th>
+                      <th className="text-center py-1.5 font-semibold">Vendas</th>
+                      <th className="text-center py-1.5 font-semibold">FEE MRR</th>
+                      <th className="text-center py-1.5 font-semibold">FEE ONE TIME</th>
+                      <th className="text-center py-1.5 font-semibold">Taxa Conversão</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {forecastByCloser.map((closer, index) => (
-                      <tr
-                        key={closer.name}
-                        className={`border-b border-gray-100 hover:bg-gray-50 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
-                      >
-                        <td className="py-3 px-4 font-medium text-gray-900">{closer.name}</td>
-                        <td className="text-center py-3 px-4">
-                          <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full font-semibold text-xs">
-                            {closer.quantidade}
-                          </span>
-                        </td>
-                        <td className="text-center py-3 px-4 font-semibold text-green-600">
-                          R$ {closer.potencialFeeMrr.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                        </td>
-                        <td className="text-center py-3 px-4 font-semibold text-blue-600">
-                          R$ {closer.potencialFeeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                        </td>
-                        <td className="text-center py-3 px-4">
-                          <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded font-semibold">
-                            R$ {closer.totalOportunidade.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {closerFunnels.map((closerFunnel) => {
+                      const conversionRate =
+                        closerFunnel.funnel.leads.count > 0
+                          ? (closerFunnel.funnel.vendas.count / closerFunnel.funnel.leads.count) * 100
+                          : 0
+
+                      return (
+                        <tr key={closerFunnel.name} className="border-b hover:bg-gray-50">
+                          <td className="py-2 font-medium">{closerFunnel.name}</td>
+                          <td className="text-center py-2 font-bold text-blue-600">
+                            {closerFunnel.funnel.leads.count}
+                          </td>
+                          <td className="text-center py-2">
+                            {closerFunnel.funnel.contato.count}
+                            <span className="text-xs text-gray-500 ml-1">
+                              ({closerFunnel.funnel.contato.percentage.toFixed(1)}%)
+                            </span>
+                          </td>
+                          <td className="text-center py-2">
+                            {closerFunnel.funnel.agendada.count}
+                            <span className="text-xs text-gray-500 ml-1">
+                              ({closerFunnel.funnel.agendada.percentage.toFixed(1)}%)
+                            </span>
+                          </td>
+                          <td className="text-center py-2">
+                            {closerFunnel.funnel.realizada.count}
+                            <span className="text-xs text-gray-500 ml-1">
+                              ({closerFunnel.funnel.realizada.percentage.toFixed(1)}%)
+                            </span>
+                          </td>
+                          <td className="text-center py-2 font-bold text-green-600">
+                            {closerFunnel.funnel.vendas.count}
+                          </td>
+                          <td className="text-center py-2 font-bold text-green-600">
+                            R$ {closerFunnel.funnel.feeMrr.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                          </td>
+                          <td className="text-center py-2 font-bold text-blue-600">
+                            R$ {closerFunnel.funnel.feeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                          </td>
+                          <td className="text-center py-2">
+                            <span
+                              className={`font-bold px-1.5 py-0.5 rounded text-xs ${
+                                conversionRate >= 10
+                                  ? "bg-green-100 text-green-800"
+                                  : conversionRate >= 5
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {conversionRate.toFixed(1)}%
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {sdrFunnels.length > 0 && (
+          <Card className="mt-4">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold text-gray-900">
+                📊 Comparativo de Performance - SDRs
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-1.5 font-semibold">SDR</th>
+                      <th className="text-center py-1.5 font-semibold">Leads</th>
+                      <th className="text-center py-1.5 font-semibold">Contato</th>
+                      <th className="text-center py-1.5 font-semibold">Agendadas</th>
+                      <th className="text-center py-1.5 font-semibold">Realizadas</th>
+                      <th className="text-center py-1.5 font-semibold">Vendas</th>
+                      <th className="text-center py-1.5 font-semibold">FEE MRR</th>
+                      <th className="text-center py-1.5 font-semibold">FEE ONE TIME</th>
+                      <th className="text-center py-1.5 font-semibold">Taxa Conversão</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sdrFunnels.map((sdrFunnel) => {
+                      const conversionRate =
+                        sdrFunnel.funnel.leads.count > 0
+                          ? (sdrFunnel.funnel.vendas.count / sdrFunnel.funnel.leads.count) * 100
+                          : 0
+
+                      return (
+                        <tr key={sdrFunnel.name} className="border-b hover:bg-gray-50">
+                          <td className="py-2 font-medium">{sdrFunnel.name}</td>
+                          <td className="text-center py-2 font-bold text-blue-600">{sdrFunnel.funnel.leads.count}</td>
+                          <td className="text-center py-2">
+                            {sdrFunnel.funnel.contato.count}
+                            <span className="text-xs text-gray-500 ml-1">
+                              ({sdrFunnel.funnel.contato.percentage.toFixed(1)}%)
+                            </span>
+                          </td>
+                          <td className="text-center py-2">
+                            {sdrFunnel.funnel.agendada.count}
+                            <span className="text-xs text-gray-500 ml-1">
+                              ({sdrFunnel.funnel.agendada.percentage.toFixed(1)}%)
+                            </span>
+                          </td>
+                          <td className="text-center py-2">
+                            {sdrFunnel.funnel.realizada.count}
+                            <span className="text-xs text-gray-500 ml-1">
+                              ({sdrFunnel.funnel.realizada.percentage.toFixed(1)}%)
+                            </span>
+                          </td>
+                          <td className="text-center py-2 font-bold text-green-600">{sdrFunnel.funnel.vendas.count}</td>
+                          <td className="text-center py-2 font-bold text-green-600">
+                            R$ {sdrFunnel.funnel.feeMrr.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                          </td>
+                          <td className="text-center py-2 font-bold text-blue-600">
+                            R$ {sdrFunnel.funnel.feeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                          </td>
+                          <td className="text-center py-2">
+                            <span
+                              className={`font-bold px-1.5 py-0.5 rounded text-xs ${
+                                conversionRate >= 10
+                                  ? "bg-green-100 text-green-800"
+                                  : conversionRate >= 5
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {conversionRate.toFixed(1)}%
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -856,276 +1146,6 @@ export function DashboardAnalytics({ leads }: DashboardAnalyticsProps) {
           </Card>
         )}
       </div>
-
-      <div className="space-y-4">
-        <h2 className="text-lg font-bold text-gray-900 mb-3">👥 Funis por Closer</h2>
-
-        {closerFunnels.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
-            {closerFunnels.map((closerFunnel, index) => {
-              const colors = [
-                "#2563eb",
-                "#dc2626",
-                "#059669",
-                "#7c3aed",
-                "#ea580c",
-                "#0891b2",
-                "#be123c",
-                "#65a30d",
-                "#4338ca",
-                "#c2410c",
-              ]
-
-              const closerColor = colors[index % colors.length]
-
-              return (
-                <VisualFunnel
-                  key={closerFunnel.name}
-                  title={`${closerFunnel.name}`}
-                  funnel={closerFunnel.funnel}
-                  totalLeads={closerStats[closerFunnel.name.toLowerCase()].length}
-                  color={closerColor}
-                />
-              )
-            })}
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="p-6 text-center">
-              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-base font-semibold text-gray-900 mb-2">Nenhum Closer Encontrado</h3>
-              <p className="text-sm text-gray-500">Não foram encontrados leads com closers atribuídos no sistema.</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      <div className="space-y-4">
-        <h2 className="text-lg font-bold text-gray-900 mb-3">🎯 Funis por SDR</h2>
-
-        {sdrFunnels.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
-            {sdrFunnels.map((sdrFunnel, index) => {
-              const colors = [
-                "#16a34a",
-                "#dc2626",
-                "#2563eb",
-                "#7c3aed",
-                "#ea580c",
-                "#0891b2",
-                "#be123c",
-                "#65a30d",
-                "#4338ca",
-                "#c2410c",
-              ]
-
-              const sdrColor = colors[index % colors.length]
-
-              return (
-                <VisualFunnel
-                  key={sdrFunnel.name}
-                  title={`${sdrFunnel.name}`}
-                  funnel={sdrFunnel.funnel}
-                  totalLeads={sdrStats[sdrFunnel.name.toLowerCase()].length}
-                  color={sdrColor}
-                />
-              )
-            })}
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="p-6 text-center">
-              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-base font-semibold text-gray-900 mb-2">Nenhum SDR Encontrado</h3>
-              <p className="text-sm text-gray-500">Não foram encontrados leads com SDRs atribuídos no sistema.</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {closerFunnels.length > 0 && (
-        <Card className="mt-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold text-gray-900">
-              📈 Comparativo de Performance - CLOSERs
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-1.5 font-semibold">Closer</th>
-                    <th className="text-center py-1.5 font-semibold">Leads</th>
-                    <th className="text-center py-1.5 font-semibold">Contato</th>
-                    <th className="text-center py-1.5 font-semibold">Agendadas</th>
-                    <th className="text-center py-1.5 font-semibold">Realizadas</th>
-                    <th className="text-center py-1.5 font-semibold">Vendas</th>
-                    <th className="text-center py-1.5 font-semibold">FEE MRR</th>
-                    <th className="text-center py-1.5 font-semibold">FEE ONE TIME</th>
-                    <th className="text-center py-1.5 font-semibold">Taxa Conversão</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {closerFunnels.map((closerFunnel) => {
-                    const conversionRate =
-                      closerFunnel.funnel.leads.count > 0
-                        ? (closerFunnel.funnel.vendas.count / closerFunnel.funnel.leads.count) * 100
-                        : 0
-
-                    return (
-                      <tr key={closerFunnel.name} className="border-b hover:bg-gray-50">
-                        <td className="py-2 font-medium">{closerFunnel.name}</td>
-                        <td className="text-center py-2 font-bold text-blue-600">{closerFunnel.funnel.leads.count}</td>
-                        <td className="text-center py-2">
-                          {closerFunnel.funnel.contato.count}
-                          <span className="text-xs text-gray-500 ml-1">
-                            ({closerFunnel.funnel.contato.percentage.toFixed(1)}%)
-                          </span>
-                        </td>
-                        <td className="text-center py-2">
-                          {closerFunnel.funnel.agendada.count}
-                          <span className="text-xs text-gray-500 ml-1">
-                            ({closerFunnel.funnel.agendada.percentage.toFixed(1)}%)
-                          </span>
-                        </td>
-                        <td className="text-center py-2">
-                          {closerFunnel.funnel.realizada.count}
-                          <span className="text-xs text-gray-500 ml-1">
-                            ({closerFunnel.funnel.realizada.percentage.toFixed(1)}%)
-                          </span>
-                        </td>
-                        <td className="text-center py-2 font-bold text-green-600">
-                          {closerFunnel.funnel.vendas.count}
-                        </td>
-                        <td className="text-center py-2 font-bold text-green-600">
-                          R$ {closerFunnel.funnel.feeMrr.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                        </td>
-                        <td className="text-center py-2 font-bold text-blue-600">
-                          R$ {closerFunnel.funnel.feeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                        </td>
-                        <td className="text-center py-2">
-                          <span
-                            className={`font-bold px-1.5 py-0.5 rounded text-xs ${
-                              conversionRate >= 10
-                                ? "bg-green-100 text-green-800"
-                                : conversionRate >= 5
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-red-100 text-red-800"
-                            }`}
-                          >
-                            {conversionRate.toFixed(1)}%
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {sdrFunnels.length > 0 && (
-        <Card className="mt-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold text-gray-900">
-              📊 Comparativo de Performance - SDRs
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-1.5 font-semibold">SDR</th>
-                    <th className="text-center py-1.5 font-semibold">Leads</th>
-                    <th className="text-center py-1.5 font-semibold">Contato</th>
-                    <th className="text-center py-1.5 font-semibold">Agendadas</th>
-                    <th className="text-center py-1.5 font-semibold">Realizadas</th>
-                    <th className="text-center py-1.5 font-semibold">Vendas</th>
-                    <th className="text-center py-1.5 font-semibold">FEE MRR</th>
-                    <th className="text-center py-1.5 font-semibold">FEE ONE TIME</th>
-                    <th className="text-center py-1.5 font-semibold">Taxa Conversão</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sdrFunnels.map((sdrFunnel) => {
-                    const conversionRate =
-                      sdrFunnel.funnel.leads.count > 0
-                        ? (sdrFunnel.funnel.vendas.count / sdrFunnel.funnel.leads.count) * 100
-                        : 0
-
-                    return (
-                      <tr key={sdrFunnel.name} className="border-b hover:bg-gray-50">
-                        <td className="py-2 font-medium">{sdrFunnel.name}</td>
-                        <td className="text-center py-2 font-bold text-blue-600">{sdrFunnel.funnel.leads.count}</td>
-                        <td className="text-center py-2">
-                          {sdrFunnel.funnel.contato.count}
-                          <span className="text-xs text-gray-500 ml-1">
-                            ({sdrFunnel.funnel.contato.percentage.toFixed(1)}%)
-                          </span>
-                        </td>
-                        <td className="text-center py-2">
-                          {sdrFunnel.funnel.agendada.count}
-                          <span className="text-xs text-gray-500 ml-1">
-                            ({sdrFunnel.funnel.agendada.percentage.toFixed(1)}%)
-                          </span>
-                        </td>
-                        <td className="text-center py-2">
-                          {sdrFunnel.funnel.realizada.count}
-                          <span className="text-xs text-gray-500 ml-1">
-                            ({sdrFunnel.funnel.realizada.percentage.toFixed(1)}%)
-                          </span>
-                        </td>
-                        <td className="text-center py-2 font-bold text-green-600">{sdrFunnel.funnel.vendas.count}</td>
-                        <td className="text-center py-2 font-bold text-green-600">
-                          R$ {sdrFunnel.funnel.feeMrr.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                        </td>
-                        <td className="text-center py-2 font-bold text-blue-600">
-                          R$ {sdrFunnel.funnel.feeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                        </td>
-                        <td className="text-center py-2">
-                          <span
-                            className={`font-bold px-1.5 py-0.5 rounded text-xs ${
-                              conversionRate >= 10
-                                ? "bg-green-100 text-green-800"
-                                : conversionRate >= 5
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-red-100 text-red-800"
-                            }`}
-                          >
-                            {conversionRate.toFixed(1)}%
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+    </TooltipProvider>
   )
 }

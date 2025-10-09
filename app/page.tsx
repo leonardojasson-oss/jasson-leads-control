@@ -13,8 +13,8 @@ import { ProspeccaoAtiva } from "@/components/prospeccao-ativa" // Importação 
 import { leadOperations, type Lead, isSupabaseConfigured, testSupabaseConnection } from "@/lib/supabase-operations"
 import { LeadsSpreadsheet } from "@/components/leads-spreadsheet"
 import { useRealtimeLeadsSync } from "@/hooks/useRealtimeLeadsSync"
-
-export type { Lead }
+import { UserMenu } from "@/components/auth/UserMenu"
+import { AuthGuard } from "@/components/auth/AuthGuard"
 
 const RefreshIcon = () => <span className="inline-block">🔄</span>
 const PlusIcon = () => <span className="inline-block">➕</span>
@@ -64,6 +64,8 @@ interface ClosersMetasConfig {
 }
 
 export default function LeadsControl() {
+  console.log("[v0] LeadsControl: Componente renderizado")
+
   const [activeTab, setActiveTab] = useState("lista")
   const [isNovoLeadModalOpen, setIsNovoLeadModalOpen] = useState(false)
   const [leads, setLeads] = useState<Lead[]>([])
@@ -150,6 +152,7 @@ export default function LeadsControl() {
 
   // Carregar leads na inicialização
   useEffect(() => {
+    console.log("[v0] LeadsControl: useEffect inicial executado")
     loadLeads()
     loadMetasConfig()
     const currentMonth = getCurrentMonthRange()
@@ -754,261 +757,268 @@ export default function LeadsControl() {
   const headerMetrics = calculateHeaderMetrics()
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">V4</span>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Controle de Leads</h1>
-              <p className="text-sm text-red-600 font-medium">Jasson Oliveira & Co</p>
-              <div className="flex items-center space-x-4">
-                <p className="text-sm text-gray-500">Gerenciamento Comercial</p>
-                {getStatusBadge()}
+    <AuthGuard>
+      <div className="min-h-screen bg-gray-50">
+        {console.log("[v0] LeadsControl: Renderizando conteúdo dentro do AuthGuard")}
+
+        {/* Header */}
+        <header className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-lg">V4</span>
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Controle de Leads</h1>
+                <p className="text-sm text-red-600 font-medium">Jasson Oliveira & Co</p>
+                <div className="flex items-center space-x-4">
+                  <p className="text-sm text-gray-500">Gerenciamento Comercial</p>
+                  {getStatusBadge()}
+                </div>
               </div>
             </div>
-          </div>
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="outline"
-              className="flex items-center space-x-2 bg-transparent"
-              onClick={handleRefresh}
-              disabled={loading}
-            >
-              <RefreshIcon />
-              <span>Atualizar</span>
-            </Button>
-            <Button
-              className="bg-red-600 hover:bg-red-700 flex items-center space-x-2"
-              onClick={() => setIsNovoLeadModalOpen(true)}
-            >
-              <PlusIcon />
-              <span>Novo Lead</span>
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <div className="px-6 py-6">
-        {/* Filtro por Data */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <CalendarIcon />
-              <span className="text-sm font-medium text-gray-700">Filtro por Data</span>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">Filtrar por:</span>
-              <select
-                value={dateFilterType}
-                onChange={(e) => setDateFilterType(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+            <div className="flex items-center space-x-3">
+              <UserMenu />
+              <Button
+                variant="outline"
+                className="flex items-center space-x-2 bg-transparent"
+                onClick={handleRefresh}
+                disabled={loading}
               >
-                <option value="data_hora_compra">Data Criação</option>
-                <option value="data_marcacao">Data da Marcação</option>
-                <option value="data_reuniao">Data da Reunião</option>
-                <option value="data_assinatura">Data de Assinatura</option>
-                <option value="data_ultimo_contato">Data Último Contato</option>
-              </select>
+                <RefreshIcon />
+                <span>Atualizar</span>
+              </Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700 flex items-center space-x-2"
+                onClick={() => setIsNovoLeadModalOpen(true)}
+              >
+                <PlusIcon />
+                <span>Novo Lead</span>
+              </Button>
             </div>
-
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">De:</span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-              />
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">Até:</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-              />
-            </div>
-
-            <Button
-              onClick={applyDateFilter}
-              className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 text-sm"
-            >
-              Aplicar
-            </Button>
           </div>
+        </header>
+
+        <div className="px-6 py-6">
+          {/* Filtro por Data */}
+          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <CalendarIcon />
+                <span className="text-sm font-medium text-gray-700">Filtro por Data</span>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">Filtrar por:</span>
+                <select
+                  value={dateFilterType}
+                  onChange={(e) => setDateFilterType(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="data_hora_compra">Data Criação</option>
+                  <option value="data_marcacao">Data da Marcação</option>
+                  <option value="data_reuniao">Data da Reunião</option>
+                  <option value="data_assinatura">Data de Assinatura</option>
+                  <option value="data_ultimo_contato">Data Último Contato</option>
+                </select>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">De:</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">Até:</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+
+              <Button
+                onClick={applyDateFilter}
+                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 text-sm"
+              >
+                Aplicar
+              </Button>
+            </div>
+          </div>
+
+          {/* Cards de Métricas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {/* Primeira fileira: Valor Compra | FEE MRR | FEE ONE-TIME | ROAS */}
+
+            {/* Valor Compra */}
+            <Card className="border-l-4 border-l-blue-500">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 flex items-center">
+                      <DollarIcon />
+                      Valor Compra
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      R$ {headerMetrics.valorCompra.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* FEE MRR */}
+            <Card className="border-l-4 border-l-green-500">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 flex items-center">
+                      <DollarIcon />
+                      FEE MRR
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      R$ {headerMetrics.feeMRR.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* FEE ONE-TIME */}
+            <Card className="border-l-4 border-l-red-500">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 flex items-center">
+                      <DollarIcon />
+                      FEE ONE-TIME
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      R$ {headerMetrics.feeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* ROAS */}
+            <Card className="border-l-4 border-l-orange-500">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 flex items-center">
+                      <ChartIcon />
+                      ROAS
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">{headerMetrics.roas.toFixed(2)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Segunda fileira: Qtd. Leads | Ticket Médio | Custo por Lead | Qtd. Vendas */}
+
+            {/* Qtd. Leads */}
+            <Card className="border-l-4 border-l-purple-500">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 flex items-center">
+                      <UsersIcon />
+                      Qtd. Leads
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">{headerMetrics.qtdLeads}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Ticket Médio */}
+            <Card className="border-l-4 border-l-yellow-500">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 flex items-center">
+                      <TargetIcon />
+                      Ticket Médio
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      R$ {headerMetrics.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Custo por Lead */}
+            <Card className="border-l-4 border-l-indigo-500">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 flex items-center">
+                      <InfoIcon />
+                      Custo por Lead
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      R$ {headerMetrics.custoPorLead.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Qtd. Vendas */}
+            <Card className="border-l-4 border-l-teal-500">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 flex items-center">
+                      <CheckIcon />
+                      Qtd. Vendas
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">{headerMetrics.qtdVendas}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Navigation Tabs */}
+          <div className="flex space-x-1 mb-6">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                  tab.active
+                    ? "bg-red-600 text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Content */}
+          {renderContent()}
         </div>
 
-        {/* Cards de Métricas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {/* Primeira fileira: Valor Compra | FEE MRR | FEE ONE-TIME | ROAS */}
-
-          {/* Valor Compra */}
-          <Card className="border-l-4 border-l-blue-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <DollarIcon />
-                    Valor Compra
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    R$ {headerMetrics.valorCompra.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* FEE MRR */}
-          <Card className="border-l-4 border-l-green-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <DollarIcon />
-                    FEE MRR
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    R$ {headerMetrics.feeMRR.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* FEE ONE-TIME */}
-          <Card className="border-l-4 border-l-red-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <DollarIcon />
-                    FEE ONE-TIME
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    R$ {headerMetrics.feeOneTime.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* ROAS */}
-          <Card className="border-l-4 border-l-orange-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <ChartIcon />
-                    ROAS
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">{headerMetrics.roas.toFixed(2)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Segunda fileira: Qtd. Leads | Ticket Médio | Custo por Lead | Qtd. Vendas */}
-
-          {/* Qtd. Leads */}
-          <Card className="border-l-4 border-l-purple-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <UsersIcon />
-                    Qtd. Leads
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">{headerMetrics.qtdLeads}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Ticket Médio */}
-          <Card className="border-l-4 border-l-yellow-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <TargetIcon />
-                    Ticket Médio
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    R$ {headerMetrics.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Custo por Lead */}
-          <Card className="border-l-4 border-l-indigo-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <InfoIcon />
-                    Custo por Lead
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    R$ {headerMetrics.custoPorLead.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Qtd. Vendas */}
-          <Card className="border-l-4 border-l-teal-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 flex items-center">
-                    <CheckIcon />
-                    Qtd. Vendas
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">{headerMetrics.qtdVendas}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="flex space-x-1 mb-6">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                tab.active ? "bg-red-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Content */}
-        {renderContent()}
+        {/* Novo Lead Modal */}
+        <NovoLeadModal
+          isOpen={isNovoLeadModalOpen}
+          onClose={handleCloseModal}
+          onSave={handleSaveLead}
+          editingLead={editingLead}
+          saving={saving}
+        />
       </div>
-
-      {/* Novo Lead Modal */}
-      <NovoLeadModal
-        isOpen={isNovoLeadModalOpen}
-        onClose={handleCloseModal}
-        onSave={handleSaveLead}
-        editingLead={editingLead}
-        saving={saving}
-      />
-    </div>
+    </AuthGuard>
   )
 }

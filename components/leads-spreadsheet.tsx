@@ -70,6 +70,7 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
         "FOLLOW UP",
         "FOLLOW INFINITO",
         "NO-SHOW",
+        "NON-SAL", // Adicionando status NON-SAL
         "DROPADO",
         "PERDIDO",
       ],
@@ -693,6 +694,12 @@ export function LeadsSpreadsheet({ leads, onUpdateLead, onRefresh, onNavigateToD
   }
 
   const getUniqueValues = (columnKey: string): string[] => {
+    const column = columns.find((col) => col.key === columnKey)
+    if (column?.type === "select" && column.options) {
+      return column.options.sort()
+    }
+    // </CHANGE>
+
     const values = leads.map((lead) => {
       const value = getCellValue(lead, columnKey)
       const column = columns.find((col) => col.key === columnKey)
