@@ -19,6 +19,76 @@ interface NovoLeadModalProps {
   saving?: boolean
 }
 
+function toTitleCase(str: string): string {
+  if (!str) return ""
+  return str
+    .toLowerCase()
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
+}
+
+function cleanPhoneToBR(phone: string): string {
+  if (!phone) return ""
+  // Remove tudo que não é dígito
+  const digits = phone.replace(/\D/g, "")
+  // Se começar com 55, remove
+  if (digits.startsWith("55")) {
+    return digits.slice(2)
+  }
+  return digits
+}
+
+function isFreeEmail(email: string): boolean {
+  if (!email) return false
+  const domain = email.split("@")[1]?.toLowerCase() || ""
+  const freeProviders = [
+    "gmail.com",
+    "hotmail.com",
+    "outlook.com",
+    "yahoo.com",
+    "icloud.com",
+    "live.com",
+    "bol.com.br",
+    "uol.com.br",
+    "terra.com.br",
+    "ig.com.br",
+    "globo.com",
+    "r7.com",
+  ]
+  return freeProviders.includes(domain)
+}
+
+function getLineAfter(label: string, text: string): string {
+  const regex = new RegExp(`${label}\\s*\\n\\s*([^\\n]+)`, "i")
+  const match = text.match(regex)
+  return match ? match[1].trim() : ""
+}
+
+function getAfter(label: string, text: string, nextLabels: string[]): string {
+  // Encontra o índice onde o label aparece
+  const labelRegex = new RegExp(label, "i")
+  const labelMatch = text.match(labelRegex)
+  if (!labelMatch) return ""
+
+  const startIndex = labelMatch.index! + labelMatch[0].length
+  let endIndex = text.length
+
+  // Encontra o próximo label que aparece
+  for (const nextLabel of nextLabels) {
+    const nextRegex = new RegExp(nextLabel, "i")
+    const nextMatch = text.slice(startIndex).match(nextRegex)
+    if (nextMatch && nextMatch.index !== undefined) {
+      const potentialEnd = startIndex + nextMatch.index
+      if (potentialEnd < endIndex) {
+        endIndex = potentialEnd
+      }
+    }
+  }
+
+  return text.slice(startIndex, endIndex).trim()
+}
+
 export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = false }: NovoLeadModalProps) {
   const [formData, setFormData] = useState({
     nomeEmpresa: "",
@@ -73,6 +143,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
   })
 
   const [autoFillData, setAutoFillData] = useState("")
+  const [insideBoxDetected, setInsideBoxDetected] = useState(false)
 
   useEffect(() => {
     if (!isOpen) {
@@ -128,6 +199,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
         temperatura: "Frio",
       })
       setAutoFillData("")
+      setInsideBoxDetected(false)
     }
 
     if (editingLead && isOpen) {
@@ -199,7 +271,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     }
   }, [formData.email])
 
-  // Added useEffect for auto-filling arrematador when origemLead is Blackbox
   useEffect(() => {
     if (formData.origemLead === "blackbox") {
       setFormData((prev) => ({
@@ -216,6 +287,149 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
     }))
   }
 
+  const looksLikeInsideBox = (text: string): boolean => {
+    const normalizedText = text.toLowerCase()
+
+    // Verifica se tem os rótulos essenciais
+    const hasEssentialLabels =
+      normalizedText.includes("nome completo") &&
+      normalizedText.includes("empresa") &&
+      normalizedText.includes("celular") &&
+      normalizedText.includes("email")
+
+    // Verifica se tem o marcador "Inside Box"
+    const hasInsideBoxMarker =
+      normalizedText.includes("box type") ||
+      normalizedText.includes("canal de aquisição") ||
+      normalizedText.includes("inside box")
+
+    return hasEssentialLabels && hasInsideBoxMarker
+  }
+
+  const parseInsideBox = (data: string) => {
+    console.log("🔄 === PARSING INSIDE BOX FORMAT (COMPREHENSIVE) ===")
+    console.log("📝 Dados recebidos:", data)
+
+    const updates: any = {}
+
+    try {
+      // Nome da Empresa
+      const empresa = getLineAfter("Empresa", data)
+      if (empresa) {
+        updates.nomeEmpresa = toTitleCase(empresa)
+        console.log("✅ Nome da Empresa:", updates.nomeEmpresa)
+      }
+
+      // Produto de Marketing
+      const produto = getLineAfter("Produtos Marketing", data)
+      if (produto) {
+        updates.produtoMarketing = toTitleCase(produto)
+        console.log("✅ Produto de Marketing:", updates.produtoMarketing)
+      }
+
+      // Nicho (Setor/Segmento)
+      const setor = getLineAfter("Setor/Segmento", data)
+      if (setor) {
+        updates.nicho = toTitleCase(setor)
+        console.log("✅ Nicho:", updates.nicho)
+      }
+
+      // Data/Hora da Compra do Lead
+      const dataCadastro = getLineAfter("Data de Cadastro do Lead", data)
+      if (dataCadastro) {
+        // Formato: "04/10/2025 08:17" -> "2025-10-04T08:17"
+        const match = dataCadastro.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/)
+        if (match) {
+          const [, dia, mes, ano, hora, minuto] = match
+          updates.dataHoraCompra = `${ano}-${mes}-${dia}T${hora}:${minuto}`
+          console.log("✅ Data/Hora da Compra:", updates.dataHoraCompra)
+        }
+      }
+
+      // Canal
+      const canal = getLineAfter("Canal de Origem", data)
+      if (canal) {
+        updates.canal = toTitleCase(canal)
+        console.log("✅ Canal:", updates.canal)
+      }
+
+      // Nível de Urgência (entre "Quando pretende iniciar/inicar o projeto?" e "Descrição feita pelo Lead")
+      const urgencia = getAfter("Quando pretende inic[ia]?r o projeto\\?", data, [
+        "Descrição feita pelo Lead",
+        "Facebook",
+        "Instagram",
+      ])
+      if (urgencia && urgencia.trim() !== "") {
+        updates.nivelUrgencia = urgencia.trim()
+        console.log("✅ Nível de Urgência:", updates.nivelUrgencia)
+      }
+
+      // CNPJ
+      const cnpj = getLineAfter("CNPJ/TaxId", data)
+      if (cnpj) {
+        updates.cnpj = cnpj
+        console.log("✅ CNPJ:", updates.cnpj)
+      }
+
+      // Comentário do Lead (entre "Descrição feita pelo Lead" e "Facebook")
+      const comentario = getAfter("Descrição feita pelo Lead", data, ["Facebook", "Instagram", "LinkedIn"])
+      if (comentario && comentario.trim() !== "") {
+        updates.comentarioLead = comentario.trim()
+        updates.temComentarioLBF = true
+        console.log("✅ Comentário do Lead:", updates.comentarioLead)
+      }
+
+      // Nome do Contato
+      const nomeCompleto = getLineAfter("Nome completo", data)
+      if (nomeCompleto) {
+        updates.nomeContato = toTitleCase(nomeCompleto)
+        console.log("✅ Nome do Contato:", updates.nomeContato)
+      }
+
+      // Cargo do Contato (entre "Cargo" e "Setor/Segmento")
+      const cargo = getAfter("Cargo", data, ["Setor/Segmento", "Empresa", "Email"])
+      if (cargo && cargo.trim() !== "") {
+        updates.cargoContato = toTitleCase(cargo.trim())
+        console.log("✅ Cargo do Contato:", updates.cargoContato)
+      }
+
+      // E-mail
+      const email = getLineAfter("Email", data)
+      if (email) {
+        updates.email = email.toLowerCase()
+
+        // Se não for email gratuito, preencher também o email corporativo
+        if (!isFreeEmail(email)) {
+          updates.emailCorporativo = true
+          console.log("✅ E-mail Corporativo detectado")
+        }
+        console.log("✅ E-mail:", updates.email)
+      }
+
+      // Telefone
+      const celular = getLineAfter("Celular", data)
+      if (celular) {
+        updates.telefone = cleanPhoneToBR(celular)
+        console.log("✅ Telefone:", updates.telefone)
+      }
+
+      // Valor Pago no Lead - SEMPRE 357.00 para Inside Box
+      updates.valorPagoLead = "357.00"
+      console.log("✅ Valor Pago no Lead: 357.00 (fixo para Inside Box)")
+
+      // Status inicial
+      updates.status = "BACKLOG"
+      console.log("✅ Status inicial: BACKLOG")
+
+      console.log("📊 Inside Box updates completos:", updates)
+
+      return updates
+    } catch (error) {
+      console.error("❌ Erro ao parsear Inside Box:", error)
+      return {}
+    }
+  }
+
   const parseAutoFillData = (data: string) => {
     console.log("🔄 === INICIANDO PARSER ESPECÍFICO ===")
     console.log("📝 Dados recebidos:", data)
@@ -224,6 +438,27 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
       console.log("❌ Dados vazios")
       return
     }
+
+    if (looksLikeInsideBox(data)) {
+      console.log("✅ Detectado formato Inside Box")
+      const updates = parseInsideBox(data)
+
+      if (Object.keys(updates).length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          ...updates,
+        }))
+
+        setInsideBoxDetected(true)
+        setAutoFillData("")
+
+        console.log(`✅ ${Object.keys(updates).length} campos preenchidos (Inside Box)`)
+      }
+      return
+    }
+
+    console.log("✅ Usando parser padrão (LeadBroker/Blackbox)")
+    setInsideBoxDetected(false)
 
     const updates: any = {}
 
@@ -270,7 +505,6 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
           servico: "Serviço",
           varejo: "Varejo",
           industria: "Indústria",
-          indústria: "Indústria",
           "e-commerce": "E-commerce",
           ecommerce: "E-commerce",
           "food service": "Food Service",
@@ -508,14 +742,19 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center space-x-2 mb-3">
                 <Sparkles className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-semibold text-blue-900 mb-4">✨ Preenchimento Automático</h3>
+                <h3 className="text-lg font-semibold text-blue-900">✨ Preenchimento Automático</h3>
               </div>
               <p className="text-sm text-blue-700 mb-3">
                 Cole os dados do lead abaixo e clique em "Preencher" para completar automaticamente os campos:
               </p>
+              {insideBoxDetected && (
+                <div className="mb-3 inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-800 text-sm font-medium">
+                  ✅ Detectado: Inside Box
+                </div>
+              )}
               <div className="space-y-3">
                 <Textarea
-                  placeholder="Cole aqui os dados do lead do LeadBroker..."
+                  placeholder="Cole aqui os dados do lead do LeadBroker ou Inside Box..."
                   value={autoFillData}
                   onChange={(e) => setAutoFillData(e.target.value)}
                   className="min-h-[120px] resize-none"
@@ -529,7 +768,14 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <Sparkles className="w-4 h-4 mr-2" />
                     Preencher Automaticamente
                   </Button>
-                  <Button variant="outline" onClick={() => setAutoFillData("")} disabled={!autoFillData.trim()}>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setAutoFillData("")
+                      setInsideBoxDetected(false)
+                    }}
+                    disabled={!autoFillData.trim()}
+                  >
                     <X className="w-4 h-4 mr-2" />
                     Limpar
                   </Button>
@@ -805,7 +1051,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectItem value="guilherme">Guilherme</SelectItem>
                     <SelectItem value="marcelo">Marcelo</SelectItem>
                     <SelectItem value="allan">Allan</SelectItem>
-                    <SelectItem value="matriz">Matriz</SelectItem> {/* Added option Matriz */}
+                    <SelectItem value="matriz">Matriz</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -824,7 +1070,7 @@ export function NovoLeadModal({ isOpen, onClose, onSave, editingLead, saving = f
                     <SelectItem value="leonardo">Leonardo</SelectItem>
                     <SelectItem value="marcelo">Marcelo</SelectItem>
                     <SelectItem value="allan">Allan</SelectItem>
-                    <SelectItem value="matriz">Matriz</SelectItem> {/* Added option Matriz */}
+                    <SelectItem value="matriz">Matriz</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
